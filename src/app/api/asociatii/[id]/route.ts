@@ -11,6 +11,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     where:  { id, organizationId: session.user.organizationId },
     select: {
       bank: true, iban: true, wizardData: true, name: true,
+      address: true, city: true, sector: true,
+      adminName: true, presedinteName: true, cenzorName: true,
       fonduri: { where: { isEnabled: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } },
     },
   });
@@ -29,7 +31,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     banci = [{ name: a.bank, iban: a.iban || undefined }];
   }
 
-  return NextResponse.json({ name: a.name, banci, fonduri: a.fonduri ?? [] });
+  return NextResponse.json({
+    name:           a.name,
+    address:        a.address ?? null,
+    city:           a.city    ?? null,
+    sector:         a.sector  ?? null,
+    adminName:      a.adminName      ?? null,
+    presedinteName: a.presedinteName ?? null,
+    cenzorName:     a.cenzorName     ?? null,
+    banci,
+    fonduri: a.fonduri ?? [],
+  });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
