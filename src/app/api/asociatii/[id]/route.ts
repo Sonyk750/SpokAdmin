@@ -12,6 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     select: {
       bank: true, iban: true, wizardData: true, name: true,
       address: true, city: true, sector: true,
+      cui: true, phone: true, email: true,
       adminName: true, presedinteName: true, cenzorName: true,
       fonduri: { where: { isEnabled: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } },
     },
@@ -36,6 +37,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     address:        a.address ?? null,
     city:           a.city    ?? null,
     sector:         a.sector  ?? null,
+    cui:            a.cui     ?? null,
+    phone:          a.phone   ?? null,
+    email:          a.email   ?? null,
     adminName:      a.adminName      ?? null,
     presedinteName: a.presedinteName ?? null,
     cenzorName:     a.cenzorName     ?? null,

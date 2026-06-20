@@ -25,6 +25,9 @@ interface AsocInfo {
   address:        string | null;
   city:           string | null;
   sector:         string | null;
+  cui:            string | null;
+  phone:          string | null;
+  email:          string | null;
   adminName:      string | null;
   presedinteName: string | null;
   cenzorName:     string | null;
@@ -64,6 +67,11 @@ async function generateAndDownloadPdf(
     asoc?.sector ? `Sector ${asoc.sector}` : null,
     asoc?.city,
   ].filter(Boolean).join(", ");
+  const contact = [
+    asoc?.cui   ? `CUI: ${asoc.cui}`     : null,
+    asoc?.phone ? `Tel: ${asoc.phone}`   : null,
+    asoc?.email ? `Email: ${asoc.email}` : null,
+  ].filter(Boolean).join("   |   ");
 
   const tableBody: any[][] = [
     // Header row
@@ -80,13 +88,13 @@ async function generateAndDownloadPdf(
       { text: String(idx + 1), alignment: "center", fontSize: 8 },
       { text: roDate(row.data), alignment: "center", fontSize: 8 },
       { text: `${row.serie} ${row.numarDocument}`, alignment: "center", fontSize: 8 },
-      { text: row.nrApartament, alignment: "center", fontSize: 8 },
       {
         stack: [
-          { text: ceReprezinta(row), fontSize: 8 },
-          ...(row.proprietarNume ? [{ text: row.proprietarNume, fontSize: 7.5, color: "#555", margin: [0, 2, 0, 0] }] : []),
+          { text: row.nrApartament, bold: true, alignment: "center", fontSize: 9 },
+          ...(row.proprietarNume ? [{ text: row.proprietarNume, fontSize: 7.5, color: "#444", alignment: "center", margin: [0, 2, 0, 0] }] : []),
         ],
       },
+      { text: ceReprezinta(row), fontSize: 8 },
       { text: fmt2(row.sumaIncasata), alignment: "right", fontSize: 8 },
     ]),
     // Total row
@@ -109,7 +117,8 @@ async function generateAndDownloadPdf(
           {
             stack: [
               { text: asoc?.name ?? "", bold: true, fontSize: 13 },
-              adresa ? { text: adresa, fontSize: 9, color: "#444", margin: [0, 2, 0, 0] } : {},
+              adresa  ? { text: adresa,  fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
+              contact ? { text: contact, fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
             ],
             width: "*",
           },
@@ -133,7 +142,7 @@ async function generateAndDownloadPdf(
       {
         table: {
           headerRows: 1,
-          widths: [22, 48, 55, 22, "*", 48],
+          widths: [22, 48, 55, 62, "*", 48],
           body: tableBody,
         },
         layout: {
@@ -418,8 +427,13 @@ export default function RaportIncasariClient({
           <div>
             <div style={{ fontSize: "13pt", fontWeight: "bold" }}>{asoc?.name ?? ""}</div>
             {(asoc?.address || asoc?.city) && (
-              <div style={{ fontSize: "9pt", color: "#444", marginTop: "2pt" }}>
+              <div style={{ fontSize: "9pt", color: "#333", marginTop: "2pt" }}>
                 {[asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ")}
+              </div>
+            )}
+            {(asoc?.cui || asoc?.phone || asoc?.email) && (
+              <div style={{ fontSize: "8pt", color: "#555", marginTop: "2pt" }}>
+                {[asoc?.cui ? `CUI: ${asoc.cui}` : null, asoc?.phone ? `Tel: ${asoc.phone}` : null, asoc?.email ? `Email: ${asoc.email}` : null].filter(Boolean).join("  |  ")}
               </div>
             )}
           </div>
@@ -455,13 +469,13 @@ export default function RaportIncasariClient({
                   {row.serie} {row.numarDocument}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>
-                  {row.nrApartament}
+                  <span style={{ fontWeight: "bold" }}>{row.nrApartament}</span>
+                  {row.proprietarNume && (
+                    <span style={{ display: "block", fontSize: "7.5pt", color: "#444", marginTop: "2pt", fontWeight: "normal" }}>{row.proprietarNume}</span>
+                  )}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>
                   {ceReprezinta(row)}
-                  {row.proprietarNume && (
-                    <span style={{ display: "block", fontSize: "8pt", color: "#444", marginTop: "2pt" }}>{row.proprietarNume}</span>
-                  )}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", whiteSpace: "nowrap" }}>
                   {fmt2(row.sumaIncasata)}
