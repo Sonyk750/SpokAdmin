@@ -389,7 +389,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
       {/* ─────────────────────── Adaugă încasare modal ─────────────────────── */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: "62rem", width: "96vw" }}>
 
             <div className="modal__header">
