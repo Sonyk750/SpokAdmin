@@ -106,6 +106,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
 
   const [luna,     setLuna]     = useState(defaultLuna);
   const [an,       setAn]       = useState(defaultAn);
+
   const [fondMode, setFondMode] = useState<FondMode>("detaliat");
   const [data,     setData]     = useState<ListaData | null>(null);
   const [loading,  setLoading]  = useState(false);
@@ -115,6 +116,29 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   const [movCols,     setMovCols]     = useState<MovCol[]>([]);
   const dragIdx                        = useRef<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // Restore last-used luna/an then auto-generate on first load
+  const autoGenDone = useRef(false);
+  useEffect(() => {
+    if (!asociatieId || autoGenDone.current) return;
+    autoGenDone.current = true;
+    let l = luna, a = an;
+    try {
+      const saved = localStorage.getItem(`lp-period:${asociatieId}`);
+      if (saved) { const p = JSON.parse(saved); l = p.l; a = p.a; setLuna(l); setAn(a); }
+    } catch {}
+    setLoading(true); setError(null);
+    fetch(`/api/lista-plata?asociatieId=${asociatieId}&luna=${l}&an=${a}`)
+      .then(r => r.json().then(json => ({ ok: r.ok, json })))
+      .then(({ ok, json }) => {
+        if (!ok) throw new Error(json.error ?? "Eroare server");
+        setData(json);
+        try { localStorage.setItem(`lp-period:${asociatieId}`, JSON.stringify({ l, a })); } catch {}
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asociatieId]);
 
   // Rebuild movCols when data changes; try to restore saved order from localStorage
   useEffect(() => {
@@ -144,6 +168,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
       setData(json);
+      try { localStorage.setItem(`lp-period:${asociatieId}`, JSON.stringify({ l: luna, a: an })); } catch {}
     } catch (e: any) {
       setError(e.message);
     } finally {
