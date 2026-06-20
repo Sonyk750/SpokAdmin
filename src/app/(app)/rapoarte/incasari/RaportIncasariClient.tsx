@@ -72,7 +72,7 @@ async function generateAndDownloadPdf(
       { text: "Data",      style: "th", alignment: "center" },
       { text: "Seria și nr.\nchitanță", style: "th", alignment: "center" },
       { text: "Ap.", style: "th", alignment: "center" },
-      { text: "Ce reprezintă", style: "th" },
+      { text: "Detalii încasare", style: "th" },
       { text: "Valoare\n(lei)", style: "th", alignment: "right" },
     ],
     // Data rows
@@ -80,8 +80,8 @@ async function generateAndDownloadPdf(
       { text: String(idx + 1), alignment: "center", fontSize: 8 },
       { text: roDate(row.data), alignment: "center", fontSize: 8 },
       { text: `${row.serie} ${row.numarDocument}`, alignment: "center", fontSize: 8 },
-      { text: row.nrApartament, alignment: "center", fontSize: 8 },
-      { text: ceReprezinta(row) + (row.proprietarNume ? `\n${row.proprietarNume}` : ""), fontSize: 8 },
+      { text: row.nrApartament + (row.proprietarNume ? `\n${row.proprietarNume}` : ""), alignment: "center", fontSize: 8 },
+      { text: ceReprezinta(row), fontSize: 8 },
       { text: fmt2(row.sumaIncasata), alignment: "right", fontSize: 8 },
     ]),
     // Total row
@@ -361,8 +361,8 @@ export default function RaportIncasariClient({
                 <th style={{ width: 40, textAlign: "center" }}>Nr.</th>
                 <th>Data</th>
                 <th>Chitanță</th>
-                <th style={{ width: 50, textAlign: "center" }}>Ap.</th>
-                <th>Ce reprezintă</th>
+                <th style={{ width: 60, textAlign: "center" }}>Ap.</th>
+                <th>Detalii încasare</th>
                 <th style={{ textAlign: "right" }}>Valoare (lei)</th>
               </tr>
             </thead>
@@ -374,14 +374,16 @@ export default function RaportIncasariClient({
                   <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>
                     {row.serie} {row.numarDocument}
                   </td>
-                  <td style={{ fontWeight: 700, color: "#a78bfa", textAlign: "center" }}>{row.nrApartament}</td>
-                  <td style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                    {ceReprezinta(row)}
+                  <td style={{ fontWeight: 700, color: "#a78bfa", textAlign: "center" }}>
+                    {row.nrApartament}
                     {row.proprietarNume && (
-                      <span style={{ display: "block", color: "#64748b", fontSize: "0.7rem", marginTop: 1 }}>
+                      <span style={{ display: "block", fontWeight: 400, color: "#64748b", fontSize: "0.7rem", marginTop: 1 }}>
                         {row.proprietarNume}
                       </span>
                     )}
+                  </td>
+                  <td style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
+                    {ceReprezinta(row)}
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>
                     {fmt2(row.sumaIncasata)}
@@ -430,7 +432,7 @@ export default function RaportIncasariClient({
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
           <thead>
             <tr>
-              {["Nr.\ncrt.", "Data", "Seria și nr.\nchitanță", "Ap.", "Ce reprezintă", "Valoare\n(lei)"].map((h, i) => (
+              {["Nr.\ncrt.", "Data", "Seria și nr.\nchitanță", "Ap.", "Detalii încasare", "Valoare\n(lei)"].map((h, i) => (
                 <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555",
                   padding: "4pt 5pt", textAlign: i === 5 ? "right" : i <= 3 ? "center" : "left",
                   fontWeight: "bold", fontSize: "9pt", whiteSpace: "pre-line" }}>{h}</th>
@@ -447,12 +449,14 @@ export default function RaportIncasariClient({
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>
                   {row.serie} {row.numarDocument}
                 </td>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{row.nrApartament}</td>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>
-                  {ceReprezinta(row)}
+                <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>
+                  {row.nrApartament}
                   {row.proprietarNume && (
                     <span style={{ display: "block", fontSize: "8pt", color: "#444" }}>{row.proprietarNume}</span>
                   )}
+                </td>
+                <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>
+                  {ceReprezinta(row)}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", whiteSpace: "nowrap" }}>
                   {fmt2(row.sumaIncasata)}
