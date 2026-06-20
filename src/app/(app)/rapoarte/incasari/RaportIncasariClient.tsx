@@ -258,11 +258,13 @@ export default function RaportIncasariClient({
   const totalIncasat = rows.reduce((s, r) => s + r.sumaIncasata, 0);
 
   async function handleDownloadPdf() {
-    if (!rows.length) return;
+    if (!rows.length || !asociatieId) return;
     setPdfLoading(true);
     setError(null);
     try {
-      await generateAndDownloadPdf(asoc, rows, dataStart, dataEnd);
+      const res = await fetch(`/api/asociatii/${asociatieId}`);
+      const freshAsoc: AsocInfo = await res.json();
+      await generateAndDownloadPdf(freshAsoc, rows, dataStart, dataEnd);
     } catch (e: any) {
       setError(`Eroare PDF: ${e?.message ?? String(e)}`);
     } finally {
