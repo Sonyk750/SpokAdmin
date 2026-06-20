@@ -7,8 +7,10 @@ interface Props { onClose: () => void }
 
 export default function AsociatieModal({ onClose }: Props) {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [error,  setError]  = useState("");
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState("");
+  const [cuiLoading,  setCuiLoading]  = useState(false);
+  const [cuiMsg,      setCuiMsg]      = useState("");
   const [form, setForm] = useState({
     name:           "",
     address:        "",
@@ -25,6 +27,29 @@ export default function AsociatieModal({ onClose }: Props) {
 
   function set(k: keyof typeof form, v: string) {
     setForm(p => ({ ...p, [k]: v }));
+  }
+
+  async function lookupCui() {
+    const cui = form.cui.trim();
+    if (!cui) return;
+    setCuiLoading(true); setCuiMsg("");
+    try {
+      const res  = await fetch(`/api/anaf?cui=${encodeURIComponent(cui)}`);
+      const data = await res.json();
+      if (!res.ok) { setCuiMsg(data.error ?? "CUI negăsit"); return; }
+      setForm(p => ({
+        ...p,
+        name:    p.name    || data.denumire,
+        address: p.address || data.adresa,
+        city:    data.city    || p.city,
+        sector:  data.sector  || p.sector,
+      }));
+      setCuiMsg("✓ Date preluate de la ANAF");
+    } catch {
+      setCuiMsg("Eroare la interogare ANAF");
+    } finally {
+      setCuiLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +86,30 @@ export default function AsociatieModal({ onClose }: Props) {
           <div className="form-grid form-grid--2">
             <div className="form-field">
               <label className="form-field__label">CUI</label>
-              <input className="input" value={form.cui} onChange={e => set("cui", e.target.value)} placeholder="12345678" />
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  className="input"
+                  value={form.cui}
+                  onChange={e => { set("cui", e.target.value); setCuiMsg(""); }}
+                  onBlur={lookupCui}
+                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), lookupCui())}
+                  placeholder="12345678"
+                />
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  style={{ whiteSpace: "nowrap", padding: "0 0.875rem", fontSize: "0.8rem" }}
+                  onClick={lookupCui}
+                  disabled={cuiLoading}
+                >
+                  {cuiLoading ? "..." : "Caută"}
+                </button>
+              </div>
+              {cuiMsg && (
+                <p style={{ fontSize: "0.75rem", marginTop: "0.25rem", color: cuiMsg.startsWith("✓") ? "#4ade80" : "#f87171" }}>
+                  {cuiMsg}
+                </p>
+              )}
             </div>
 
             <div className="form-field">
