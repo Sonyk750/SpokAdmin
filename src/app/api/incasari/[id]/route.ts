@@ -38,6 +38,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         });
       }
     }
+
+    // Reverse avans allocations
+    const avansItems: { tip: string; suma: number; fondId?: string }[] =
+      incasare.avansJson ? JSON.parse(incasare.avansJson) : [];
+
+    for (const a of avansItems) {
+      if (!a.suma || a.suma <= 0) continue;
+      if (a.tip === "intretinere") {
+        await db.soldApartament.updateMany({
+          where: { apartamentId: incasare.apartamentId },
+          data:  { intretinereCurenta: { increment: a.suma } },
+        });
+      } else if (a.tip === "fond" && a.fondId) {
+        await db.fondApartament.updateMany({
+          where: { apartamentId: incasare.apartamentId, fondId: a.fondId },
+          data:  { restanta: { increment: a.suma } },
+        });
+      }
+    }
   }
 
   await db.incasare.delete({ where: { id } });

@@ -41,6 +41,14 @@ interface IncasareRow {
 
 interface ApOption { id: string; numar: string; proprietar: string; }
 interface BancaOption { name: string; iban?: string; }
+interface FondOption  { id: string; name: string; }
+
+interface AvansItem {
+  tip:      "intretinere" | "fond";
+  fondId?:  string;
+  denumire: string;
+  suma:     string;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -104,6 +112,8 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [tipDocument,  setTipDocument]  = useState("chitanta");
   const [whereCollect, setWhereCollect] = useState("casa");
   const [banci,        setBanci]        = useState<BancaOption[]>([]);
+  const [fonduri,      setFonduri]      = useState<FondOption[]>([]);
+  const [avansItems,   setAvansItems]   = useState<AvansItem[]>([]);
   const [observatii,   setObservatii]   = useState("");
 
   // ── Detail modal ──────────────────────────────────────────────────────────
@@ -181,7 +191,10 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     if (!asociatieId) { setBanci([]); return; }
     fetch(`/api/asociatii/${asociatieId}`)
       .then(r => r.json())
-      .then((data: { banci: BancaOption[] }) => setBanci(data.banci ?? []))
+      .then((data: { banci: BancaOption[]; fonduri: FondOption[] }) => {
+        setBanci(data.banci ?? []);
+        setFonduri(data.fonduri ?? []);
+      })
       .catch(() => {});
   }, [asociatieId]);
 
@@ -250,6 +263,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     setSelectedApId(""); setApSearch(""); setShowDropdown(false);
     setAllDebts([]); setRightDebts([]); setLeftSelected(new Set()); setRightSelected(new Set());
     setSumaPlatita("");
+    setAvansItems([]);
     setDataDoc(new Date().toISOString().slice(0, 10));
     setSerieDoc("CH"); setNrDocManual("");
     setTipDocument("chitanta");
@@ -263,6 +277,16 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     if (!asociatieId || !selectedApId) { setFormErr("Selectează un apartament."); return; }
     const payload = rightDebts.filter(d => parseFloat(d.suma) > 0);
     if (payload.length === 0) { setFormErr("Adaugă cel puțin o datorie în lista de achitat."); return; }
+
+    const avansRepartizat = avansItems
+      .map(a => ({ ...a, suma: Math.round((parseFloat(a.suma) || 0) * 100) / 100 }))
+      .filter(a => a.suma > 0);
+
+    const totalAvansRepartizat = avansRepartizat.reduce((s, a) => s + a.suma, 0);
+    if (avans > 0 && Math.abs(totalAvansRepartizat - avans) > 0.01) {
+      setFormErr(`Avansul de ${fmt2(avans)} lei nu este complet repartizat (repartizat: ${fmt2(totalAvansRepartizat)} lei).`);
+      return;
+    }
 
     const tipPlata = whereCollect === "casa" ? "casa" : "banca";
 
@@ -280,7 +304,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
           nrDocManual: nrDocManual ? parseInt(nrDocManual) : undefined,
           observatii,
           pozitii: payload.map(d => ({ tip: d.tip, fondId: d.fondId, denumire: d.denumire, suma: Math.round(parseFloat(d.suma) * 100) / 100 })),
-          avans: avans > 0 ? { suma: avans } : undefined,
+          avansRepartizat: avansRepartizat.length > 0 ? avansRepartizat : undefined,
         }),
       });
       const json = await res.json();
@@ -289,7 +313,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
       fetchIncasari();
     } catch (e: any) { setFormErr(e.message); }
     finally { setSaving(false); }
-  }, [asociatieId, selectedApId, rightDebts, tipDocument, whereCollect, dataDoc, serieDoc, nrDocManual, observatii, avans, fetchIncasari]);
+  }, [asociatieId, selectedApId, rightDebts, avansItems, avans, tipDocument, whereCollect, dataDoc, serieDoc, nrDocManual, observatii, fetchIncasari]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (id: string, noReverse = false) => {
@@ -753,6 +777,102 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 </div>
               )}
 
+              {/* ── Repartizare avans ── */}
+              {selectedApId && avans > 0 && (
+                <div style={{
+                  padding: "1rem 1.25rem",
+                  background: "rgba(167,139,250,0.06)",
+                  border: "1px solid rgba(167,139,250,0.25)",
+                  borderRadius: "10px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.875rem" }}>
+                    <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#a78bfa" }}>
+                      Repartizare avans — {fmt2(avans)} lei
+                    </div>
+                    <div style={{ fontSize: "0.8125rem", color: (() => {
+                      const rep = avansItems.reduce((s, a) => s + (parseFloat(a.suma) || 0), 0);
+                      return Math.abs(rep - avans) < 0.01 ? "#4ade80" : "#f87171";
+                    })() }}>
+                      Repartizat: {fmt2(avansItems.reduce((s, a) => s + (parseFloat(a.suma) || 0), 0))} / {fmt2(avans)} lei
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    {/* Întreținere row */}
+                    {(() => {
+                      const idx = avansItems.findIndex(a => a.tip === "intretinere");
+                      const val = idx >= 0 ? avansItems[idx].suma : "";
+                      return (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                          <div style={{ flex: 1, fontSize: "0.875rem", color: "#e2e8f0" }}>Întreținere</div>
+                          <input
+                            type="number" step="0.01" min="0"
+                            className="input input--sm"
+                            style={{ width: "110px", textAlign: "right" }}
+                            placeholder="0.00"
+                            value={val}
+                            onChange={e => {
+                              setAvansItems(prev => {
+                                const next = prev.filter(a => a.tip !== "intretinere");
+                                if (e.target.value) next.push({ tip: "intretinere", denumire: "Întreținere (avans)", suma: e.target.value });
+                                return next;
+                              });
+                            }}
+                          />
+                          <span style={{ fontSize: "0.75rem", color: "#64748b", width: "24px" }}>lei</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Fond rows */}
+                    {fonduri.map(f => {
+                      const idx = avansItems.findIndex(a => a.tip === "fond" && a.fondId === f.id);
+                      const val = idx >= 0 ? avansItems[idx].suma : "";
+                      return (
+                        <div key={f.id} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                          <div style={{ flex: 1, fontSize: "0.875rem", color: "#e2e8f0" }}>{f.name}</div>
+                          <input
+                            type="number" step="0.01" min="0"
+                            className="input input--sm"
+                            style={{ width: "110px", textAlign: "right" }}
+                            placeholder="0.00"
+                            value={val}
+                            onChange={e => {
+                              setAvansItems(prev => {
+                                const next = prev.filter(a => !(a.tip === "fond" && a.fondId === f.id));
+                                if (e.target.value) next.push({ tip: "fond", fondId: f.id, denumire: `${f.name} (avans)`, suma: e.target.value });
+                                return next;
+                              });
+                            }}
+                          />
+                          <span style={{ fontSize: "0.75rem", color: "#64748b", width: "24px" }}>lei</span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Quick fill button */}
+                    <button type="button"
+                      style={{ alignSelf: "flex-start", marginTop: "0.25rem", fontSize: "0.75rem", color: "#a78bfa", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                      onClick={() => {
+                        // Auto-fill first available destination with full avans
+                        let remaining = avans;
+                        const next: AvansItem[] = [];
+                        for (const f of fonduri) {
+                          if (remaining <= 0) break;
+                          next.push({ tip: "fond", fondId: f.id, denumire: `${f.name} (avans)`, suma: fmt2(remaining) });
+                          remaining = 0;
+                        }
+                        if (remaining > 0) {
+                          next.push({ tip: "intretinere", denumire: "Întreținere (avans)", suma: fmt2(remaining) });
+                        }
+                        setAvansItems(next);
+                      }}>
+                      → Repartizează tot la primul fond disponibil
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* ── Observații ── */}
               {selectedApId && (
                 <div className="form-field" style={{ marginBottom: 0 }}>
@@ -767,8 +887,8 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <div className="modal__footer">
                 <button className="btn btn--secondary" onClick={() => setModalOpen(false)}>Anulare</button>
                 <button className="btn btn--primary" onClick={handleSave}
-                  disabled={saving || !selectedApId || totalAchitat <= 0}>
-                  {saving ? "Se salvează..." : `Salvează chitanța${totalAchitat > 0 ? ` — ${fmt2(totalAchitat)} lei` : ""}`}
+                  disabled={saving || !selectedApId || totalAchitat <= 0 || (avans > 0 && Math.abs(avansItems.reduce((s,a) => s+(parseFloat(a.suma)||0),0) - avans) > 0.01)}>
+                  {saving ? "Se salvează..." : `Salvează chitanța${totalAchitat > 0 ? ` — ${fmt2(sumaPlatitaNum > 0 ? sumaPlatitaNum : totalAchitat)} lei` : ""}`}
                 </button>
               </div>
             </div>
@@ -814,7 +934,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 )}
               </div>
 
-              {detail.pozitii.length > 0 && (
+              {(detail.pozitii.length > 0 || (Array.isArray(detail.avans) && detail.avans.length > 0)) && (
                 <div style={{ marginTop: "1.25rem" }}>
                   <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: "0.625rem" }}>
                     Detaliu
@@ -826,15 +946,22 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                         <span style={{ fontWeight: 600, color: "#e2e8f0" }}>{fmt2(p.suma)} lei</span>
                       </div>
                     ))}
-                    {(detail.avans?.suma ?? 0) > 0 && (
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: "6px", fontSize: "0.875rem" }}>
+                    {Array.isArray(detail.avans) && detail.avans.map((a: any, i: number) => (
+                      <div key={`av${i}`} style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "6px", fontSize: "0.875rem" }}>
+                        <span style={{ color: "#a78bfa" }}>{a.denumire ?? "Avans"}</span>
+                        <span style={{ fontWeight: 600, color: "#a78bfa" }}>− {fmt2(a.suma)} lei</span>
+                      </div>
+                    ))}
+                    {/* legacy scalar avans */}
+                    {!Array.isArray(detail.avans) && (detail.avans?.suma ?? 0) > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.15)", borderRadius: "6px", fontSize: "0.875rem" }}>
                         <span style={{ color: "#a78bfa" }}>Avans</span>
-                        <span style={{ fontWeight: 600, color: "#a78bfa" }}>{fmt2(detail.avans?.suma ?? 0)} lei</span>
+                        <span style={{ fontWeight: 600, color: "#a78bfa" }}>− {fmt2(detail.avans?.suma ?? 0)} lei</span>
                       </div>
                     )}
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", padding: "0.75rem 0.75rem 0", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "0.5rem" }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8" }}>Total</span>
+                    <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8" }}>Total încasat</span>
                     <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(detail.sumaIncasata)} lei</span>
                   </div>
                 </div>

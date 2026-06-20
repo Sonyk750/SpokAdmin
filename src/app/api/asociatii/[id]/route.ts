@@ -9,7 +9,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const a = await db.asociatie.findFirst({
     where:  { id, organizationId: session.user.organizationId },
-    select: { bank: true, iban: true, wizardData: true, name: true },
+    select: {
+      bank: true, iban: true, wizardData: true, name: true,
+      fonduri: { where: { isEnabled: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } },
+    },
   });
   if (!a) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -26,7 +29,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     banci = [{ name: a.bank, iban: a.iban || undefined }];
   }
 
-  return NextResponse.json({ name: a.name, banci });
+  return NextResponse.json({ name: a.name, banci, fonduri: a.fonduri ?? [] });
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const body = await req.json();
-  const { asociatieId, apartamentId, tipDocument, tipPlata, data, pozitii, avans, observatii } = body;
+  const { asociatieId, apartamentId, tipDocument, tipPlata, data, pozitii, avans, avansRepartizat, observatii } = body;
 
   if (!asociatieId || !apartamentId || !Array.isArray(pozitii) || pozitii.length === 0)
     return NextResponse.json({ error: "Date incomplete" }, { status: 400 });
@@ -97,8 +97,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const totalSelectat  = pozitii.reduce((s: number, p: any) => s + (p.suma || 0), 0);
-  const sumaIncasata   = totalSelectat + (avans?.suma || 0);
+  // Apply avans repartition to solduri
+  const avansItems: { tip: string; fondId?: string; denumire: string; suma: number }[] =
+    Array.isArray(avansRepartizat) ? avansRepartizat : [];
+
+  for (const a of avansItems) {
+    if (!a.suma || a.suma <= 0) continue;
+    if (a.tip === "intretinere") {
+      await db.soldApartament.upsert({
+        where:  { apartamentId },
+        update: { intretinereCurenta: { decrement: a.suma } },
+        create: { apartamentId, asociatieId, intretinereCurenta: -a.suma, restantaIntretinere: 0 },
+      });
+    } else if (a.tip === "fond" && a.fondId) {
+      await db.fondApartament.updateMany({
+        where: { apartamentId, fondId: a.fondId },
+        data:  { restanta: { decrement: a.suma } },
+      });
+    }
+  }
+
+  const totalSelectat = pozitii.reduce((s: number, p: any) => s + (p.suma || 0), 0);
+  const totalAvans    = avansItems.reduce((s, a) => s + a.suma, 0);
+  const sumaIncasata  = totalSelectat + totalAvans;
 
   const incasare = await db.incasare.create({
     data: {
@@ -114,7 +135,7 @@ export async function POST(req: NextRequest) {
       tipPlata:       tipPlata || "casa",
       sumaIncasata,
       totalSelectat,
-      avansJson:      avans?.suma > 0 ? JSON.stringify(avans) : null,
+      avansJson:      avansItems.length > 0 ? JSON.stringify(avansItems) : null,
       pozitiiJson:    JSON.stringify(pozitii),
       observatii:     observatii || null,
     },
