@@ -425,13 +425,28 @@ export default function WizardClient({
       const saved: { id: string; numar: string }[] = data.apartamente;
       const merged = apartamente.map(ap => ({ ...ap, id: saved.find(s => s.numar === ap.numar)?.id ?? ap.id }));
       setApartamente(merged);
-      setProprietari(buildPropRows(merged));
-      setSolduri(buildSoldRows(merged));
-      setSoldFonduri(prev => buildSoldFondRows(
-        merged, fonduri,
-        prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
-            .filter(sf => sf.restanta !== 0),
-      ));
+      setProprietari(prev => {
+        const prevMap = new Map(prev.map(p => [p.apartamentId, p]));
+        return buildPropRows(merged).map(row => prevMap.get(row.apartamentId) ?? row);
+      });
+      // Preserve any solduri values already entered by user
+      setSolduri(prev => {
+        const prevMap = new Map(prev.map(s => [s.apartamentId, s]));
+        return buildSoldRows(merged).map(row => {
+          const ex = prevMap.get(row.apartamentId);
+          return ex ? { ...row, restantaIntretinere: ex.restantaIntretinere, restantaCurenta: ex.restantaCurenta } : row;
+        });
+      });
+      // Preserve existing soldFonduri values
+      setSoldFonduri(prev => {
+        const prevMap = new Map(prev.map(sf => [`${sf.apartamentId}:${sf.fondId}`, sf]));
+        return buildSoldFondRows(merged, fonduri,
+          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
+        ).map(row => {
+          const ex = prevMap.get(`${row.apartamentId}:${row.fondId}`);
+          return ex ? { ...row, restanta: ex.restanta } : row;
+        });
+      });
       setMaxStep(p => Math.max(p, 3)); setStep(3);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -477,16 +492,26 @@ export default function WizardClient({
       const data = await api("fonduri", { fonduri: fonduri.map((f, i) => ({ ...f, sortOrder: i })) });
       if (data.fonduri) {
         setFonduri(data.fonduri);
-        setSoldFonduri(prev => buildSoldFondRows(
-          apartamente, data.fonduri,
-          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
-              .filter(sf => sf.restanta !== 0),
-        ));
-        setSoldContribFonduri(prev => buildSoldContribFondRows(
-          apartamente, data.fonduri,
-          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: 0, sold: parseFloat(sf.sold) || 0 }))
-              .filter(sf => sf.sold !== 0),
-        ));
+        // Preserve existing restanta values entered by user
+        setSoldFonduri(prev => {
+          const prevMap = new Map(prev.map(sf => [`${sf.apartamentId}:${sf.fondId}`, sf]));
+          return buildSoldFondRows(apartamente, data.fonduri,
+            prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
+          ).map(row => {
+            const ex = prevMap.get(`${row.apartamentId}:${row.fondId}`);
+            return ex ? { ...row, restanta: ex.restanta } : row;
+          });
+        });
+        // Preserve existing sold values entered by user
+        setSoldContribFonduri(prev => {
+          const prevMap = new Map(prev.map(sf => [`${sf.apartamentId}:${sf.fondId}`, sf]));
+          return buildSoldContribFondRows(apartamente, data.fonduri,
+            prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: 0, sold: parseFloat(sf.sold) || 0 }))
+          ).map(row => {
+            const ex = prevMap.get(`${row.apartamentId}:${row.fondId}`);
+            return ex ? { ...row, sold: ex.sold } : row;
+          });
+        });
       }
       setMaxStep(p => Math.max(p, 6)); setStep(6);
     } catch (e: any) { setError(e.message); }
@@ -561,6 +586,26 @@ export default function WizardClient({
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [indexRows]);
+
+  // ─── Silent save (fără navigare) — folosit la Înapoi și la click pe step label ─
+  const silentSaveStep = useCallback(async (s: number) => {
+    try {
+      if (s === 1) await api("info", { info: asocInfo, blocuri });
+      else if (s === 3) {
+        const payload = proprietari.map(p => {
+          const parts = p.numeComplet.trim().split(/\s+/);
+          const prenume = parts.length > 1 ? parts.slice(0, -1).join(" ") : "";
+          const nume    = parts.length > 1 ? parts[parts.length - 1] : (parts[0] ?? "");
+          return { apartamentId: p.apartamentId, numar: p.numar, numeComplet: p.numeComplet, nume, prenume, telefon: p.telefon, emailuri: p.emailuri.filter(Boolean) };
+        });
+        await api("proprietari", { proprietari: payload });
+      }
+      else if (s === 4) await api("solduri", { solduri: solduri.map(s2 => ({ ...s2, restantaIntretinere: s2.restantaIntretinere || "0", restantaCurenta: s2.restantaCurenta || "0" })) });
+      else if (s === 6) await api("sold-fonduri", { soldFonduri });
+      else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })) });
+      else if (s === 8) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
+    } catch { /* silent — nu blocăm navigarea */ }
+  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
 
   const finalizeaza = useCallback(async () => {
     setSaving(true); setError(null);
@@ -689,8 +734,8 @@ export default function WizardClient({
                 className="wizard__step-dot"
                 role={clickable ? "button" : undefined}
                 tabIndex={clickable ? 0 : undefined}
-                onClick={() => { if (clickable) setStep(n); }}
-                onKeyDown={e => { if (clickable && e.key === "Enter") setStep(n); }}
+                onClick={() => { if (clickable) { silentSaveStep(step).then(() => setStep(n)); } }}
+                onKeyDown={e => { if (clickable && e.key === "Enter") { silentSaveStep(step).then(() => setStep(n)); } }}
               >
                 {done ? "✓" : n}
               </div>
@@ -877,7 +922,7 @@ export default function WizardClient({
             </table>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(1)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(2).then(() => setStep(1)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveApartamente} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -966,7 +1011,7 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(2)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(3).then(() => setStep(2)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveProprietari} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1021,7 +1066,7 @@ export default function WizardClient({
             </table>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(3)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(4).then(() => setStep(3)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSolduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1058,7 +1103,7 @@ export default function WizardClient({
             </button>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(4)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(5).then(() => setStep(4)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1103,7 +1148,7 @@ export default function WizardClient({
             </div>
           )}
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(5)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(6).then(() => setStep(5)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1148,7 +1193,7 @@ export default function WizardClient({
             </div>
           )}
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(6)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(7).then(() => setStep(6)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSolduriContribFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1230,7 +1275,7 @@ export default function WizardClient({
           </div>
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(7)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(8).then(() => setStep(7)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldInitial} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1325,6 +1370,7 @@ export default function WizardClient({
           <div className="wizard__footer">
             <button className="btn btn--secondary" onClick={() => setStep(8)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveContoare} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
+
           </div>
         </div>
       )}
