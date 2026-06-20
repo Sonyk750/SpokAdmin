@@ -1037,12 +1037,12 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               {confirmDel === "sterge" && (
                 <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px" }}>
                   <div style={{ fontSize: "0.875rem", color: "#f87171", marginBottom: "0.875rem" }}>
-                    Ștergerea elimină înregistrarea fără a modifica soldul. Continui?
+                    Ștergerea elimină înregistrarea și restaurează datoriile în sold. Continui?
                   </div>
                   <div style={{ display: "flex", gap: "0.75rem" }}>
                     <button className="btn btn--secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>Anulare</button>
                     <button className="btn btn--primary" style={{ background: "rgba(239,68,68,0.8)" }}
-                      onClick={() => handleDelete(detail.id, true)} disabled={deleting}>
+                      onClick={() => handleDelete(detail.id, false)} disabled={deleting}>
                       {deleting ? "Se șterge..." : "Confirmă ștergerea"}
                     </button>
                   </div>
