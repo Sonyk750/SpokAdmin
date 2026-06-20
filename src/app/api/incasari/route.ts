@@ -14,8 +14,16 @@ export async function GET(req: NextRequest) {
 
   if (!asociatieId) return NextResponse.json({ error: "Parametri lipsă" }, { status: 400 });
 
+  const dataStart = searchParams.get("dataStart");
+  const dataEnd   = searchParams.get("dataEnd");
+
   const where: Record<string, unknown> = { asociatieId, organizationId: orgId };
-  if (luna && an) {
+  if (dataStart || dataEnd) {
+    where.data = {
+      ...(dataStart ? { gte: new Date(dataStart) } : {}),
+      ...(dataEnd   ? { lte: new Date(dataEnd + "T23:59:59") } : {}),
+    };
+  } else if (luna && an) {
     const li = parseInt(luna);
     const ai = parseInt(an);
     where.data = { gte: new Date(ai, li - 1, 1), lt: new Date(ai, li, 1) };

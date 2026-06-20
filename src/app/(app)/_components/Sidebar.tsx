@@ -23,6 +23,7 @@ const nav: Item[] = [
     type: "group", label: "Rapoarte", key: "rapoarte",
     children: [
       { type: "link",  href: "/rapoarte/lista-intretinere",   label: "Lista întreținere" },
+      { type: "link",  href: "/rapoarte/incasari",            label: "Raport încasări" },
       { type: "link",  href: "/rapoarte/explicatii-lista",    label: "Explicații listă" },
       { type: "link",  href: "/rapoarte/restantieri",         label: "Restanțieri" },
       { type: "link",  href: "/rapoarte/venituri-cheltuieli", label: "Venituri și cheltuieli" },
