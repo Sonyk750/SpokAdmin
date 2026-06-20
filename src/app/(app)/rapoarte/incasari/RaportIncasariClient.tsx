@@ -80,8 +80,13 @@ async function generateAndDownloadPdf(
       { text: String(idx + 1), alignment: "center", fontSize: 8 },
       { text: roDate(row.data), alignment: "center", fontSize: 8 },
       { text: `${row.serie} ${row.numarDocument}`, alignment: "center", fontSize: 8 },
-      { text: row.nrApartament + (row.proprietarNume ? `\n${row.proprietarNume}` : ""), alignment: "center", fontSize: 8 },
-      { text: ceReprezinta(row), fontSize: 8 },
+      { text: row.nrApartament, alignment: "center", fontSize: 8 },
+      {
+        stack: [
+          { text: ceReprezinta(row), fontSize: 8 },
+          ...(row.proprietarNume ? [{ text: row.proprietarNume, fontSize: 7.5, color: "#555", margin: [0, 2, 0, 0] }] : []),
+        ],
+      },
       { text: fmt2(row.sumaIncasata), alignment: "right", fontSize: 8 },
     ]),
     // Total row
@@ -349,19 +354,19 @@ export default function RaportIncasariClient({
 
       {/* Table (screen) */}
       {rows.length === 0 && !loading ? (
-        <div className="empty-state" style={{ margin: "0 1.5rem" }}>
+        <div className="empty-state">
           <span className="empty-state__icon">🧾</span>
           <div className="empty-state__title">Nicio încasare în perioada selectată</div>
         </div>
       ) : (
-        <div className="table-wrap" style={{ margin: "0 1.5rem 1.5rem" }}>
+        <div className="table-wrap" style={{ margin: "0 0 1.5rem" }}>
           <table className="data-table" style={{ fontSize: "0.8125rem" }}>
             <thead>
               <tr>
                 <th style={{ width: 40, textAlign: "center" }}>Nr.</th>
                 <th>Data</th>
                 <th>Chitanță</th>
-                <th style={{ width: 60, textAlign: "center" }}>Ap.</th>
+                <th style={{ width: 44, textAlign: "center" }}>Ap.</th>
                 <th>Detalii încasare</th>
                 <th style={{ textAlign: "right" }}>Valoare (lei)</th>
               </tr>
@@ -376,14 +381,14 @@ export default function RaportIncasariClient({
                   </td>
                   <td style={{ fontWeight: 700, color: "#a78bfa", textAlign: "center" }}>
                     {row.nrApartament}
+                  </td>
+                  <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>
+                    {ceReprezinta(row)}
                     {row.proprietarNume && (
-                      <span style={{ display: "block", fontWeight: 400, color: "#64748b", fontSize: "0.7rem", marginTop: 1 }}>
+                      <span style={{ display: "block", color: "#64748b", fontSize: "0.75rem", marginTop: 2 }}>
                         {row.proprietarNume}
                       </span>
                     )}
-                  </td>
-                  <td style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
-                    {ceReprezinta(row)}
                   </td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>
                     {fmt2(row.sumaIncasata)}
@@ -451,12 +456,12 @@ export default function RaportIncasariClient({
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>
                   {row.nrApartament}
-                  {row.proprietarNume && (
-                    <span style={{ display: "block", fontSize: "8pt", color: "#444" }}>{row.proprietarNume}</span>
-                  )}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>
                   {ceReprezinta(row)}
+                  {row.proprietarNume && (
+                    <span style={{ display: "block", fontSize: "8pt", color: "#444", marginTop: "2pt" }}>{row.proprietarNume}</span>
+                  )}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", whiteSpace: "nowrap" }}>
                   {fmt2(row.sumaIncasata)}
