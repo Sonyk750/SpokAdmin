@@ -97,11 +97,12 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [rightSelected, setRightSelected] = useState<Set<number>>(new Set());
 
   // Form fields
+  const [sumaPlatita,  setSumaPlatita]  = useState("");
   const [dataDoc,      setDataDoc]      = useState(new Date().toISOString().slice(0, 10));
   const [serieDoc,     setSerieDoc]     = useState("CH");
   const [nrDocManual,  setNrDocManual]  = useState("");
   const [tipDocument,  setTipDocument]  = useState("chitanta");
-  const [whereCollect, setWhereCollect] = useState("casa"); // "casa" | bank name
+  const [whereCollect, setWhereCollect] = useState("casa");
   const [banci,        setBanci]        = useState<BancaOption[]>([]);
   const [observatii,   setObservatii]   = useState("");
 
@@ -112,10 +113,15 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [confirmDel, setConfirmDel] = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const totalDatorat  = allDebts.reduce((s, d) => s + d.datorat, 0);
-  const totalAchitat  = rightDebts.reduce((s, d) => s + (parseFloat(d.suma) || 0), 0);
-  const sumaRamasa    = Math.max(0, totalDatorat - totalAchitat);
-  const avans         = Math.max(0, totalAchitat - rightDebts.reduce((s, d) => s + d.datorat, 0));
+  const sumaPlatitaNum = parseFloat(sumaPlatita) || 0;
+  const totalDatorat   = allDebts.reduce((s, d) => s + d.datorat, 0);
+  const totalAchitat   = rightDebts.reduce((s, d) => s + (parseFloat(d.suma) || 0), 0);
+  const sumaRamasa     = Math.max(0, totalDatorat - totalAchitat);
+  const avans          = sumaPlatitaNum > 0
+    ? Math.max(0, Math.round((sumaPlatitaNum - totalAchitat) * 100) / 100)
+    : Math.max(0, totalAchitat - rightDebts.reduce((s, d) => s + d.datorat, 0));
+  const insuficient    = sumaPlatitaNum > 0 && totalAchitat > sumaPlatitaNum
+    ? Math.round((totalAchitat - sumaPlatitaNum) * 100) / 100 : 0;
 
   const filteredAps = apOptions.filter(ap => {
     const q = apSearch.toLowerCase();
@@ -191,8 +197,18 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   }, [selectedApId, asociatieId]);
 
   // ── Dual-list helpers ─────────────────────────────────────────────────────
+  function distribute(debts: DebtRow[], existing: SelectedDebt[]): SelectedDebt[] {
+    const already = existing.reduce((s, d) => s + (parseFloat(d.suma) || 0), 0);
+    let remaining = sumaPlatitaNum > 0 ? Math.max(0, sumaPlatitaNum - already) : Infinity;
+    return debts.map(d => {
+      const allocated = Math.min(remaining, d.datorat);
+      remaining = Math.max(0, remaining - allocated);
+      return { ...d, suma: fmt2(sumaPlatitaNum > 0 ? allocated : d.datorat) };
+    });
+  }
+
   function moveAllToRight() {
-    setRightDebts(allDebts.map(d => ({ ...d, suma: fmt2(d.datorat) })));
+    setRightDebts(distribute(allDebts, []));
     setLeftSelected(new Set());
     setRightSelected(new Set());
   }
@@ -201,7 +217,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     const toMove = allDebts.filter((_, i) => leftSelected.has(i));
     const existingKeys = new Set(rightDebts.map(d => `${d.tip}:${d.fondId ?? ""}`));
     const newOnes = toMove.filter(d => !existingKeys.has(`${d.tip}:${d.fondId ?? ""}`));
-    setRightDebts(prev => [...prev, ...newOnes.map(d => ({ ...d, suma: fmt2(d.datorat) }))]);
+    setRightDebts(prev => [...prev, ...distribute(newOnes, prev)]);
     setLeftSelected(new Set());
   }
 
@@ -222,6 +238,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   function openModal() {
     setSelectedApId(""); setApSearch(""); setShowDropdown(false);
     setAllDebts([]); setRightDebts([]); setLeftSelected(new Set()); setRightSelected(new Set());
+    setSumaPlatita("");
     setDataDoc(new Date().toISOString().slice(0, 10));
     setSerieDoc("CH"); setNrDocManual("");
     setTipDocument("chitanta");
@@ -476,7 +493,57 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 </div>
               </div>
 
-              {/* ── Row 3: Dual-list datorii ── */}
+              {/* ── Row 3: Suma plătită ── */}
+              {selectedApId && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: "1.5rem",
+                  padding: "1rem 1.25rem",
+                  background: "rgba(74,222,128,0.05)",
+                  border: "1px solid rgba(74,222,128,0.18)",
+                  borderRadius: "10px",
+                }}>
+                  <div style={{ flex: 1 }}>
+                    <label className="form-field__label" style={{ marginBottom: "0.375rem", display: "block", color: "#4ade80" }}>
+                      Suma plătită de proprietar (lei)
+                    </label>
+                    <input
+                      type="number"
+                      className="input"
+                      value={sumaPlatita}
+                      step="0.01" min="0"
+                      placeholder="0.00"
+                      style={{ fontSize: "1.25rem", fontWeight: 700, textAlign: "right", maxWidth: "200px" }}
+                      onChange={e => setSumaPlatita(e.target.value)}
+                    />
+                  </div>
+                  {sumaPlatitaNum > 0 && (
+                    <div style={{ display: "flex", gap: "2rem", flexShrink: 0 }}>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Total datorat</div>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f87171", marginTop: "0.25rem" }}>{fmt2(totalDatorat)} lei</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "0.7rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Se achită</div>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#4ade80", marginTop: "0.25rem" }}>{fmt2(totalAchitat)} lei</div>
+                      </div>
+                      {avans > 0 && (
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "0.7rem", color: "#a78bfa", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Avans</div>
+                          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#a78bfa", marginTop: "0.25rem" }}>+{fmt2(avans)} lei</div>
+                        </div>
+                      )}
+                      {insuficient > 0 && (
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: "0.7rem", color: "#f87171", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Insuficient</div>
+                          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f87171", marginTop: "0.25rem" }}>-{fmt2(insuficient)} lei</div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Row 4: Dual-list datorii ── */}
               {soldLoading && (
                 <div style={{ fontSize: "0.875rem", color: "#64748b", padding: "0.5rem 0" }}>Se încarcă datoriile...</div>
               )}
