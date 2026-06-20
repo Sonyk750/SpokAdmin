@@ -1,0 +1,63 @@
+@use 'variables' as *;
+
+// Responsive
+@mixin sm  { @media (min-width: #{$sm})  { @content; } }
+@mixin md  { @media (min-width: #{$md})  { @content; } }
+@mixin lg  { @media (min-width: #{$lg})  { @content; } }
+@mixin xl  { @media (min-width: #{$xl})  { @content; } }
+
+// Gradient text (violet → cyan, signature style)
+@mixin gradient-text($from: $violet-light, $to: $cyan-light) {
+  background: linear-gradient(135deg, $from, $to);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// Glow box shadow
+@mixin glow($color, $size: 30px) {
+  box-shadow: 0 0 #{$size} $color;
+}
+
+// Glass card
+@mixin glass-card($border: $border-subtle) {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-xl;
+}
+
+// Container
+@mixin container {
+  width: 100%;
+  max-width: $container-max;
+  margin-inline: auto;
+  padding-inline: $container-pad;
+}
+
+// Flex center
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Section padding
+@mixin section-pad {
+  padding-block: 5rem;
+  @include lg { padding-block: 7rem; }
+}
+
+// Top line decorator (subtle gradient line at top of card)
+@mixin top-line($color) {
+  position: relative;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 25%;
+    width: 50%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, $color, transparent);
+    border-radius: 1px;
+  }
+}

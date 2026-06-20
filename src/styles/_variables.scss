@@ -1,0 +1,50 @@
+// === COLORS ===
+$bg-primary:       #050814;
+$bg-card:          rgba(255, 255, 255, 0.02);
+$bg-card-hover:    rgba(255, 255, 255, 0.04);
+$bg-input:         rgba(255, 255, 255, 0.05);
+
+$border-subtle:    rgba(255, 255, 255, 0.08);
+$border-medium:    rgba(255, 255, 255, 0.12);
+
+$text-primary:     #ffffff;
+$text-secondary:   #d1d5db;
+$text-muted:       #9ca3af;
+$text-faint:       #6b7280;
+
+// Accents
+$violet:           #7c3aed;
+$violet-light:     #a78bfa;
+$violet-dark:      #6d28d9;
+$violet-glow:      rgba(124, 58, 237, 0.4);
+$violet-subtle:    rgba(124, 58, 237, 0.1);
+$violet-border:    rgba(124, 58, 237, 0.3);
+
+$cyan:             #06b6d4;
+$cyan-light:       #67e8f9;
+$cyan-glow:        rgba(6, 182, 212, 0.35);
+$cyan-subtle:      rgba(6, 182, 212, 0.1);
+$cyan-border:      rgba(6, 182, 212, 0.25);
+
+$emerald:          #10b981;
+$emerald-light:    #6ee7b7;
+
+// === TYPOGRAPHY ===
+$font-sans:        'DM Sans', Inter, system-ui, -apple-system, sans-serif;
+
+// === SPACING ===
+$container-max:    1280px;
+$container-pad:    1.5rem;
+
+// === BORDER RADIUS ===
+$radius-sm:   0.5rem;    //  8px
+$radius-md:   0.75rem;   // 12px
+$radius-lg:   1rem;      // 16px
+$radius-xl:   1.5rem;    // 24px
+$radius-2xl:  2rem;      // 32px
+
+// === BREAKPOINTS ===
+$sm:  640px;
+$md:  768px;
+$lg:  1024px;
+$xl:  1280px;

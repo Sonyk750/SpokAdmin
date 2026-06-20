@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #080A0F;
+  --color-surface: #0D1117;
+  --color-card: #111820;
+  --color-blue: #1D6FD8;
+  --color-blue-light: #3B8EF0;
+  --color-blue-pale: #0A1F3D;
+  --color-white: #FFFFFF;
+  --color-gray: #4B5563;
+  --color-gray-light: #9CA3AF;
+  --color-border: #1E2733;
+
+  --font-sans: 'Geist', 'DM Sans', sans-serif;
+  --font-display: 'Geist', 'DM Sans', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: #080A0F;
+  color: #F8FAFC;
+  font-family: 'DM Sans', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+@keyframes fadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; pointer-events: none; }
+}
+
+@keyframes scaleUp {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.08); opacity: 0; }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.intro-out {
+  animation: fadeOut 0.7s ease forwards;
+}
+
+.logo-scale {
+  animation: scaleUp 0.7s ease forwards;
+}
+
+.page-in {
+  animation: fadeIn 0.8s ease forwards;
+}

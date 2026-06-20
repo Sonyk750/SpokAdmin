@@ -1,0 +1,72 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.auth-shell {
+  min-height: 100vh;
+  position: relative;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 26rem;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  padding: 2.5rem;
+  backdrop-filter: blur(12px);
+
+  &__logo {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+  }
+
+  &__header { margin-bottom: 1.75rem; }
+
+  &__title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.375rem;
+  }
+
+  &__sub { font-size: 0.9rem; color: $text-muted; }
+
+  &__footer {
+    margin-top: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: $text-faint;
+  }
+
+  &__link {
+    color: $violet-light;
+    font-weight: 600;
+    transition: color 0.2s;
+    &:hover { color: #c4affe; }
+  }
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-alert {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: $radius-md;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: #fca5a5;
+}

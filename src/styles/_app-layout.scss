@@ -1,0 +1,609 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+$sidebar-w: 248px;
+$header-h:  60px;
+
+// ─── Layout shell ─────────────────────────────────────────────────────────────
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: $bg-primary;
+}
+
+.app-body {
+  flex: 1;
+  margin-left: $sidebar-w;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+
+  @media (max-width: 768px) { margin-left: 0; }
+}
+
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 199;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.3rem;
+  color: #c4b5fd;
+  line-height: 0;
+  border-radius: 6px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+
+  &:hover { background: rgba(139,92,246,0.12); }
+
+  @media (max-width: 768px) { display: flex; align-items: center; }
+}
+
+.sidebar {
+  width: $sidebar-w;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 200;
+  background: #080e1c;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+
+  @media (max-width: 768px) {
+    transform: translateX(-100%);
+  }
+
+  &--open {
+    @media (max-width: 768px) {
+      transform: translateX(0);
+    }
+  }
+
+  &__brand {
+    padding: 1.125rem 1.25rem 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+
+  &__brand-link {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    text-decoration: none;
+  }
+
+  &__brand-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #7c3aed;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(124,58,237,0.7);
+  }
+
+  &__brand-name {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.01em;
+  }
+
+  &__nav {
+    flex: 1;
+    padding: 0.625rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+
+    &::-webkit-scrollbar       { width: 4px; }
+    &::-webkit-scrollbar-track { background: transparent; }
+    &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+  }
+
+  &__footer {
+    padding: 0.75rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+  }
+}
+
+// ─── Flat nav link ─────────────────────────────────────────────────────────────
+
+.snav-link {
+  display: block;
+  padding: 0.5rem 0.875rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: #8b9ab4;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+  letter-spacing: 0.005em;
+
+  &:hover {
+    background: rgba(255,255,255,0.05);
+    color: #d4dbe8;
+  }
+
+  &--active {
+    background: rgba(124,58,237,0.14);
+    color: #c4b5fd;
+    font-weight: 600;
+  }
+}
+
+// ─── Collapsible group ────────────────────────────────────────────────────────
+
+.snav-group {
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0.875rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #c8d3e8;
+    text-align: left;
+    border-radius: 6px;
+    transition: background 0.12s, color 0.12s;
+    letter-spacing: 0.005em;
+
+    &:hover {
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+    }
+  }
+
+  &__arrow {
+    font-size: 0.5rem;
+    color: #4a5568;
+    transform: rotate(180deg);
+    transition: transform 0.2s, color 0.2s;
+
+    &--open {
+      transform: rotate(0deg);
+      color: #7c3aed;
+    }
+  }
+
+  &__body {
+    padding-bottom: 0.25rem;
+  }
+}
+
+// ─── Sub-item ─────────────────────────────────────────────────────────────────
+
+.snav-sub {
+  display: block;
+  padding: 0.375rem 0.875rem 0.375rem 1.5rem;
+  font-size: 0.775rem;
+  color: #6b7a96;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background 0.1s, color 0.1s;
+  letter-spacing: 0.005em;
+
+  &:hover {
+    background: rgba(255,255,255,0.04);
+    color: #b0bccc;
+  }
+
+  &--active {
+    color: #a78bfa;
+    font-weight: 600;
+    background: rgba(124,58,237,0.1);
+  }
+}
+
+.snav-section-label {
+  display: block;
+  padding: 0.625rem 0.875rem 0.25rem 1.5rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #3d4f6a;
+}
+
+// ─── Logout button ────────────────────────────────────────────────────────────
+
+.snav-logout {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  color: #8b9ab4;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  text-align: center;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  margin-bottom: 0.625rem;
+
+  &:hover {
+    background: rgba(239,68,68,0.1);
+    border-color: rgba(239,68,68,0.25);
+    color: #fca5a5;
+  }
+}
+
+// ─── BNR Widget ───────────────────────────────────────────────────────────────
+
+.bnr-widget {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 0.625rem 0.75rem;
+
+  &__header {
+    margin-bottom: 0.5rem;
+  }
+
+  &__title {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: #c8d3e8;
+    letter-spacing: 0.02em;
+  }
+
+  &__date {
+    display: block;
+    font-size: 0.625rem;
+    color: #3d4f6a;
+    margin-top: 0.125rem;
+  }
+
+  &__rates {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  &__code {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #6b7a96;
+  }
+
+  &__val {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #8b9ab4;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__calc-title {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #3d4f6a;
+    margin: 0.5rem 0 0.375rem;
+  }
+
+  &__calc {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem;
+  }
+
+  &__input {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 5px;
+    color: #8b9ab4;
+    font-size: 0.625rem;
+    padding: 0.25rem 0.375rem;
+    font-family: inherit;
+    outline: none;
+    width: 100%;
+
+    &:focus { border-color: rgba(124,58,237,0.4); }
+  }
+
+  &__btn {
+    grid-column: 1 / -1;
+    padding: 0.3rem;
+    background: rgba(124,58,237,0.18);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 5px;
+    color: #a78bfa;
+    font-size: 0.625rem;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: 0.03em;
+
+    &:hover { background: rgba(124,58,237,0.28); }
+  }
+
+  &__result {
+    margin-top: 0.375rem;
+    padding: 0.3rem 0.5rem;
+    background: rgba(255,255,255,0.03);
+    border-radius: 5px;
+    font-size: 0.625rem;
+    font-weight: 700;
+    color: #c4b5fd;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// ─── App Header ───────────────────────────────────────────────────────────────
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: $header-h;
+  background: rgba(5, 8, 20, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid $border-subtle;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.75rem;
+  flex-shrink: 0;
+
+  &__left {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: $text-primary;
+    white-space: nowrap;
+  }
+
+  &__org {
+    font-size: 0.75rem;
+    color: $text-faint;
+    padding: 0.2rem 0.625rem;
+    background: $violet-subtle;
+    border: 1px solid $violet-border;
+    border-radius: 9999px;
+    color: $violet-light;
+  }
+
+  &__right { display: flex; align-items: center; gap: 1rem; }
+
+  &__user {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    cursor: pointer;
+  }
+
+  &__avatar {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, $violet, $cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  &__name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: $text-secondary;
+  }
+
+  &__asoc {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-left: 0.25rem;
+
+    @media (max-width: 600px) { display: none; }
+  }
+
+  &__asoc-label {
+    font-size: 0.75rem;
+    color: $text-faint;
+    white-space: nowrap;
+
+    @media (max-width: 900px) { display: none; }
+  }
+
+  &__asoc-select {
+    background: rgba(139, 92, 246, 0.08);
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    border-radius: 0.375rem;
+    color: #c4b5fd;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    outline: none;
+    max-width: 200px;
+
+    option {
+      background: #0d1224;
+      color: #e2e8f0;
+    }
+
+    &:hover { border-color: rgba(139, 92, 246, 0.7); }
+    &:focus { border-color: rgba(139, 92, 246, 0.8); box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.18); }
+  }
+
+  &__name {
+    @media (max-width: 480px) { display: none; }
+  }
+}
+
+// ─── App Main ─────────────────────────────────────────────────────────────────
+
+.app-main {
+  flex: 1;
+  padding: 2rem 1.75rem;
+  max-width: 1400px;
+  width: 100%;
+
+  @include md { padding: 2rem 2rem; }
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+
+  &__welcome { }
+
+  &__heading {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.375rem;
+  }
+
+  &__sub { font-size: 0.9rem; color: $text-muted; }
+
+  &__grid {
+    display: grid;
+    gap: 1.5rem;
+    @include lg { grid-template-columns: 1fr 1fr; }
+  }
+}
+
+// ─── KPI cards ────────────────────────────────────────────────────────────────
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  @include md { grid-template-columns: repeat(4, 1fr); }
+}
+
+.kpi-card {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  padding: 1.5rem;
+  transition: border-color 0.2s, transform 0.2s;
+
+  &:hover { transform: translateY(-2px); }
+
+  &--violet { border-color: $violet-border; }
+  &--cyan   { border-color: $cyan-border; }
+
+  &__icon { font-size: 1.5rem; display: block; margin-bottom: 0.875rem; }
+
+  &__value {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, $violet-light, $cyan-light);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 0.375rem;
+  }
+
+  &__label { font-size: 0.75rem; color: $text-faint; text-transform: uppercase; letter-spacing: 0.1em; }
+}
+
+// ─── Dash panels ──────────────────────────────────────────────────────────────
+
+.dash-panel {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  padding: 1.5rem;
+
+  &__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: $text-secondary;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid $border-subtle;
+  }
+
+  &__empty {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: $text-faint;
+    font-size: 0.875rem;
+    line-height: 1.7;
+  }
+}
+
+// ─── Generic 2-col grid panel ────────────────────────────────────────────────
+
+.dash__grid {
+  display: grid;
+  gap: 1.5rem;
+  @include lg { grid-template-columns: 1fr 1fr; }
+}
+
+// ─── Onboarding empty state ───────────────────────────────────────────────────
+
+.dash-onboarding {
+  background: linear-gradient(135deg, rgba(124,58,237,0.08), rgba(6,182,212,0.04));
+  border: 1px solid $violet-border;
+  border-radius: $radius-xl;
+  padding: 3rem 2rem;
+  text-align: center;
+
+  &__icon { font-size: 3rem; margin-bottom: 1rem; display: block; }
+
+  &__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+
+  &__desc {
+    color: $text-muted;
+    font-size: 0.9375rem;
+    max-width: 28rem;
+    margin: 0 auto 2rem;
+    line-height: 1.75;
+  }
+}
