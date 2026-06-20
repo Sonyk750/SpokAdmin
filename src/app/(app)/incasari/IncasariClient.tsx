@@ -730,7 +730,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
       {/* ─────────────────────── Detail / storno modal ─────────────────────── */}
       {detail && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setDetail(null); setConfirmDel(false); } }}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: "32rem" }}>
             <div className="modal__header">
               <span className="modal__title">

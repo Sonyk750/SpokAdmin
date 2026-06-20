@@ -381,7 +381,7 @@ export default function OfertaModal({ onClose }: { onClose: () => void }) {
       position: "fixed", inset: 0, zIndex: 200,
       background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
+    }}>
       <div style={{
         background: "#0D1117", border: "1px solid #1E2733", borderRadius: "16px",
         width: "100%", maxWidth: "780px", maxHeight: "92vh", overflowY: "auto", padding: "40px",
