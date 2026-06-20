@@ -40,7 +40,7 @@ export default function LoginPage() {
 
         <div className="auth-card__header">
           <h1 className="auth-card__title">Bun venit înapoi</h1>
-          <p className="auth-card__sub">Conectează-te la contul tău DecoImob</p>
+          <p className="auth-card__sub">Conectează-te la contul tău SpokAdmin</p>
         </div>
 
         <form onSubmit={handleSubmit} className="auth-form">
