@@ -60,6 +60,14 @@ interface SoldFondRow {
   restanta:     string;
 }
 
+interface SoldContribFondRow {
+  numar:        string;
+  apartamentId: string;
+  fondId:       string;
+  fondName:     string;
+  sold:         string;
+}
+
 interface SubConfig {
   enabled: boolean;
   locatii: string[];
@@ -110,7 +118,7 @@ const TIP_LABEL: Record<string, string> = {
 
 const STEP_LABELS = [
   "Info asociație", "Apartamente", "Proprietari", "Solduri",
-  "Fonduri", "Sold fonduri", "Sold casă / bancă", "Contoare", "Indecși", "Finalizare",
+  "Fonduri", "Restanțe fonduri", "Solduri fonduri", "Sold casă / bancă", "Contoare", "Indecși", "Finalizare",
 ];
 
 const LUNI_NAMES = [
@@ -130,6 +138,7 @@ interface ExistingSoldFond {
   apartamentId: string;
   fondId:       string;
   restanta:     number;
+  sold:         number;
 }
 
 interface ExistingContor {
@@ -190,6 +199,17 @@ function buildSoldFondRows(aps: ApartRow[], fonduri: FondRow[], existingSF?: Exi
     return {
       numar: ap.numar, apartamentId: ap.id ?? "", fondId: f.id ?? "", fondName: f.name,
       restanta: sf && sf.restanta !== 0 ? sf.restanta.toFixed(2) : "",
+    };
+  }));
+}
+
+function buildSoldContribFondRows(aps: ApartRow[], fonduri: FondRow[], existingSF?: ExistingSoldFond[]): SoldContribFondRow[] {
+  const active = fonduri.filter(f => f.isEnabled);
+  return aps.flatMap(ap => active.map(f => {
+    const sf = existingSF?.find(s => s.apartamentId === (ap.id ?? "") && s.fondId === (f.id ?? ""));
+    return {
+      numar: ap.numar, apartamentId: ap.id ?? "", fondId: f.id ?? "", fondName: f.name,
+      sold: sf && sf.sold !== 0 ? sf.sold.toFixed(2) : "",
     };
   }));
 }
@@ -306,7 +326,7 @@ export default function WizardClient({
 }: Props) {
   const router = useRouter();
 
-  const initStep = Math.min(Math.max(wizardStep, 0) + 1, 10);
+  const initStep = Math.min(Math.max(wizardStep, 0) + 1, 11);
   const [step,    setStep]    = useState<number>(initStep);
   const [maxStep, setMaxStep] = useState<number>(initStep);
   const [saving,  setSaving]  = useState(false);
@@ -335,8 +355,11 @@ export default function WizardClient({
   const [fonduri,     setFonduri]     = useState<FondRow[]>(existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI);
   const [newFondName, setNewFondName] = useState("");
 
-  // ── Step 6: Sold fonduri ──
+  // ── Step 6: Restanțe fonduri ──
   const [soldFonduri, setSoldFonduri] = useState<SoldFondRow[]>(buildSoldFondRows(initAps, existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI, existingSoldFonduri));
+
+  // ── Step 7: Solduri fonduri (contribuții acumulate) ──
+  const [soldContribFonduri, setSoldContribFonduri] = useState<SoldContribFondRow[]>(buildSoldContribFondRows(initAps, existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI, existingSoldFonduri));
 
   // ── Step 7: Sold casă / bancă + prima listă de plată ──
   const _today = new Date().toISOString().slice(0, 10);
@@ -456,8 +479,13 @@ export default function WizardClient({
         setFonduri(data.fonduri);
         setSoldFonduri(prev => buildSoldFondRows(
           apartamente, data.fonduri,
-          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0 }))
+          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
               .filter(sf => sf.restanta !== 0),
+        ));
+        setSoldContribFonduri(prev => buildSoldContribFondRows(
+          apartamente, data.fonduri,
+          prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: 0, sold: parseFloat(sf.sold) || 0 }))
+              .filter(sf => sf.sold !== 0),
         ));
       }
       setMaxStep(p => Math.max(p, 6)); setStep(6);
@@ -474,6 +502,15 @@ export default function WizardClient({
     finally { setSaving(false); }
   }, [soldFonduri]);
 
+  const saveSolduriContribFonduri = useCallback(async () => {
+    setSaving(true); setError(null);
+    try {
+      await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s => ({ apartamentId: s.apartamentId, fondId: s.fondId, sold: s.sold || "0" })) });
+      setMaxStep(p => Math.max(p, 8)); setStep(8);
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }, [soldContribFonduri]);
+
   const saveSoldInitial = useCallback(async () => {
     setSaving(true); setError(null);
     try {
@@ -484,7 +521,7 @@ export default function WizardClient({
         primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null,
         primaListaAn:   primaListaAn   ? parseInt(primaListaAn)   : null,
       });
-      setMaxStep(p => Math.max(p, 8)); setStep(8);
+      setMaxStep(p => Math.max(p, 9)); setStep(9);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
@@ -509,7 +546,7 @@ export default function WizardClient({
           indexNou:   match?.indexNou   ?? "",
         };
       }));
-      setMaxStep(p => Math.max(p, 9)); setStep(9);
+      setMaxStep(p => Math.max(p, 10)); setStep(10);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [conturCfg]);
@@ -520,7 +557,7 @@ export default function WizardClient({
       await api("index-contoare", {
         indecsi: indexRows.map(r => ({ contorId: r.contorId, numarSerie: r.numarSerie, indexVechi: r.indexVechi, indexNou: r.indexNou })),
       });
-      setMaxStep(p => Math.max(p, 10)); setStep(10);
+      setMaxStep(p => Math.max(p, 11)); setStep(11);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [indexRows]);
@@ -1027,11 +1064,11 @@ export default function WizardClient({
         </div>
       )}
 
-      {/* ── Step 6: Sold fonduri ─────────────────────────────────────────── */}
+      {/* ── Step 6: Restanțe fonduri ─────────────────────────────────────── */}
       {step === 6 && (
         <div className="wizard__body">
-          <h2 className="wizard__step-title">Solduri inițiale — Fonduri</h2>
-          <p className="wizard__step-desc">Soldurile restante pe fonduri la data preluării. Lasă gol dacă nu există.</p>
+          <h2 className="wizard__step-title">Restanțe — Fonduri</h2>
+          <p className="wizard__step-desc">Sumele pe care proprietarii le datorează pe fonduri la data preluării. Lasă gol dacă nu există restanțe.</p>
           {fondActive.length === 0 ? (
             <div className="dash-panel__empty">Niciun fond activ.</div>
           ) : (
@@ -1072,8 +1109,53 @@ export default function WizardClient({
         </div>
       )}
 
-      {/* ── Step 7: Sold casă / bancă + prima listă de plată ───────────── */}
+      {/* ── Step 7: Solduri fonduri (contribuții acumulate) ──────────────── */}
       {step === 7 && (
+        <div className="wizard__body">
+          <h2 className="wizard__step-title">Solduri — Fonduri</h2>
+          <p className="wizard__step-desc">Contribuțiile acumulate de proprietari la fiecare fond de-a lungul timpului. Lasă gol dacă nu există sold acumulat.</p>
+          {fondActive.length === 0 ? (
+            <div className="dash-panel__empty">Niciun fond activ.</div>
+          ) : (
+            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: "60px" }}>Ap.</th>
+                    <th>Proprietar</th>
+                    {fondActive.map(f => <th key={f.id ?? f.name} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{f.name} (lei)</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {apsWithFonduri.map(({ ap, prop }) => (
+                    <tr key={ap.numar}>
+                      <td style={{ color: "#a78bfa", fontWeight: 700 }}>{ap.numar}</td>
+                      <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{prop?.numeComplet || "—"}</td>
+                      {fondActive.map(f => {
+                        const gi = soldContribFonduri.findIndex(sf => sf.numar === ap.numar && sf.fondName === f.name);
+                        return (
+                          <td key={f.id ?? f.name} style={{ textAlign: "right" }}>
+                            <input type="number" className="input input--sm" value={soldContribFonduri[gi]?.sold ?? ""}
+                              onChange={e => gi >= 0 && setSoldContribFonduri(prev => prev.map((s, j) => j === gi ? { ...s, sold: e.target.value } : s))}
+                              style={{ width: "110px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="wizard__footer">
+            <button className="btn btn--secondary" onClick={() => setStep(6)}>← Înapoi</button>
+            <button className="btn btn--primary" onClick={saveSolduriContribFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 8: Sold casă / bancă + prima listă de plată ───────────── */}
+      {step === 8 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Sold casă / bancă inițial</h2>
           <p className="wizard__step-desc">Introdu soldurile inițiale ale casieriei și ale conturilor bancare la data preluării.</p>
@@ -1148,14 +1230,14 @@ export default function WizardClient({
           </div>
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(6)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(7)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldInitial} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
       )}
 
-      {/* ── Step 8: Contoare ─────────────────────────────────────────────── */}
-      {step === 8 && (
+      {/* ── Step 9: Contoare ─────────────────────────────────────────────── */}
+      {step === 9 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Configurare contoare</h2>
           <p className="wizard__step-desc">Selectează tipurile de contoare existente în asociație și locațiile lor.</p>
@@ -1241,14 +1323,14 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(7)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(8)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveContoare} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
       )}
 
-      {/* ── Step 9: Indecși contoare ─────────────────────────────────────── */}
-      {step === 9 && (
+      {/* ── Step 10: Indecși contoare ────────────────────────────────────── */}
+      {step === 10 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Indecși contoare</h2>
           <p className="wizard__step-desc">Introdu indexul vechi și indexul nou pentru fiecare contor. Lasă gol dacă nu ai valori.</p>
@@ -1313,14 +1395,14 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(8)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(9)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveIndecsi} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
       )}
 
-      {/* ── Step 10: Finalizare ──────────────────────────────────────────── */}
-      {step === 10 && (
+      {/* ── Step 11: Finalizare ──────────────────────────────────────────── */}
+      {step === 11 && (
         <div className="wizard__body wizard__body--center">
           <div className="wizard__success-icon">✓</div>
           <h2 className="wizard__step-title" style={{ textAlign: "center" }}>Inițializare completă!</h2>
@@ -1366,7 +1448,7 @@ export default function WizardClient({
             )}
           </div>
           <div className="wizard__footer wizard__footer--center">
-            <button className="btn btn--secondary" onClick={() => setStep(9)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(10)}>← Înapoi</button>
             <button className="btn btn--primary btn--lg" onClick={finalizeaza} disabled={saving}>
               {saving ? "Se finalizează..." : "Finalizează și mergi la asociație →"}
             </button>

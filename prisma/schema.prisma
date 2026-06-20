@@ -260,6 +260,7 @@ model FondApartament {
   asociatieId    String
   fondId         String
   restanta       Float    @default(0)
+  sold           Float    @default(0)
   updatedAt      DateTime @updatedAt
 
   apartament Apartament    @relation(fields: [apartamentId], references: [id], onDelete: Cascade)

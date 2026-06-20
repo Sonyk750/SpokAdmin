@@ -96,6 +96,7 @@ export default async function InitializarePage({ params }: { params: Promise<{ i
           apartamentId: f.apartamentId,
           fondId:       f.fondId,
           restanta:     f.restanta,
+          sold:         f.sold ?? 0,
         }))
       )}
       existingContoare={a.apartamente.flatMap(ap =>
