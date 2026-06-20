@@ -1,16 +1,19 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PozitieRow {
-  tip:      string; // "intretinere_curenta" | "intretinere" | "fond"
+interface DebtRow {
+  tip:      string;
   fondId?:  string;
   denumire: string;
-  datorat:  number; // original balance
-  suma:     string; // amount being paid (editable)
+  datorat:  number;
+}
+
+interface SelectedDebt extends DebtRow {
+  suma: string;
 }
 
 interface SoldCurent {
@@ -33,14 +36,11 @@ interface IncasareRow {
   sumaIncasata:   number;
   observatii:     string | null;
   pozitii:        { tip: string; denumire: string; suma: number; fondId?: string }[];
-  avans:          { suma: number; destinatie?: string } | null;
+  avans:          { suma: number } | null;
 }
 
-interface ApOption {
-  id:    string;
-  numar: string;
-  proprietar: string;
-}
+interface ApOption { id: string; numar: string; proprietar: string; }
+interface BancaOption { name: string; iban?: string; }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -50,9 +50,9 @@ const LUNI = [
 ];
 
 const TIP_DOC_LABEL: Record<string, string> = {
-  chitanta:              "Chitanță",
-  dispozitie_incasare:   "Dispoziție de încasare",
-  proces_verbal:         "Proces verbal",
+  chitanta:            "Chitanță",
+  dispozitie_incasare: "Dispoziție de încasare",
+  proces_verbal:       "Proces verbal",
 };
 
 const TIP_PLATA_LABEL: Record<string, string> = {
@@ -68,7 +68,7 @@ const fmt2 = (v: number) => v.toFixed(2);
 export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna: number; defaultAn: number }) {
   const { activeId: asociatieId } = useAsociatie();
 
-  // ── Filters ──────────────────────────────────────────────────────────────
+  // ── List filters ─────────────────────────────────────────────────────────
   const [fLuna, setFLuna] = useState(String(defaultLuna));
   const [fAn,   setFAn]   = useState(String(defaultAn));
 
@@ -78,41 +78,60 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [error,    setError]    = useState<string | null>(null);
 
   // ── Modal state ───────────────────────────────────────────────────────────
-  const [modalOpen,   setModalOpen]   = useState(false);
-  const [saving,      setSaving]      = useState(false);
-  const [formErr,     setFormErr]     = useState<string | null>(null);
+  const [modalOpen,  setModalOpen]  = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [formErr,    setFormErr]    = useState<string | null>(null);
 
-  // Modal form
+  // Apartment lookup
   const [apOptions,    setApOptions]    = useState<ApOption[]>([]);
   const [apSearch,     setApSearch]     = useState("");
   const [selectedApId, setSelectedApId] = useState("");
-  const [soldLoading,  setSoldLoading]  = useState(false);
-  const [sold,         setSold]         = useState<SoldCurent | null>(null);
-  const [pozitii,      setPozitii]      = useState<PozitieRow[]>([]);
-  const [tipDocument,  setTipDocument]  = useState("chitanta");
-  const [tipPlata,     setTipPlata]     = useState("casa");
+  const [showDropdown, setShowDropdown] = useState(false);
+  const apRef = useRef<HTMLDivElement>(null);
+
+  // Sold + debts
+  const [soldLoading, setSoldLoading] = useState(false);
+  const [allDebts,    setAllDebts]    = useState<DebtRow[]>([]);
+  const [rightDebts,  setRightDebts]  = useState<SelectedDebt[]>([]);
+  const [leftSelected, setLeftSelected] = useState<Set<number>>(new Set());
+  const [rightSelected, setRightSelected] = useState<Set<number>>(new Set());
+
+  // Form fields
   const [dataDoc,      setDataDoc]      = useState(new Date().toISOString().slice(0, 10));
+  const [serieDoc,     setSerieDoc]     = useState("CH");
+  const [nrDocManual,  setNrDocManual]  = useState("");
+  const [tipDocument,  setTipDocument]  = useState("chitanta");
+  const [whereCollect, setWhereCollect] = useState("casa"); // "casa" | bank name
+  const [banci,        setBanci]        = useState<BancaOption[]>([]);
   const [observatii,   setObservatii]   = useState("");
 
   // ── Detail modal ──────────────────────────────────────────────────────────
-  const [detail,      setDetail]      = useState<IncasareRow | null>(null);
-  const [deleting,    setDeleting]    = useState(false);
-  const [deleteErr,   setDeleteErr]   = useState<string | null>(null);
-  const [confirmDel,  setConfirmDel]  = useState(false);
+  const [detail,     setDetail]     = useState<IncasareRow | null>(null);
+  const [deleting,   setDeleting]   = useState(false);
+  const [deleteErr,  setDeleteErr]  = useState<string | null>(null);
+  const [confirmDel, setConfirmDel] = useState(false);
 
   // ── Derived ───────────────────────────────────────────────────────────────
-
-  const totalPozitii = pozitii.reduce((s, p) => s + (parseFloat(p.suma) || 0), 0);
-  const totalDatorat  = pozitii.reduce((s, p) => s + p.datorat, 0);
-  const avans = Math.max(0, Math.round((totalPozitii - totalDatorat) * 100) / 100);
+  const totalDatorat  = allDebts.reduce((s, d) => s + d.datorat, 0);
+  const totalAchitat  = rightDebts.reduce((s, d) => s + (parseFloat(d.suma) || 0), 0);
+  const sumaRamasa    = Math.max(0, totalDatorat - totalAchitat);
+  const avans         = Math.max(0, totalAchitat - rightDebts.reduce((s, d) => s + d.datorat, 0));
 
   const filteredAps = apOptions.filter(ap => {
     const q = apSearch.toLowerCase();
     return !q || ap.numar.includes(q) || ap.proprietar.toLowerCase().includes(q);
   });
 
-  // ── Fetch incasari ────────────────────────────────────────────────────────
+  // ── Close dropdown on outside click ──────────────────────────────────────
+  useEffect(() => {
+    function handle(e: MouseEvent) {
+      if (apRef.current && !apRef.current.contains(e.target as Node)) setShowDropdown(false);
+    }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
 
+  // ── Fetch incasari ────────────────────────────────────────────────────────
   const fetchIncasari = useCallback(async () => {
     if (!asociatieId) { setIncasari([]); return; }
     setLoading(true); setError(null);
@@ -124,84 +143,100 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare");
       setIncasari(json);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) { setError(e.message); }
+    finally { setLoading(false); }
   }, [asociatieId, fLuna, fAn]);
 
   useEffect(() => { fetchIncasari(); }, [fetchIncasari]);
 
   // ── Fetch apartment options ───────────────────────────────────────────────
-
   useEffect(() => {
     if (!asociatieId) { setApOptions([]); return; }
     fetch(`/api/asociatii/${asociatieId}/apartamente`)
       .then(r => r.json())
-      .then((data: { apartamente: any[] }) => {
-        setApOptions((data.apartamente ?? []).map(ap => ({
-          id:         ap.id,
-          numar:      ap.numar,
-          proprietar: ap.proprietar || "",
-        })));
-      })
+      .then((data: { apartamente: any[] }) =>
+        setApOptions((data.apartamente ?? []).map(ap => ({ id: ap.id, numar: ap.numar, proprietar: ap.proprietar || "" })))
+      ).catch(() => {});
+  }, [asociatieId]);
+
+  // ── Fetch association banks ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!asociatieId) { setBanci([]); return; }
+    fetch(`/api/asociatii/${asociatieId}`)
+      .then(r => r.json())
+      .then((data: { banci: BancaOption[] }) => setBanci(data.banci ?? []))
       .catch(() => {});
   }, [asociatieId]);
 
-  // ── Load sold curent ──────────────────────────────────────────────────────
-
+  // ── Load sold curent when apartment changes ───────────────────────────────
   useEffect(() => {
-    if (!selectedApId || !asociatieId) { setSold(null); setPozitii([]); return; }
+    if (!selectedApId || !asociatieId) { setAllDebts([]); setRightDebts([]); return; }
     setSoldLoading(true);
     fetch(`/api/incasari/sold-curent?apartamentId=${selectedApId}&asociatieId=${asociatieId}`)
       .then(r => r.json())
       .then((data: SoldCurent) => {
-        setSold(data);
-        const rows: PozitieRow[] = [];
-        if (data.intretinereCurenta > 0) {
-          rows.push({
-            tip: "intretinere_curenta", denumire: "Întreținere luna curentă",
-            datorat: data.intretinereCurenta, suma: fmt2(data.intretinereCurenta),
-          });
-        }
-        if (data.restantaIntretinere > 0) {
-          rows.push({
-            tip: "intretinere", denumire: "Restanță întreținere",
-            datorat: data.restantaIntretinere, suma: fmt2(data.restantaIntretinere),
-          });
-        }
+        const rows: DebtRow[] = [];
+        if (data.intretinereCurenta > 0) rows.push({ tip: "intretinere_curenta", denumire: "Întreținere luna curentă", datorat: data.intretinereCurenta });
+        if (data.restantaIntretinere > 0) rows.push({ tip: "intretinere", denumire: "Restanță întreținere", datorat: data.restantaIntretinere });
         for (const f of data.fonduri) {
-          if (f.restanta > 0) {
-            rows.push({
-              tip: "fond", fondId: f.id, denumire: f.name,
-              datorat: f.restanta, suma: fmt2(f.restanta),
-            });
-          }
+          if (f.restanta > 0) rows.push({ tip: "fond", fondId: f.id, denumire: f.name, datorat: f.restanta });
         }
-        setPozitii(rows);
+        setAllDebts(rows);
+        setRightDebts([]);
+        setLeftSelected(new Set());
+        setRightSelected(new Set());
       })
-      .catch(() => { setSold(null); setPozitii([]); })
+      .catch(() => { setAllDebts([]); setRightDebts([]); })
       .finally(() => setSoldLoading(false));
   }, [selectedApId, asociatieId]);
 
-  // ── Open modal ────────────────────────────────────────────────────────────
+  // ── Dual-list helpers ─────────────────────────────────────────────────────
+  function moveAllToRight() {
+    setRightDebts(allDebts.map(d => ({ ...d, suma: fmt2(d.datorat) })));
+    setLeftSelected(new Set());
+    setRightSelected(new Set());
+  }
 
+  function moveSelectedToRight() {
+    const toMove = allDebts.filter((_, i) => leftSelected.has(i));
+    const existingKeys = new Set(rightDebts.map(d => `${d.tip}:${d.fondId ?? ""}`));
+    const newOnes = toMove.filter(d => !existingKeys.has(`${d.tip}:${d.fondId ?? ""}`));
+    setRightDebts(prev => [...prev, ...newOnes.map(d => ({ ...d, suma: fmt2(d.datorat) }))]);
+    setLeftSelected(new Set());
+  }
+
+  function removeFromRight() {
+    setRightDebts(prev => prev.filter((_, i) => !rightSelected.has(i)));
+    setRightSelected(new Set());
+  }
+
+  function toggleLeft(i: number) {
+    setLeftSelected(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s; });
+  }
+
+  function toggleRight(i: number) {
+    setRightSelected(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s; });
+  }
+
+  // ── Open modal ────────────────────────────────────────────────────────────
   function openModal() {
-    setSelectedApId(""); setApSearch(""); setSold(null); setPozitii([]);
-    setTipDocument("chitanta"); setTipPlata("casa");
+    setSelectedApId(""); setApSearch(""); setShowDropdown(false);
+    setAllDebts([]); setRightDebts([]); setLeftSelected(new Set()); setRightSelected(new Set());
     setDataDoc(new Date().toISOString().slice(0, 10));
+    setSerieDoc("CH"); setNrDocManual("");
+    setTipDocument("chitanta");
+    setWhereCollect("casa");
     setObservatii(""); setFormErr(null);
     setModalOpen(true);
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
-
   const handleSave = useCallback(async () => {
     if (!asociatieId || !selectedApId) { setFormErr("Selectează un apartament."); return; }
-    if (pozitii.length === 0) { setFormErr("Nu există sume de achitat."); return; }
-    const payload = pozitii.filter(p => parseFloat(p.suma) > 0);
-    if (payload.length === 0) { setFormErr("Introdu cel puțin o sumă."); return; }
+    const payload = rightDebts.filter(d => parseFloat(d.suma) > 0);
+    if (payload.length === 0) { setFormErr("Adaugă cel puțin o datorie în lista de achitat."); return; }
+
+    const tipPlata = whereCollect === "casa" ? "casa" : "banca";
 
     setSaving(true); setFormErr(null);
     try {
@@ -210,11 +245,13 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           asociatieId, apartamentId: selectedApId,
-          tipDocument, tipPlata, data: dataDoc, observatii,
-          pozitii: payload.map(p => ({
-            tip: p.tip, fondId: p.fondId, denumire: p.denumire,
-            suma: Math.round(parseFloat(p.suma) * 100) / 100,
-          })),
+          tipDocument, tipPlata,
+          bancaName: whereCollect !== "casa" ? whereCollect : undefined,
+          data: dataDoc,
+          serieOverride: serieDoc || undefined,
+          nrDocManual: nrDocManual ? parseInt(nrDocManual) : undefined,
+          observatii,
+          pozitii: payload.map(d => ({ tip: d.tip, fondId: d.fondId, denumire: d.denumire, suma: Math.round(parseFloat(d.suma) * 100) / 100 })),
           avans: avans > 0 ? { suma: avans } : undefined,
         }),
       });
@@ -222,32 +259,24 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
       if (!res.ok) throw new Error(json.error ?? "Eroare");
       setModalOpen(false);
       fetchIncasari();
-    } catch (e: any) {
-      setFormErr(e.message);
-    } finally {
-      setSaving(false);
-    }
-  }, [asociatieId, selectedApId, pozitii, tipDocument, tipPlata, dataDoc, observatii, avans, fetchIncasari]);
+    } catch (e: any) { setFormErr(e.message); }
+    finally { setSaving(false); }
+  }, [asociatieId, selectedApId, rightDebts, tipDocument, whereCollect, dataDoc, serieDoc, nrDocManual, observatii, avans, fetchIncasari]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
-
   const handleDelete = useCallback(async (id: string) => {
     setDeleting(true); setDeleteErr(null);
     try {
-      const res = await fetch(`/api/incasari/${id}`, { method: "DELETE" });
+      const res  = await fetch(`/api/incasari/${id}`, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare");
       setDetail(null); setConfirmDel(false);
       fetchIncasari();
-    } catch (e: any) {
-      setDeleteErr(e.message);
-    } finally {
-      setDeleting(false);
-    }
+    } catch (e: any) { setDeleteErr(e.message); }
+    finally { setDeleting(false); }
   }, [fetchIncasari]);
 
   // ── Render ────────────────────────────────────────────────────────────────
-
   const totalIncasat = incasari.reduce((s, i) => s + i.sumaIncasata, 0);
 
   return (
@@ -258,7 +287,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
           <p className="page-sub">Chitanțe și încasări de la proprietari</p>
         </div>
         <button className="btn btn--primary" onClick={openModal} disabled={!asociatieId}>
-          + Încasare nouă
+          + Adaugă încasare
         </button>
       </div>
 
@@ -290,16 +319,14 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
       {/* Summary */}
       {incasari.length > 0 && (
-        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-          <div className="dash-panel" style={{ padding: "1rem 1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
-            <div>
-              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-faint, #475569)", marginBottom: "0.25rem" }}>Documente</div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#a78bfa" }}>{incasari.length}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--text-faint, #475569)", marginBottom: "0.25rem" }}>Total încasat</div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</div>
-            </div>
+        <div className="dash-panel" style={{ padding: "1rem 1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+          <div>
+            <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Documente</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#a78bfa" }}>{incasari.length}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Total încasat</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</div>
           </div>
         </div>
       )}
@@ -312,7 +339,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
           <div className="empty-state__desc">
             {fLuna && fAn
               ? `Nu există încasări pentru ${LUNI[parseInt(fLuna) - 1]} ${fAn}.`
-              : 'Apasă "+ Încasare nouă" pentru a înregistra prima chitanță.'}
+              : 'Apasă "+ Adaugă încasare" pentru a înregistra prima chitanță.'}
           </div>
         </div>
       ) : (
@@ -324,14 +351,15 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 <th>Data</th>
                 <th>Ap.</th>
                 <th>Proprietar</th>
-                <th>Tip plată</th>
+                <th>Plată</th>
                 <th style={{ textAlign: "right" }}>Sumă</th>
                 <th style={{ width: "48px" }} />
               </tr>
             </thead>
             <tbody>
               {incasari.map(inc => (
-                <tr key={inc.id} style={{ cursor: "pointer" }} onClick={() => { setDetail(inc); setConfirmDel(false); setDeleteErr(null); }}>
+                <tr key={inc.id} style={{ cursor: "pointer" }}
+                  onClick={() => { setDetail(inc); setConfirmDel(false); setDeleteErr(null); }}>
                   <td>
                     <span style={{ fontWeight: 700, color: "#a78bfa" }}>{inc.serie} {inc.numarDocument}</span>
                     <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", color: "#64748b" }}>
@@ -344,7 +372,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                   <td style={{ fontWeight: 700, color: "#a78bfa" }}>{inc.nrApartament}</td>
                   <td style={{ color: "#94a3b8" }}>{inc.proprietarNume || "—"}</td>
                   <td>
-                    <span className={`pill ${inc.tipPlata === "casa" ? "pill--violet" : inc.tipPlata === "banca" ? "pill--gray" : "pill--green"}`}>
+                    <span className={`pill ${inc.tipPlata === "casa" ? "pill--violet" : "pill--gray"}`}>
                       {TIP_PLATA_LABEL[inc.tipPlata] ?? inc.tipPlata}
                     </span>
                   </td>
@@ -359,168 +387,273 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
         </div>
       )}
 
-      {/* ── New incasare modal ────────────────────────────────────────────────── */}
+      {/* ─────────────────────── Adaugă încasare modal ─────────────────────── */}
       {modalOpen && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}>
-          <div className="modal" style={{ maxWidth: "36rem" }}>
+          <div className="modal" style={{ maxWidth: "62rem", width: "96vw" }}>
+
             <div className="modal__header">
-              <span className="modal__title">Încasare nouă</span>
+              <span className="modal__title">Adaugă încasare</span>
               <button className="modal__close" onClick={() => setModalOpen(false)}>✕</button>
             </div>
-            <div className="modal__body">
 
-              {/* Apartment selector */}
-              <div className="form-field" style={{ marginBottom: "1.25rem" }}>
-                <label className="form-field__label">Apartament *</label>
+            <div className="modal__body" style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+              {/* ── Row 1: Apartament ── */}
+              <div ref={apRef} style={{ position: "relative" }}>
+                <label className="form-field__label" style={{ marginBottom: "0.375rem", display: "block" }}>
+                  Plătitor — Apartament *
+                </label>
                 <input
                   type="text"
                   className="input"
                   placeholder="Caută după număr sau proprietar..."
                   value={apSearch}
-                  onChange={e => { setApSearch(e.target.value); setSelectedApId(""); setSold(null); setPozitii([]); }}
+                  autoComplete="off"
+                  onChange={e => { setApSearch(e.target.value); setSelectedApId(""); setShowDropdown(true); setAllDebts([]); setRightDebts([]); }}
+                  onFocus={() => { if (apSearch) setShowDropdown(true); }}
                 />
-                {apSearch && !selectedApId && filteredAps.length > 0 && (
+                {showDropdown && apSearch && filteredAps.length > 0 && (
                   <div style={{
+                    position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
                     border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px",
-                    background: "#0d1325", marginTop: "0.25rem", maxHeight: "180px",
-                    overflowY: "auto", position: "relative", zIndex: 10,
+                    background: "#0d1325", zIndex: 20, maxHeight: "200px", overflowY: "auto",
+                    boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
                   }}>
                     {filteredAps.slice(0, 20).map(ap => (
-                      <div key={ap.id}
-                        style={{ padding: "0.5rem 0.875rem", cursor: "pointer", fontSize: "0.875rem", transition: "background 0.1s" }}
+                      <div key={ap.id} style={{ padding: "0.5rem 1rem", cursor: "pointer", fontSize: "0.875rem" }}
                         onMouseEnter={e => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
                         onMouseLeave={e => (e.currentTarget.style.background = "")}
-                        onClick={() => {
+                        onMouseDown={() => {
                           setSelectedApId(ap.id);
                           setApSearch(`Ap. ${ap.numar}${ap.proprietar ? ` — ${ap.proprietar}` : ""}`);
-                        }}
-                      >
+                          setShowDropdown(false);
+                        }}>
                         <span style={{ fontWeight: 700, color: "#a78bfa" }}>Ap. {ap.numar}</span>
-                        {ap.proprietar && <span style={{ color: "#94a3b8", marginLeft: "0.5rem" }}>{ap.proprietar}</span>}
+                        {ap.proprietar && <span style={{ color: "#94a3b8", marginLeft: "0.625rem" }}>{ap.proprietar}</span>}
                       </div>
                     ))}
                   </div>
                 )}
-                {apSearch && !selectedApId && filteredAps.length === 0 && (
-                  <div style={{ fontSize: "0.8125rem", color: "#64748b", marginTop: "0.375rem" }}>Niciun apartament găsit.</div>
+                {showDropdown && apSearch && !selectedApId && filteredAps.length === 0 && (
+                  <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, padding: "0.5rem 1rem", fontSize: "0.8125rem", color: "#64748b", background: "#0d1325", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "8px", zIndex: 20 }}>
+                    Niciun apartament găsit.
+                  </div>
                 )}
               </div>
 
-              {/* Sold curent */}
-              {soldLoading && (
-                <div style={{ fontSize: "0.875rem", color: "#64748b", padding: "1rem 0" }}>Se încarcă soldul...</div>
-              )}
-
-              {sold && pozitii.length === 0 && !soldLoading && (
-                <div className="dash-panel" style={{ padding: "1rem 1.25rem", marginBottom: "1.25rem" }}>
-                  <div style={{ fontSize: "0.875rem", color: "#4ade80", fontWeight: 600 }}>
-                    ✓ Apartamentul nu are restanțe
+              {/* ── Row 2: Chitanță + unde se încasează ── */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr", gap: "1rem" }}>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-field__label">Data încasării</label>
+                  <input type="date" className="input" value={dataDoc} onChange={e => setDataDoc(e.target.value)} />
+                </div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-field__label">Tip document</label>
+                  <select className="input" value={tipDocument} onChange={e => setTipDocument(e.target.value)}>
+                    <option value="chitanta">Chitanță</option>
+                    <option value="dispozitie_incasare">Dispoziție de încasare</option>
+                    <option value="proces_verbal">Proces verbal</option>
+                  </select>
+                </div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-field__label">Serie / Nr. chitanță</label>
+                  <div style={{ display: "flex", gap: "0.375rem" }}>
+                    <input type="text" className="input" value={serieDoc} onChange={e => setSerieDoc(e.target.value)}
+                      style={{ width: "54px" }} maxLength={6} placeholder="CH" />
+                    <input type="number" className="input" value={nrDocManual} onChange={e => setNrDocManual(e.target.value)}
+                      style={{ flex: 1 }} placeholder="auto" min={1} />
                   </div>
                 </div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-field__label">Se încasează în</label>
+                  <select className="input" value={whereCollect} onChange={e => setWhereCollect(e.target.value)}>
+                    <option value="casa">🏠 Casă (numerar)</option>
+                    {banci.map((b, i) => (
+                      <option key={i} value={b.name}>🏦 {b.name}{b.iban ? ` — ${b.iban}` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ── Row 3: Dual-list datorii ── */}
+              {soldLoading && (
+                <div style={{ fontSize: "0.875rem", color: "#64748b", padding: "0.5rem 0" }}>Se încarcă datoriile...</div>
               )}
 
-              {pozitii.length > 0 && (
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: "0.75rem" }}>
-                    Alocare plată
-                  </div>
+              {selectedApId && !soldLoading && (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 44px 1fr", gap: "0.75rem", alignItems: "start" }}>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                    {pozitii.map((p, i) => (
-                      <div key={i} style={{
-                        display: "grid", gridTemplateColumns: "1fr auto auto",
-                        alignItems: "center", gap: "0.75rem",
-                        padding: "0.625rem 0.875rem",
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        borderRadius: "8px",
-                      }}>
-                        <div>
-                          <div style={{ fontSize: "0.875rem", color: "#e2e8f0" }}>{p.denumire}</div>
-                          <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.125rem" }}>
-                            Datorat: {fmt2(p.datorat)} lei
-                          </div>
-                        </div>
-                        <input
-                          type="number"
-                          className="input input--sm"
-                          value={p.suma}
-                          step="0.01"
-                          min="0"
-                          style={{ width: "110px", textAlign: "right" }}
-                          onChange={e => setPozitii(prev => prev.map((r, j) => j === i ? { ...r, suma: e.target.value } : r))}
-                        />
-                        <span style={{ fontSize: "0.8125rem", color: "#64748b" }}>lei</span>
+                    {/* Left — datorii disponibile */}
+                    <div>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", marginBottom: "0.5rem" }}>
+                        Datorii curente
                       </div>
-                    ))}
-                  </div>
+                      <div style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", minHeight: "140px", overflow: "hidden" }}>
+                        {allDebts.length === 0 ? (
+                          <div style={{ padding: "1.5rem 1rem", fontSize: "0.8125rem", color: "#4ade80", textAlign: "center" }}>
+                            ✓ Fără restanțe
+                          </div>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8125rem" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                <th style={{ padding: "0.5rem 0.75rem", textAlign: "left", color: "#64748b", fontWeight: 600, fontSize: "0.7rem" }}>Datorie</th>
+                                <th style={{ padding: "0.5rem 0.75rem", textAlign: "right", color: "#64748b", fontWeight: 600, fontSize: "0.7rem" }}>Sumă</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {allDebts.map((d, i) => {
+                                const sel = leftSelected.has(i);
+                                const inRight = rightDebts.some(r => r.tip === d.tip && (r.fondId ?? "") === (d.fondId ?? ""));
+                                return (
+                                  <tr key={i}
+                                    onClick={() => !inRight && toggleLeft(i)}
+                                    style={{
+                                      cursor: inRight ? "default" : "pointer",
+                                      background: sel ? "rgba(124,58,237,0.12)" : inRight ? "rgba(255,255,255,0.02)" : "",
+                                      opacity: inRight ? 0.4 : 1,
+                                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                    }}
+                                  >
+                                    <td style={{ padding: "0.5rem 0.75rem", color: sel ? "#a78bfa" : "#e2e8f0" }}>
+                                      {sel && <span style={{ marginRight: "0.375rem", color: "#a78bfa" }}>✓</span>}
+                                      {d.denumire}
+                                    </td>
+                                    <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 600, color: "#f87171", whiteSpace: "nowrap" }}>
+                                      {fmt2(d.datorat)} lei
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            {totalDatorat > 0 && (
+                              <tfoot>
+                                <tr style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                                  <td style={{ padding: "0.5rem 0.75rem", fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>Total datorat</td>
+                                  <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 800, color: "#f87171" }}>{fmt2(totalDatorat)} lei</td>
+                                </tr>
+                              </tfoot>
+                            )}
+                          </table>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Total */}
-                  <div style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "0.875rem 0.875rem 0", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "0.75rem",
-                  }}>
-                    <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8" }}>Total de încasat</span>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
-                      <span style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80" }}>
-                        {fmt2(totalPozitii)} lei
-                      </span>
-                      {avans > 0 && (
-                        <span style={{ fontSize: "0.75rem", color: "#a78bfa", background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: "4px", padding: "0.1rem 0.4rem" }}>
-                          avans {fmt2(avans)} lei
-                        </span>
-                      )}
+                    {/* Transfer buttons */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", paddingTop: "1.75rem", alignItems: "center" }}>
+                      <button type="button" title="Mută toate"
+                        onClick={moveAllToRight}
+                        style={{ width: "38px", height: "30px", background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", borderRadius: "6px", color: "#a78bfa", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700 }}>
+                        ⇒
+                      </button>
+                      <button type="button" title="Mută selecția"
+                        onClick={moveSelectedToRight}
+                        disabled={leftSelected.size === 0}
+                        style={{ width: "38px", height: "30px", background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", borderRadius: "6px", color: leftSelected.size > 0 ? "#a78bfa" : "#475569", cursor: leftSelected.size > 0 ? "pointer" : "default", fontSize: "0.75rem", fontWeight: 700 }}>
+                        →
+                      </button>
+                      <button type="button" title="Elimină selecția"
+                        onClick={removeFromRight}
+                        disabled={rightSelected.size === 0}
+                        style={{ width: "38px", height: "30px", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "6px", color: rightSelected.size > 0 ? "#f87171" : "#475569", cursor: rightSelected.size > 0 ? "pointer" : "default", fontSize: "0.75rem", fontWeight: 700 }}>
+                        ←
+                      </button>
+                    </div>
+
+                    {/* Right — se achită */}
+                    <div>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#64748b", marginBottom: "0.5rem" }}>
+                        Se achită cu această chitanță
+                      </div>
+                      <div style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: "8px", minHeight: "140px", overflow: "hidden" }}>
+                        {rightDebts.length === 0 ? (
+                          <div style={{ padding: "1.5rem 1rem", fontSize: "0.8125rem", color: "#475569", textAlign: "center" }}>
+                            ← Selectează datorii
+                          </div>
+                        ) : (
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8125rem" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                <th style={{ padding: "0.5rem 0.75rem", textAlign: "left", color: "#64748b", fontWeight: 600, fontSize: "0.7rem" }}>Datorie</th>
+                                <th style={{ padding: "0.5rem 0.75rem", textAlign: "right", color: "#64748b", fontWeight: 600, fontSize: "0.7rem" }}>Sumă (lei)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rightDebts.map((d, i) => {
+                                const sel = rightSelected.has(i);
+                                return (
+                                  <tr key={i}
+                                    style={{
+                                      background: sel ? "rgba(239,68,68,0.07)" : "",
+                                      borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                    }}>
+                                    <td style={{ padding: "0.5rem 0.75rem", color: "#e2e8f0", cursor: "pointer", userSelect: "none" }}
+                                      onClick={() => toggleRight(i)}>
+                                      {sel && <span style={{ marginRight: "0.375rem", color: "#f87171" }}>✓</span>}
+                                      {d.denumire}
+                                    </td>
+                                    <td style={{ padding: "0.375rem 0.75rem 0.375rem 0.25rem", textAlign: "right" }}>
+                                      <input
+                                        type="number"
+                                        className="input input--sm"
+                                        value={d.suma}
+                                        step="0.01" min="0"
+                                        style={{ width: "100px", textAlign: "right" }}
+                                        onChange={e => setRightDebts(prev => prev.map((r, j) => j === i ? { ...r, suma: e.target.value } : r))}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                                <td style={{ padding: "0.5rem 0.75rem", fontSize: "0.75rem", color: "#64748b", fontWeight: 700 }}>Total</td>
+                                <td style={{ padding: "0.5rem 0.75rem", textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>
+                                  {fmt2(totalAchitat)} lei
+                                </td>
+                              </tr>
+                              {sumaRamasa > 0 && (
+                                <tr>
+                                  <td colSpan={2} style={{ padding: "0.25rem 0.75rem 0.5rem", fontSize: "0.75rem", color: "#f87171", textAlign: "right" }}>
+                                    Rămâne neachitat: {fmt2(sumaRamasa)} lei
+                                  </td>
+                                </tr>
+                              )}
+                              {avans > 0 && (
+                                <tr>
+                                  <td colSpan={2} style={{ padding: "0.25rem 0.75rem 0.5rem", fontSize: "0.75rem", color: "#a78bfa", textAlign: "right" }}>
+                                    Avans: {fmt2(avans)} lei
+                                  </td>
+                                </tr>
+                              )}
+                            </tfoot>
+                          </table>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-                    <button type="button" className="btn btn--secondary"
-                      style={{ padding: "0.25rem 0.75rem", fontSize: "0.8125rem" }}
-                      onClick={() => setPozitii(prev => prev.map(p => ({ ...p, suma: fmt2(p.datorat) })))}>
-                      Achită tot
-                    </button>
-                  </div>
                 </div>
               )}
 
-              {/* Document metadata */}
+              {/* ── Observații ── */}
               {selectedApId && (
-                <div className="form-grid form-grid--2" style={{ gap: "1rem" }}>
-                  <div className="form-field">
-                    <label className="form-field__label">Tip document</label>
-                    <select className="input" value={tipDocument} onChange={e => setTipDocument(e.target.value)}>
-                      <option value="chitanta">Chitanță</option>
-                      <option value="dispozitie_incasare">Dispoziție de încasare</option>
-                      <option value="proces_verbal">Proces verbal</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-field__label">Tip plată</label>
-                    <select className="input" value={tipPlata} onChange={e => setTipPlata(e.target.value)}>
-                      <option value="casa">Casă</option>
-                      <option value="banca">Bancă</option>
-                      <option value="online">Online</option>
-                    </select>
-                  </div>
-                  <div className="form-field">
-                    <label className="form-field__label">Data</label>
-                    <input type="date" className="input" value={dataDoc} onChange={e => setDataDoc(e.target.value)} />
-                  </div>
-                  <div className="form-field form-field--full">
-                    <label className="form-field__label">Observații</label>
-                    <input type="text" className="input" value={observatii} placeholder="Opțional..."
-                      onChange={e => setObservatii(e.target.value)} />
-                  </div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-field__label">Observații</label>
+                  <input type="text" className="input" value={observatii} placeholder="Opțional..."
+                    onChange={e => setObservatii(e.target.value)} />
                 </div>
               )}
 
-              {formErr && <div className="wizard__error" style={{ marginTop: "1rem" }}>{formErr}</div>}
+              {formErr && <div className="wizard__error">{formErr}</div>}
 
               <div className="modal__footer">
                 <button className="btn btn--secondary" onClick={() => setModalOpen(false)}>Anulare</button>
                 <button className="btn btn--primary" onClick={handleSave}
-                  disabled={saving || !selectedApId || totalPozitii <= 0}>
-                  {saving ? "Se salvează..." : "Salvează"}
+                  disabled={saving || !selectedApId || totalAchitat <= 0}>
+                  {saving ? "Se salvează..." : `Salvează chitanța${totalAchitat > 0 ? ` — ${fmt2(totalAchitat)} lei` : ""}`}
                 </button>
               </div>
             </div>
@@ -528,7 +661,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
         </div>
       )}
 
-      {/* ── Detail / storno modal ─────────────────────────────────────────────── */}
+      {/* ─────────────────────── Detail / storno modal ─────────────────────── */}
       {detail && (
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) { setDetail(null); setConfirmDel(false); } }}>
           <div className="modal" style={{ maxWidth: "32rem" }}>
@@ -539,13 +672,10 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <button className="modal__close" onClick={() => { setDetail(null); setConfirmDel(false); }}>✕</button>
             </div>
             <div className="modal__body">
-
               <div className="info-list">
                 <div className="info-row">
                   <span className="info-row__label">Apartament</span>
-                  <span className="info-row__value" style={{ color: "#a78bfa", fontWeight: 700 }}>
-                    Ap. {detail.nrApartament}
-                  </span>
+                  <span className="info-row__value" style={{ color: "#a78bfa", fontWeight: 700 }}>Ap. {detail.nrApartament}</span>
                 </div>
                 {detail.proprietarNume && (
                   <div className="info-row">
@@ -572,58 +702,37 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               {detail.pozitii.length > 0 && (
                 <div style={{ marginTop: "1.25rem" }}>
                   <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#64748b", marginBottom: "0.625rem" }}>
-                    Detaliu încasare
+                    Detaliu
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                     {detail.pozitii.map((p, i) => (
-                      <div key={i} style={{
-                        display: "flex", justifyContent: "space-between",
-                        padding: "0.5rem 0.75rem",
-                        background: "rgba(255,255,255,0.02)",
-                        borderRadius: "6px", fontSize: "0.875rem",
-                      }}>
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", background: "rgba(255,255,255,0.02)", borderRadius: "6px", fontSize: "0.875rem" }}>
                         <span style={{ color: "#94a3b8" }}>{p.denumire}</span>
                         <span style={{ fontWeight: 600, color: "#e2e8f0" }}>{fmt2(p.suma)} lei</span>
                       </div>
                     ))}
-                    {detail.avans && detail.avans.suma > 0 && (
-                      <div style={{
-                        display: "flex", justifyContent: "space-between",
-                        padding: "0.5rem 0.75rem",
-                        background: "rgba(124,58,237,0.06)",
-                        border: "1px solid rgba(124,58,237,0.15)",
-                        borderRadius: "6px", fontSize: "0.875rem",
-                      }}>
+                    {(detail.avans?.suma ?? 0) > 0 && (
+                      <div style={{ display: "flex", justifyContent: "space-between", padding: "0.5rem 0.75rem", background: "rgba(124,58,237,0.06)", border: "1px solid rgba(124,58,237,0.15)", borderRadius: "6px", fontSize: "0.875rem" }}>
                         <span style={{ color: "#a78bfa" }}>Avans</span>
-                        <span style={{ fontWeight: 600, color: "#a78bfa" }}>{fmt2(detail.avans.suma)} lei</span>
+                        <span style={{ fontWeight: 600, color: "#a78bfa" }}>{fmt2(detail.avans?.suma ?? 0)} lei</span>
                       </div>
                     )}
                   </div>
-                  <div style={{
-                    display: "flex", justifyContent: "space-between",
-                    padding: "0.75rem 0.75rem 0",
-                    borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "0.5rem",
-                  }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", padding: "0.75rem 0.75rem 0", borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "0.5rem" }}>
                     <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "#94a3b8" }}>Total</span>
-                    <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#4ade80" }}>
-                      {fmt2(detail.sumaIncasata)} lei
-                    </span>
+                    <span style={{ fontSize: "1.125rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(detail.sumaIncasata)} lei</span>
                   </div>
                 </div>
               )}
 
-              {/* Storno */}
               {deleteErr && <div className="wizard__error" style={{ marginTop: "1rem" }}>{deleteErr}</div>}
 
               {!confirmDel ? (
                 <div className="modal__footer" style={{ justifyContent: "space-between" }}>
-                  <button className="btn btn--secondary" style={{ color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }}
-                    onClick={() => setConfirmDel(true)}>
+                  <button className="btn btn--secondary" style={{ color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }} onClick={() => setConfirmDel(true)}>
                     Stornează
                   </button>
-                  <button className="btn btn--secondary" onClick={() => { setDetail(null); setConfirmDel(false); }}>
-                    Închide
-                  </button>
+                  <button className="btn btn--secondary" onClick={() => { setDetail(null); setConfirmDel(false); }}>Închide</button>
                 </div>
               ) : (
                 <div style={{ marginTop: "1.5rem", padding: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px" }}>
@@ -631,9 +740,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                     Confirmi stornarea? Soldul apartamentului va fi refăcut.
                   </div>
                   <div style={{ display: "flex", gap: "0.75rem" }}>
-                    <button className="btn btn--secondary" onClick={() => setConfirmDel(false)} disabled={deleting}>
-                      Anulare
-                    </button>
+                    <button className="btn btn--secondary" onClick={() => setConfirmDel(false)} disabled={deleting}>Anulare</button>
                     <button className="btn btn--primary" style={{ background: "rgba(239,68,68,0.8)" }}
                       onClick={() => handleDelete(detail.id)} disabled={deleting}>
                       {deleting ? "Se stornează..." : "Confirmă storno"}
