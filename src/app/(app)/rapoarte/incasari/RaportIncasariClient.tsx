@@ -88,13 +88,13 @@ async function generateAndDownloadPdf(
       { text: String(idx + 1), alignment: "center", fontSize: 8 },
       { text: roDate(row.data), alignment: "center", fontSize: 8 },
       { text: `${row.serie} ${row.numarDocument}`, alignment: "center", fontSize: 8 },
+      { text: row.nrApartament, bold: true, alignment: "center", fontSize: 9 },
       {
         stack: [
-          { text: row.nrApartament, bold: true, alignment: "center", fontSize: 9 },
-          ...(row.proprietarNume ? [{ text: row.proprietarNume, fontSize: 7.5, color: "#444", alignment: "center", margin: [0, 2, 0, 0] }] : []),
+          { text: ceReprezinta(row), fontSize: 8 },
+          ...(row.proprietarNume ? [{ text: row.proprietarNume, fontSize: 7.5, color: "#555", margin: [0, 2, 0, 0], italics: true }] : []),
         ],
       },
-      { text: ceReprezinta(row), fontSize: 8 },
       { text: fmt2(row.sumaIncasata), alignment: "right", fontSize: 8 },
     ]),
     // Total row
@@ -142,7 +142,7 @@ async function generateAndDownloadPdf(
       {
         table: {
           headerRows: 1,
-          widths: [22, 48, 55, 62, "*", 48],
+          widths: [22, 48, 55, 24, "*", 48],
           body: tableBody,
         },
         layout: {
