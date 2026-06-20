@@ -429,7 +429,7 @@ export default function WizardClient({
       setSolduri(buildSoldRows(merged));
       setSoldFonduri(prev => buildSoldFondRows(
         merged, fonduri,
-        prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0 }))
+        prev.map(sf => ({ apartamentId: sf.apartamentId, fondId: sf.fondId, restanta: parseFloat(sf.restanta) || 0, sold: 0 }))
             .filter(sf => sf.restanta !== 0),
       ));
       setMaxStep(p => Math.max(p, 3)); setStep(3);
