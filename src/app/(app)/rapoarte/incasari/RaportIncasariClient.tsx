@@ -53,11 +53,10 @@ async function generateAndDownloadPdf(
   dataStart: string,
   dataEnd:   string,
 ) {
-  const pdfMakeModule = await import("pdfmake/build/pdfmake");
-  const pdfFontsModule = await import("pdfmake/build/vfs_fonts");
-  const pdfMake = (pdfMakeModule as any).default ?? pdfMakeModule;
-  const pdfFonts = (pdfFontsModule as any).default ?? pdfFontsModule;
-  pdfMake.vfs = pdfFonts.vfs ?? pdfFonts.pdfMake?.vfs;
+  // pdfmake exports the instance directly (no .default); vfs_fonts exports the vfs object directly
+  const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
+  const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
+  (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
 
   const totalIncasat = rows.reduce((s, r) => s + r.sumaIncasata, 0);
   const adresa = [
@@ -198,7 +197,8 @@ async function generateAndDownloadPdf(
   };
 
   const fileName = `registru-incasari-${dataStart}-${dataEnd}.pdf`;
-  pdfMake.download(fileName, docDefinition);
+  const pm = pdfMake.default ?? pdfMake;
+  pm.createPdf(docDefinition).download(fileName);
 }
 
 export default function RaportIncasariClient({
@@ -246,8 +246,11 @@ export default function RaportIncasariClient({
   async function handleDownloadPdf() {
     if (!rows.length) return;
     setPdfLoading(true);
+    setError(null);
     try {
       await generateAndDownloadPdf(asoc, rows, dataStart, dataEnd);
+    } catch (e: any) {
+      setError(`Eroare PDF: ${e?.message ?? String(e)}`);
     } finally {
       setPdfLoading(false);
     }
