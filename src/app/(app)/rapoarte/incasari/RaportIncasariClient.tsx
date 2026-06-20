@@ -106,16 +106,19 @@ export default function RaportIncasariClient({
             margin: 15mm 12mm 20mm 12mm;
           }
 
-          /* hide everything except the printable zone */
-          body > * { display: none !important; }
-          #print-root { display: block !important; }
+          /* visibility approach works even when #print-root is nested inside Next.js wrappers */
+          body * { visibility: hidden; }
+          #print-root, #print-root * { visibility: visible; }
 
           #print-root {
-            position: static;
+            position: fixed;
+            inset: 0;
+            padding: 15mm 12mm 20mm 12mm;
+            background: #fff;
             font-family: "Times New Roman", Times, serif;
             font-size: 10pt;
             color: #000;
-            background: #fff;
+            overflow: hidden;
           }
 
           /* ── antet ── */
@@ -210,7 +213,7 @@ export default function RaportIncasariClient({
         }
 
         @media screen {
-          #print-root { display: none; }
+          #print-root { display: none !important; }
         }
       `}</style>
 
