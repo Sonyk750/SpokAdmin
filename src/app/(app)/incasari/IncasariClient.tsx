@@ -110,7 +110,18 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [detail,     setDetail]     = useState<IncasareRow | null>(null);
   const [deleting,   setDeleting]   = useState(false);
   const [deleteErr,  setDeleteErr]  = useState<string | null>(null);
-  const [confirmDel, setConfirmDel] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<"storno" | "sterge" | null>(null);
+
+  // ── Edit mode in detail modal ─────────────────────────────────────────────
+  const [editMode,     setEditMode]     = useState(false);
+  const [editSaving,   setEditSaving]   = useState(false);
+  const [editErr,      setEditErr]      = useState<string | null>(null);
+  const [editData,     setEditData]     = useState("");
+  const [editSerie,    setEditSerie]    = useState("");
+  const [editNr,       setEditNr]       = useState("");
+  const [editTipDoc,   setEditTipDoc]   = useState("");
+  const [editTipPlata, setEditTipPlata] = useState("");
+  const [editObs,      setEditObs]      = useState("");
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const sumaPlatitaNum = parseFloat(sumaPlatita) || 0;
@@ -281,17 +292,54 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   }, [asociatieId, selectedApId, rightDebts, tipDocument, whereCollect, dataDoc, serieDoc, nrDocManual, observatii, avans, fetchIncasari]);
 
   // ── Delete ────────────────────────────────────────────────────────────────
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string, noReverse = false) => {
     setDeleting(true); setDeleteErr(null);
     try {
-      const res  = await fetch(`/api/incasari/${id}`, { method: "DELETE" });
+      const url = `/api/incasari/${id}${noReverse ? "?noReverse=true" : ""}`;
+      const res  = await fetch(url, { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare");
-      setDetail(null); setConfirmDel(false);
+      setDetail(null); setConfirmDel(null);
       fetchIncasari();
     } catch (e: any) { setDeleteErr(e.message); }
     finally { setDeleting(false); }
   }, [fetchIncasari]);
+
+  function openEditMode(inc: IncasareRow) {
+    setEditData(new Date(inc.data).toISOString().slice(0, 10));
+    setEditSerie(inc.serie);
+    setEditNr(String(inc.numarDocument));
+    setEditTipDoc(inc.tipDocument);
+    setEditTipPlata(inc.tipPlata);
+    setEditObs(inc.observatii ?? "");
+    setEditErr(null);
+    setEditMode(true);
+  }
+
+  const handleEdit = useCallback(async () => {
+    if (!detail) return;
+    setEditSaving(true); setEditErr(null);
+    try {
+      const res = await fetch(`/api/incasari/${detail.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data:          editData,
+          serie:         editSerie,
+          numarDocument: editNr ? parseInt(editNr) : undefined,
+          tipDocument:   editTipDoc,
+          tipPlata:      editTipPlata,
+          observatii:    editObs,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      setEditMode(false);
+      setDetail(null);
+      fetchIncasari();
+    } catch (e: any) { setEditErr(e.message); }
+    finally { setEditSaving(false); }
+  }, [detail, editData, editSerie, editNr, editTipDoc, editTipPlata, editObs, fetchIncasari]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   const totalIncasat = incasari.reduce((s, i) => s + i.sumaIncasata, 0);
@@ -376,7 +424,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
             <tbody>
               {incasari.map(inc => (
                 <tr key={inc.id} style={{ cursor: "pointer" }}
-                  onClick={() => { setDetail(inc); setConfirmDel(false); setDeleteErr(null); }}>
+                  onClick={() => { setDetail(inc); setConfirmDel(null); setDeleteErr(null); setEditMode(false); }}>
                   <td>
                     <span style={{ fontWeight: 700, color: "#a78bfa" }}>{inc.serie} {inc.numarDocument}</span>
                     <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", color: "#64748b" }}>
@@ -736,7 +784,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <span className="modal__title">
                 {TIP_DOC_LABEL[detail.tipDocument] ?? detail.tipDocument} {detail.serie} {detail.numarDocument}
               </span>
-              <button className="modal__close" onClick={() => { setDetail(null); setConfirmDel(false); }}>✕</button>
+              <button className="modal__close" onClick={() => { setDetail(null); setConfirmDel(null); setEditMode(false); }}>✕</button>
             </div>
             <div className="modal__body">
               <div className="info-list">
@@ -794,25 +842,107 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
               {deleteErr && <div className="wizard__error" style={{ marginTop: "1rem" }}>{deleteErr}</div>}
 
-              {!confirmDel ? (
-                <div className="modal__footer" style={{ justifyContent: "space-between" }}>
-                  <button className="btn btn--secondary" style={{ color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }} onClick={() => setConfirmDel(true)}>
-                    Stornează
-                  </button>
-                  <button className="btn btn--secondary" onClick={() => { setDetail(null); setConfirmDel(false); }}>Închide</button>
+              {/* ── Edit form ── */}
+              {editMode && (
+                <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(167,139,250,0.05)", border: "1px solid rgba(167,139,250,0.2)", borderRadius: "10px", display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+                  <div style={{ fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "#a78bfa", marginBottom: "0.25rem" }}>
+                    Editează chitanța
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label className="form-field__label">Data</label>
+                      <input type="date" className="input" value={editData} onChange={e => setEditData(e.target.value)} />
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label className="form-field__label">Tip document</label>
+                      <select className="input" value={editTipDoc} onChange={e => setEditTipDoc(e.target.value)}>
+                        <option value="chitanta">Chitanță</option>
+                        <option value="dispozitie_incasare">Dispoziție de încasare</option>
+                        <option value="proces_verbal">Proces verbal</option>
+                      </select>
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label className="form-field__label">Serie / Nr.</label>
+                      <div style={{ display: "flex", gap: "0.375rem" }}>
+                        <input type="text" className="input" value={editSerie} onChange={e => setEditSerie(e.target.value)} style={{ width: "54px" }} maxLength={6} />
+                        <input type="number" className="input" value={editNr} onChange={e => setEditNr(e.target.value)} style={{ flex: 1 }} min={1} />
+                      </div>
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 0 }}>
+                      <label className="form-field__label">Tip plată</label>
+                      <select className="input" value={editTipPlata} onChange={e => setEditTipPlata(e.target.value)}>
+                        <option value="casa">Casă</option>
+                        <option value="banca">Bancă</option>
+                        <option value="online">Online</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-field" style={{ marginBottom: 0 }}>
+                    <label className="form-field__label">Observații</label>
+                    <input type="text" className="input" value={editObs} onChange={e => setEditObs(e.target.value)} placeholder="Opțional..." />
+                  </div>
+                  {editErr && <div className="wizard__error">{editErr}</div>}
+                  <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                    <button className="btn btn--secondary" onClick={() => setEditMode(false)} disabled={editSaving}>Anulare</button>
+                    <button className="btn btn--primary" onClick={handleEdit} disabled={editSaving}>
+                      {editSaving ? "Se salvează..." : "Salvează modificările"}
+                    </button>
+                  </div>
                 </div>
-              ) : (
-                <div style={{ marginTop: "1.5rem", padding: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px" }}>
+              )}
+
+              {/* ── Confirm storno / sterge ── */}
+              {confirmDel === "storno" && (
+                <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px" }}>
                   <div style={{ fontSize: "0.875rem", color: "#f87171", marginBottom: "0.875rem" }}>
-                    Confirmi stornarea? Soldul apartamentului va fi refăcut.
+                    Stornarea anulează chitanța și restaurează datoriile în sold. Continui?
                   </div>
                   <div style={{ display: "flex", gap: "0.75rem" }}>
-                    <button className="btn btn--secondary" onClick={() => setConfirmDel(false)} disabled={deleting}>Anulare</button>
+                    <button className="btn btn--secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>Anulare</button>
                     <button className="btn btn--primary" style={{ background: "rgba(239,68,68,0.8)" }}
-                      onClick={() => handleDelete(detail.id)} disabled={deleting}>
+                      onClick={() => handleDelete(detail.id, false)} disabled={deleting}>
                       {deleting ? "Se stornează..." : "Confirmă storno"}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {confirmDel === "sterge" && (
+                <div style={{ marginTop: "1.25rem", padding: "1rem", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: "8px" }}>
+                  <div style={{ fontSize: "0.875rem", color: "#f87171", marginBottom: "0.875rem" }}>
+                    Ștergerea elimină înregistrarea fără a modifica soldul. Continui?
+                  </div>
+                  <div style={{ display: "flex", gap: "0.75rem" }}>
+                    <button className="btn btn--secondary" onClick={() => setConfirmDel(null)} disabled={deleting}>Anulare</button>
+                    <button className="btn btn--primary" style={{ background: "rgba(239,68,68,0.8)" }}
+                      onClick={() => handleDelete(detail.id, true)} disabled={deleting}>
+                      {deleting ? "Se șterge..." : "Confirmă ștergerea"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Action buttons ── */}
+              {!confirmDel && !editMode && (
+                <div className="modal__footer" style={{ justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <button className="btn btn--secondary"
+                      style={{ color: "#f87171", borderColor: "rgba(239,68,68,0.3)", fontSize: "0.8125rem" }}
+                      onClick={() => { setConfirmDel("storno"); setEditMode(false); }}>
+                      Stornează
+                    </button>
+                    <button className="btn btn--secondary"
+                      style={{ color: "#f87171", borderColor: "rgba(239,68,68,0.3)", fontSize: "0.8125rem" }}
+                      onClick={() => { setConfirmDel("sterge"); setEditMode(false); }}>
+                      Șterge
+                    </button>
+                    <button className="btn btn--secondary"
+                      style={{ color: "#a78bfa", borderColor: "rgba(167,139,250,0.3)", fontSize: "0.8125rem" }}
+                      onClick={() => { openEditMode(detail); setConfirmDel(null); }}>
+                      Editează
+                    </button>
+                  </div>
+                  <button className="btn btn--secondary" onClick={() => { setDetail(null); setConfirmDel(null); setEditMode(false); }}>Închide</button>
                 </div>
               )}
             </div>
