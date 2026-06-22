@@ -23,11 +23,10 @@ const nav: Item[] = [
     type: "group", label: "Rapoarte", key: "rapoarte",
     children: [
       { type: "link",  href: "/rapoarte/lista-intretinere",   label: "Lista întreținere" },
-      { type: "link",  href: "/rapoarte/incasari",            label: "Raport încasări" },
+      { type: "link",  href: "/rapoarte/incasari",            label: "Registru încasări" },
       { type: "link",  href: "/rapoarte/explicatii-lista",    label: "Explicații listă" },
       { type: "link",  href: "/rapoarte/restantieri",         label: "Restanțieri" },
       { type: "link",  href: "/rapoarte/venituri-cheltuieli", label: "Venituri și cheltuieli" },
-      { type: "link",  href: "/rapoarte/registru-incasari",   label: "Registru încasări" },
       { type: "link",  href: "/rapoarte/registru-plati",      label: "Registru plăți" },
       { type: "link",  href: "/rapoarte/registru-casa",       label: "Registru casă" },
       { type: "link",  href: "/rapoarte/registru-banca",      label: "Registru bancă" },
