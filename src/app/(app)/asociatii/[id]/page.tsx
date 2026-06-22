@@ -112,7 +112,7 @@ export default async function AsociatieDetailPage({ params }: { params: Promise<
                 return (
                   <div key={ap.id} className="ap-row">
                     <span className="ap-row__nr">Ap. {ap.numar}</span>
-                    <span className="ap-row__prop">{prop ? `${prop.nume}${prop.prenume ? " " + prop.prenume : ""}` : "—"}</span>
+                    <span className="ap-row__prop">{prop ? [prop.prenume, prop.nume].filter(Boolean).join(" ") || "—" : "—"}</span>
                     <span className={`ap-row__rest${rest > 0 ? " ap-row__rest--red" : ""}`}>
                       {rest > 0 ? `${rest.toFixed(2)} lei` : "—"}
                     </span>

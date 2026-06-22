@@ -68,7 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         nrPersone:   ap.nrPersone,
         cotaParte:   ap.cotaParte,
         suprafata:   ap.suprafata,
-        proprietar:  p ? `${p.nume}${p.prenume ? " " + p.prenume : ""}` : "",
+        proprietar:  p ? [p.prenume, p.nume].filter(Boolean).join(" ") : "",
         consumByTip,
       };
     }),

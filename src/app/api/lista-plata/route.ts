@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
 
     return {
       apartamentId: ap.id, numar: ap.numar,
-      proprietar: prop ? `${prop.nume}${prop.prenume ? " " + prop.prenume : ""}` : "",
+      proprietar: prop ? [prop.prenume, prop.nume].filter(Boolean).join(" ") : "",
       nrPersone: ap.nrPersone, cotaParte: ap.cotaParte, suprafata: ap.suprafata,
       consumByTip,
       cheltuieli:          {} as Record<string, number>,
