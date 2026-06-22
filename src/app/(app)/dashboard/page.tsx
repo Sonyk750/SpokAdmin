@@ -3,6 +3,36 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
+const fmtLei = (v: number) => v.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// Cerc grafic (donut) — inel proporțional cu procentul + valoare în centru
+function Donut({ label, value, percent, color, sub }: {
+  label: string; value: number; percent: number; color: string; sub: string | null;
+}) {
+  const r = 52;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(1, percent));
+  const offset = c * (1 - pct);
+  return (
+    <div className="dash-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "1.25rem 1rem", textAlign: "center" }}>
+      <div style={{ position: "relative", width: 120, height: 120 }}>
+        <svg width={120} height={120} viewBox="0 0 120 120">
+          <circle cx={60} cy={60} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={12} />
+          <circle cx={60} cy={60} r={r} fill="none" stroke={color} strokeWidth={12}
+            strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+            transform="rotate(-90 60 60)" />
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontSize: "1.05rem", fontWeight: 800, color }}>{fmtLei(value)}</span>
+          <span style={{ fontSize: "0.6rem", color: "#94a3b8", letterSpacing: "0.05em" }}>LEI</span>
+        </div>
+      </div>
+      <p style={{ marginTop: "0.75rem", fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1", lineHeight: 1.3 }}>{label}</p>
+      {sub && <p style={{ marginTop: "0.15rem", fontSize: "0.7rem", color: "#94a3b8" }}>{sub}</p>}
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.organizationId) redirect("/login");
@@ -16,12 +46,53 @@ export default async function DashboardPage() {
     db.factura.count({ where: { organizationId: orgId, status: "neplatita" } }),
   ]);
 
-  // Restanțe totale
+  // Restanțe proprietari (din soldurile apartamentelor)
   const restante = await db.soldApartament.aggregate({
     where:  { apartament: { organizationId: orgId } },
     _sum:   { restantaIntretinere: true },
   });
-  const totalRestante = restante._sum.restantaIntretinere ?? 0;
+  const totalRestanteProp = restante._sum.restantaIntretinere ?? 0;
+
+  // Ultima listă de întreținere a fiecărei asociații → totaluri sumă de plată / încasări
+  const asociatiiActive = await db.asociatie.findMany({
+    where: { organizationId: orgId, isActive: true }, select: { id: true },
+  });
+  const ultimeleListe = (await Promise.all(
+    asociatiiActive.map(a =>
+      db.listaLuna.findFirst({
+        where:   { asociatieId: a.id },
+        orderBy: [{ an: "desc" }, { luna: "desc" }],
+        select:  { id: true },
+      })
+    )
+  )).filter((l): l is { id: string } => !!l).map(l => l.id);
+
+  const listaAgg = await db.listaLunaApartament.aggregate({
+    where: { listaId: { in: ultimeleListe } },
+    _sum:  { totalDePlata: true, achitat: true },
+  });
+  const totalDePlata      = listaAgg._sum.totalDePlata ?? 0;
+  const totalIncasatLista = listaAgg._sum.achitat ?? 0;
+
+  // Restanțe furnizori = total facturi − total plătit
+  const [facturiAgg, platiAgg] = await Promise.all([
+    db.factura.aggregate({ where: { organizationId: orgId }, _sum: { valoare: true } }),
+    db.plata.aggregate({ where: { factura: { organizationId: orgId } }, _sum: { suma: true } }),
+  ]);
+  const totalFacturi      = facturiAgg._sum.valoare ?? 0;
+  const restanteFurnizori = Math.max(0, totalFacturi - (platiAgg._sum.suma ?? 0));
+
+  // Procente pentru inelele donut
+  const pctIncasat   = totalDePlata  > 0 ? totalIncasatLista / totalDePlata      : 0;
+  const pctRestProp  = totalDePlata  > 0 ? totalRestanteProp / totalDePlata      : (totalRestanteProp > 0 ? 1 : 0);
+  const pctRestFurn  = totalFacturi  > 0 ? restanteFurnizori / totalFacturi      : 0;
+
+  const cercuri = [
+    { label: "Sumă de plată (lista ant.)", value: totalDePlata,      percent: 1,           color: "#a78bfa", sub: null as string | null },
+    { label: "Încasări pe listă",          value: totalIncasatLista, percent: pctIncasat,  color: "#4ade80", sub: `${Math.round(pctIncasat * 100)}% încasat` },
+    { label: "Restanțe proprietari",       value: totalRestanteProp, percent: pctRestProp, color: "#f87171", sub: null },
+    { label: "Restanțe furnizori",         value: restanteFurnizori, percent: pctRestFurn, color: "#fbbf24", sub: totalFacturi > 0 ? `${Math.round(pctRestFurn * 100)}% din facturi` : null },
+  ];
 
   // Ultimele asociații
   const ultimeleAsociatii = await db.asociatie.findMany({
@@ -65,14 +136,16 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {totalRestante > 0 && (
-        <div className="dash-panel" style={{ borderColor: "rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)" }}>
-          <p className="dash-panel__title" style={{ color: "#fca5a5" }}>⚠ Restanțe totale</p>
-          <p style={{ fontSize: "1.75rem", fontWeight: 800, color: "#f87171", marginTop: "0.5rem" }}>
-            {totalRestante.toFixed(2)} lei
-          </p>
-        </div>
-      )}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+        gap: "1rem",
+        marginBottom: "1.5rem",
+      }}>
+        {cercuri.map(c => (
+          <Donut key={c.label} label={c.label} value={c.value} percent={c.percent} color={c.color} sub={c.sub} />
+        ))}
+      </div>
 
       <div className="dashboard__grid">
         {/* Asociații recente */}
