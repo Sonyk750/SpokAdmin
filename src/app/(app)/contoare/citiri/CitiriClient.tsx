@@ -12,7 +12,7 @@ interface ContorRow {
   indexVechi: string;
   indexNou:   string;
 }
-interface ApBlock { apartamentId: string; numar: string; contoare: ContorRow[]; }
+interface ApBlock { apartamentId: string; numar: string; proprietar: string; contoare: ContorRow[]; }
 
 const LUNI = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
 const TIP_LABEL: Record<string, string> = { apa_rece: "Apă rece", apa_calda: "Apă caldă", electric: "Electric", gaz: "Gaz" };
@@ -51,7 +51,7 @@ export default function CitiriClient({ defaultLuna, defaultAn }: { defaultLuna: 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
       const aps: ApBlock[] = (json.apartamente ?? []).map((ap: any) => ({
-        apartamentId: ap.apartamentId, numar: ap.numar,
+        apartamentId: ap.apartamentId, numar: ap.numar, proprietar: ap.proprietar ?? "",
         contoare: ap.contoare.map((c: any) => ({
           contorId: c.contorId, tip: c.tip, locatie: c.locatie, denumire: c.denumire,
           numarSerie: c.numarSerie ?? "",
@@ -143,7 +143,9 @@ export default function CitiriClient({ defaultLuna, defaultAn }: { defaultLuna: 
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {data.map((ap, apIdx) => (
             <div key={ap.apartamentId || ap.numar} className="dash-panel" style={{ padding: "1rem 1.25rem" }}>
-              <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Ap. {ap.numar}</div>
+              <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>
+                Ap. {ap.numar}{ap.proprietar ? <span style={{ color: "#94a3b8", fontWeight: 500 }}> — {ap.proprietar}</span> : ""}
+              </div>
               <div className="table-wrap">
                 <table className="data-table" style={{ fontSize: "0.8125rem" }}>
                   <thead>

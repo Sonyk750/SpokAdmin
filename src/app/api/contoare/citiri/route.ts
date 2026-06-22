@@ -22,14 +22,15 @@ export async function GET(req: NextRequest) {
     where:  { asociatieId, organizationId: orgId, isActive: true },
     select: {
       id: true, tip: true, locatie: true, denumire: true, numarSerie: true,
-      apartament: { select: { id: true, numar: true } },
+      apartament: { select: { id: true, numar: true,
+        proprietari: { where: { isMain: true }, include: { proprietar: { select: { nume: true, prenume: true } } }, take: 1 } } },
       citiri: { select: { luna: true, an: true, valoare: true, valoarePrev: true } },
     },
   });
 
   const before = (c: { luna: number; an: number }) => c.an < an || (c.an === an && c.luna < luna);
 
-  const byAp = new Map<string, { apartamentId: string; numar: string; contoare: any[] }>();
+  const byAp = new Map<string, { apartamentId: string; numar: string; proprietar: string; contoare: any[] }>();
   for (const c of contoare) {
     const existing = c.citiri.find(x => x.luna === luna && x.an === an);
     const prev = c.citiri.filter(before).sort((a, b) => b.an - a.an || b.luna - a.luna)[0];
@@ -38,7 +39,9 @@ export async function GET(req: NextRequest) {
 
     const apNumar = c.apartament?.numar ?? "—";
     const apId = c.apartament?.id ?? "";
-    if (!byAp.has(apNumar)) byAp.set(apNumar, { apartamentId: apId, numar: apNumar, contoare: [] });
+    const prop = c.apartament?.proprietari[0]?.proprietar;
+    const propNume = prop ? [prop.prenume, prop.nume].filter(Boolean).join(" ") : "";
+    if (!byAp.has(apNumar)) byAp.set(apNumar, { apartamentId: apId, numar: apNumar, proprietar: propNume, contoare: [] });
     byAp.get(apNumar)!.contoare.push({
       contorId: c.id, tip: c.tip, locatie: c.locatie, denumire: c.denumire, numarSerie: c.numarSerie ?? "",
       indexVechi, indexNou,
