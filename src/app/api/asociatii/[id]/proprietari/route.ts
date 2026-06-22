@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const orgId = session.user.organizationId;
 
   for (const p of proprietari) {
-    const numeToSave    = (p.numeComplet ?? p.nume ?? "").trim();
+    const numeToSave    = (p.nume ?? p.numeComplet ?? "").trim();
     const prenumeToSave = (p.prenume ?? "").trim() || null;
     if (!p.apartamentId || !numeToSave) continue;
 
