@@ -167,6 +167,14 @@ export default function Sidebar() {
         </nav>
 
         <div className="sidebar__footer">
+          <Link
+            href="/ajutor"
+            onClick={close}
+            className={`snav-help${isActive("/ajutor") ? " snav-help--active" : ""}`}
+          >
+            <span style={{ fontSize: "1rem" }}>❓</span>
+            <span>Ghid de utilizare</span>
+          </Link>
           <button onClick={() => signOut({ callbackUrl: "/login" })} className="snav-logout">
             Logout
           </button>
