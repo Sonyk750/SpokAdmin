@@ -91,7 +91,6 @@ export default function TransferuriClient() {
   }
 
   const totalTransferat = rows.reduce((s, r) => s + r.suma, 0);
-  const soldDinCont = conturi.find(c => c.name === dinCont)?.balance ?? null;
 
   if (!asociatieId) {
     return (
@@ -138,11 +137,6 @@ export default function TransferuriClient() {
               <select className="input" value={dinCont} onChange={e => setDinCont(e.target.value)}>
                 {conturi.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
               </select>
-              {soldDinCont !== null && (
-                <span style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "0.25rem", display: "block" }}>
-                  Disponibil: <strong style={{ color: soldDinCont < 0 ? "#f87171" : "#4ade80" }}>{fmt2(soldDinCont)} lei</strong>
-                </span>
-              )}
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label className="form-field__label">În contul</label>
