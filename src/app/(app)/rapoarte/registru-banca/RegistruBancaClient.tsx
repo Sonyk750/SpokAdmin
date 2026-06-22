@@ -319,7 +319,7 @@ export default function RegistruBancaClient({
             <p className="page-sub">Operațiunile prin contul bancar selectat</p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button className="btn btn--secondary" onClick={handlePrint} disabled={ops.length === 0}>
+            <button className="btn btn--secondary" onClick={handlePrint} disabled={!cont}>
               🖨 Printează
             </button>
             <button className="btn btn--primary" onClick={handleDownloadPdf} disabled={pdfLoading || !cont}>
