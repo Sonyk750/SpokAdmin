@@ -16,11 +16,15 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   });
   if (!asociatie) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  let existing: Record<string, unknown> = {};
+  try { if (asociatie.wizardData) existing = JSON.parse(asociatie.wizardData); } catch {}
+
   await db.asociatie.update({
     where: { id },
     data: {
       wizardStep: 9,
       wizardData: JSON.stringify({
+        ...existing,
         completedAt:    new Date().toISOString(),
         nrApartamente:  asociatie.apartamente.length,
         nrFonduri:      asociatie.fonduri.length,
