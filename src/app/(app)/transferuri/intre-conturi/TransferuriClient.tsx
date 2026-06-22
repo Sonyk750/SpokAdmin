@@ -5,6 +5,8 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 
 const CASA = "Casă";
 
+interface ContBalance { name: string; balance: number; }
+
 interface TransferRow {
   id:        string;
   data:      string;
@@ -23,7 +25,7 @@ function roDate(iso: string) {
 export default function TransferuriClient() {
   const { activeId: asociatieId } = useAsociatie();
 
-  const [conturi, setConturi] = useState<string[]>([CASA]);
+  const [conturi, setConturi] = useState<ContBalance[]>([]);
   const [rows,    setRows]    = useState<TransferRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState<string | null>(null);
@@ -36,28 +38,19 @@ export default function TransferuriClient() {
   const [data,    setData]    = useState(today);
   const [notes,   setNotes]   = useState("");
 
-  // Încarcă conturile (Casă + bănci) din asociație
-  useEffect(() => {
-    if (!asociatieId) { setConturi([CASA]); return; }
-    fetch(`/api/asociatii/${asociatieId}`)
-      .then(r => r.json())
-      .then(d => {
-        const banci: string[] = Array.isArray(d.banci) ? d.banci.map((b: any) => b.name).filter(Boolean) : [];
-        const list = [CASA, ...banci];
-        setConturi(list);
-        setInCont(prev => prev || banci[0] || "");
-      })
-      .catch(() => setConturi([CASA]));
-  }, [asociatieId]);
-
   const fetchData = useCallback(async () => {
-    if (!asociatieId) { setRows([]); return; }
+    if (!asociatieId) { setConturi([]); setRows([]); return; }
     setLoading(true); setError(null);
     try {
       const res  = await fetch(`/api/transferuri?asociatieId=${asociatieId}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
-      setRows(json);
+      const c: ContBalance[] = json.conturi ?? [];
+      setConturi(c);
+      setRows(json.transferuri ?? []);
+      const names = c.map(x => x.name);
+      setDinCont(prev => names.includes(prev) ? prev : (names[0] ?? CASA));
+      setInCont(prev  => names.includes(prev) ? prev : (names.find(n => n !== (names[0] ?? CASA)) ?? ""));
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, [asociatieId]);
@@ -80,7 +73,6 @@ export default function TransferuriClient() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare la salvare");
-      // reset sumă + observații, păstrează conturile alese
       setSuma(""); setNotes("");
       await fetchData();
     } catch (e: any) { setError(e.message); }
@@ -88,7 +80,7 @@ export default function TransferuriClient() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Ștergi acest transfer?")) return;
+    if (!confirm("Ștergi acest transfer? Soldurile conturilor vor reveni la valorile anterioare.")) return;
     setError(null);
     try {
       const res = await fetch(`/api/transferuri/${id}`, { method: "DELETE" });
@@ -99,6 +91,7 @@ export default function TransferuriClient() {
   }
 
   const totalTransferat = rows.reduce((s, r) => s + r.suma, 0);
+  const soldDinCont = conturi.find(c => c.name === dinCont)?.balance ?? null;
 
   if (!asociatieId) {
     return (
@@ -117,44 +110,69 @@ export default function TransferuriClient() {
         </div>
       </div>
 
+      {/* Solduri conturi */}
+      {conturi.length > 0 && (
+        <div className="dash-panel" style={{ padding: "1rem 1.5rem", marginBottom: "1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+          {conturi.map(c => (
+            <div key={c.name}>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>
+                {c.name === CASA ? "🏠 " : "🏦 "}{c.name}
+              </div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: c.balance < 0 ? "#f87171" : "#4ade80" }}>{fmt2(c.balance)} lei</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Formular transfer nou */}
-      <div className="dash-panel" style={{ padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
-        <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "1rem", fontSize: "0.9rem" }}>Transfer nou</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", alignItems: "flex-end" }}>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-field__label">Din contul</label>
-            <select className="input" value={dinCont} onChange={e => setDinCont(e.target.value)}>
-              {conturi.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+      {conturi.length < 2 ? (
+        <div className="wizard__error" style={{ marginBottom: "1.5rem" }}>
+          Ai nevoie de cel puțin 2 conturi (Casă + bancă) pentru a face un transfer. Adaugă conturi bancare în inițializarea asociației.
+        </div>
+      ) : (
+        <div className="dash-panel" style={{ padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
+          <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "1rem", fontSize: "0.9rem" }}>Transfer nou</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "1rem", alignItems: "flex-end" }}>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label className="form-field__label">Din contul</label>
+              <select className="input" value={dinCont} onChange={e => setDinCont(e.target.value)}>
+                {conturi.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+              {soldDinCont !== null && (
+                <span style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "0.25rem", display: "block" }}>
+                  Disponibil: <strong style={{ color: soldDinCont < 0 ? "#f87171" : "#4ade80" }}>{fmt2(soldDinCont)} lei</strong>
+                </span>
+              )}
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label className="form-field__label">În contul</label>
+              <select className="input" value={inCont} onChange={e => setInCont(e.target.value)}>
+                <option value="">— alege —</option>
+                {conturi.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label className="form-field__label">Sumă (lei)</label>
+              <input type="number" className="input" step="0.01" min="0" placeholder="0.00"
+                value={suma} onChange={e => setSuma(e.target.value)} />
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label className="form-field__label">Data</label>
+              <input type="date" className="input" value={data} onChange={e => setData(e.target.value)} />
+            </div>
           </div>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-field__label">În contul</label>
-            <select className="input" value={inCont} onChange={e => setInCont(e.target.value)}>
-              <option value="">— alege —</option>
-              {conturi.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-field__label">Sumă (lei)</label>
-            <input type="number" className="input" step="0.01" min="0" placeholder="0.00"
-              value={suma} onChange={e => setSuma(e.target.value)} />
-          </div>
-          <div className="form-field" style={{ marginBottom: 0 }}>
-            <label className="form-field__label">Data</label>
-            <input type="date" className="input" value={data} onChange={e => setData(e.target.value)} />
+          <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginTop: "1rem" }}>
+            <div className="form-field" style={{ marginBottom: 0, flex: 1 }}>
+              <label className="form-field__label">Observații (opțional)</label>
+              <input type="text" className="input" placeholder="ex: depunere numerar în bancă"
+                value={notes} onChange={e => setNotes(e.target.value)} />
+            </div>
+            <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
+              {saving ? "Se salvează..." : "+ Adaugă transfer"}
+            </button>
           </div>
         </div>
-        <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginTop: "1rem" }}>
-          <div className="form-field" style={{ marginBottom: 0, flex: 1 }}>
-            <label className="form-field__label">Observații (opțional)</label>
-            <input type="text" className="input" placeholder="ex: depunere numerar în bancă"
-              value={notes} onChange={e => setNotes(e.target.value)} />
-          </div>
-          <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Se salvează..." : "+ Adaugă transfer"}
-          </button>
-        </div>
-      </div>
+      )}
 
       {error && <div className="wizard__error" style={{ marginBottom: "1rem" }}>{error}</div>}
 
