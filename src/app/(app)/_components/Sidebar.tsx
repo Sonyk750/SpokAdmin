@@ -179,6 +179,10 @@ export default function Sidebar() {
             Logout
           </button>
           <BnrWidget />
+          <div className="snav-legal">
+            <Link href="/legal/termeni" onClick={close}>Termeni și condiții</Link>
+            <Link href="/legal/confidentialitate" onClick={close}>Confidențialitate (GDPR)</Link>
+          </div>
         </div>
       </aside>
     </>
