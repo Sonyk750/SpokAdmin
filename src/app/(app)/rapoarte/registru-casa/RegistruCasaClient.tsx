@@ -6,12 +6,20 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 interface Operatiune {
   id:       string;
   data:     string;
-  fel:      "incasare" | "plata";
+  fel:      "incasare" | "plata" | "transfer";
   document: string;
   detalii:  string;
   intrare:  number;
   iesire:   number;
 }
+
+const felLabel = (fel: Operatiune["fel"]) =>
+  fel === "incasare" ? "Încasare" : fel === "plata" ? "Plată" : "Transfer";
+// culori: încasare verde, plată roșu, transfer cyan
+const felColor = (fel: Operatiune["fel"]) =>
+  fel === "incasare" ? "#4ade80" : fel === "plata" ? "#f87171" : "#22d3ee";
+const felColorPdf = (fel: Operatiune["fel"]) =>
+  fel === "incasare" ? "#1a7f37" : fel === "plata" ? "#b91c1c" : "#0e7490";
 
 interface AsocInfo {
   name:           string;
@@ -94,7 +102,7 @@ async function generateAndDownloadPdf(
       { text: row.document, alignment: "center", fontSize: 8 },
       {
         stack: [
-          { text: row.fel === "incasare" ? "Încasare" : "Plată", fontSize: 7, color: row.fel === "incasare" ? "#1a7f37" : "#b91c1c", bold: true },
+          { text: felLabel(row.fel), fontSize: 7, color: felColorPdf(row.fel), bold: true },
           { text: row.detalii, fontSize: 8, margin: [0, 1, 0, 0] },
         ],
       },
@@ -365,8 +373,8 @@ export default function RegistruCasaClient({
                   <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(row.data)}</td>
                   <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{row.document}</td>
                   <td style={{ color: "#94a3b8" }}>
-                    <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: row.fel === "incasare" ? "#4ade80" : "#f87171" }}>
-                      {row.fel === "incasare" ? "Încasare" : "Plată"}
+                    <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: felColor(row.fel) }}>
+                      {felLabel(row.fel)}
                     </span>
                     <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 1 }}>{row.detalii}</span>
                   </td>
@@ -436,7 +444,7 @@ export default function RegistruCasaClient({
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{roDate(row.data)}</td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{row.document}</td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>
-                  <span style={{ fontWeight: "bold" }}>{row.fel === "incasare" ? "Încasare" : "Plată"}: </span>{row.detalii}
+                  <span style={{ fontWeight: "bold" }}>{felLabel(row.fel)}: </span>{row.detalii}
                 </td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", whiteSpace: "nowrap" }}>{row.intrare ? fmt2(row.intrare) : ""}</td>
                 <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", whiteSpace: "nowrap" }}>{row.iesire ? fmt2(row.iesire) : ""}</td>

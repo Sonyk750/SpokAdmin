@@ -49,13 +49,22 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  // Transferuri care implică contul Casă (în = intrare, din = ieșire)
+  const transferuri = await db.transfer.findMany({
+    where:  { asociatieId, organizationId: orgId, OR: [{ dinCont: "Casă" }, { inCont: "Casă" }] },
+    select: { id: true, data: true, suma: true, dinCont: true, inCont: true, notes: true, createdAt: true },
+  });
+
   // Sold la începutul perioadei = sold inițial + intrări - ieșiri (toate înainte de start)
   const incBefore  = incasari.filter(i => i.data < start).reduce((s, i) => s + i.sumaIncasata, 0);
   const platBefore = plati   .filter(p => p.data < start).reduce((s, p) => s + p.suma, 0);
-  const soldInitial = soldCasaWizard + incBefore - platBefore;
+  const trfBefore  = transferuri
+    .filter(t => t.data < start)
+    .reduce((s, t) => s + (t.inCont === "Casă" ? t.suma : 0) - (t.dinCont === "Casă" ? t.suma : 0), 0);
+  const soldInitial = soldCasaWizard + incBefore - platBefore + trfBefore;
 
   type Op = {
-    id: string; data: string; fel: "incasare" | "plata";
+    id: string; data: string; fel: "incasare" | "plata" | "transfer";
     document: string; detalii: string; intrare: number; iesire: number;
     _dataMs: number; _createdMs: number;
   };
@@ -81,6 +90,19 @@ export async function GET(req: NextRequest) {
       detalii:  `${furn}${p.notes ? " — " + p.notes : ""}`,
       intrare:  0, iesire: p.suma,
       _dataMs: p.data.getTime(), _createdMs: p.createdAt.getTime(),
+    });
+  }
+
+  for (const t of transferuri) {
+    if (t.data < start || t.data > end) continue;
+    const inCasa = t.inCont === "Casă";
+    ops.push({
+      id: t.id, data: t.data.toISOString(), fel: "transfer",
+      document: "Transfer",
+      detalii:  inCasa ? `Din ${t.dinCont}${t.notes ? " — " + t.notes : ""}` : `Către ${t.inCont}${t.notes ? " — " + t.notes : ""}`,
+      intrare:  inCasa ? t.suma : 0,
+      iesire:   inCasa ? 0 : t.suma,
+      _dataMs: t.data.getTime(), _createdMs: t.createdAt.getTime(),
     });
   }
 
