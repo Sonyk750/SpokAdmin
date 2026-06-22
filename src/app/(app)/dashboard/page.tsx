@@ -2,42 +2,18 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-
-const fmtLei = (v: number) => v.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-// Cerc grafic (donut) — inel proporțional cu procentul + valoare în centru
-function Donut({ label, value, percent, color, sub }: {
-  label: string; value: number; percent: number; color: string; sub: string | null;
-}) {
-  const r = 52;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(1, percent));
-  const offset = c * (1 - pct);
-  return (
-    <div className="dash-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "1.25rem 1rem", textAlign: "center" }}>
-      <div style={{ position: "relative", width: 120, height: 120 }}>
-        <svg width={120} height={120} viewBox="0 0 120 120">
-          <circle cx={60} cy={60} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={12} />
-          <circle cx={60} cy={60} r={r} fill="none" stroke={color} strokeWidth={12}
-            strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
-            transform="rotate(-90 60 60)" />
-        </svg>
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontSize: "1.05rem", fontWeight: 800, color }}>{fmtLei(value)}</span>
-          <span style={{ fontSize: "0.6rem", color: "#94a3b8", letterSpacing: "0.05em" }}>LEI</span>
-        </div>
-      </div>
-      <p style={{ marginTop: "0.75rem", fontSize: "0.8rem", fontWeight: 600, color: "#cbd5e1", lineHeight: 1.3 }}>{label}</p>
-      {sub && <p style={{ marginTop: "0.15rem", fontSize: "0.7rem", color: "#94a3b8" }}>{sub}</p>}
-    </div>
-  );
-}
+import DashboardCharts from "./DashboardCharts";
 
 export default async function DashboardPage() {
   const session = await auth();
   if (!session?.user?.organizationId) redirect("/login");
 
   const orgId = session.user.organizationId;
+
+  const asociatiiActive = await db.asociatie.findMany({
+    where: { organizationId: orgId, isActive: true }, select: { id: true },
+  });
+  const asociatiiIds = asociatiiActive.map(a => a.id);
 
   const [nrAsociatii, nrApartamente, nrProprietari, nrFacturiNeplatite] = await Promise.all([
     db.asociatie.count({ where: { organizationId: orgId, isActive: true } }),
@@ -46,75 +22,136 @@ export default async function DashboardPage() {
     db.factura.count({ where: { organizationId: orgId, status: "neplatita" } }),
   ]);
 
-  // Restanțe proprietari (din soldurile apartamentelor)
-  const restante = await db.soldApartament.aggregate({
-    where:  { apartament: { organizationId: orgId } },
-    _sum:   { restantaIntretinere: true },
+  // Solduri / restanțe proprietari
+  const soldAgg = await db.soldApartament.aggregate({
+    where: { apartament: { organizationId: orgId } },
+    _sum:  { restantaIntretinere: true, intretinereCurenta: true },
   });
-  const totalRestanteProp = restante._sum.restantaIntretinere ?? 0;
+  const totalRestanteProp  = soldAgg._sum.restantaIntretinere ?? 0;
+  const intretinereCurenta = soldAgg._sum.intretinereCurenta ?? 0;
 
-  // Ultima listă de întreținere a fiecărei asociații → totaluri sumă de plată / încasări
-  const asociatiiActive = await db.asociatie.findMany({
-    where: { organizationId: orgId, isActive: true }, select: { id: true },
-  });
+  // Ultima listă de întreținere a fiecărei asociații
   const ultimeleListe = (await Promise.all(
-    asociatiiActive.map(a =>
+    asociatiiIds.map(id =>
       db.listaLuna.findFirst({
-        where:   { asociatieId: a.id },
-        orderBy: [{ an: "desc" }, { luna: "desc" }],
-        select:  { id: true },
+        where: { asociatieId: id }, orderBy: [{ an: "desc" }, { luna: "desc" }], select: { id: true },
       })
     )
   )).filter((l): l is { id: string } => !!l).map(l => l.id);
 
-  const listaAgg = await db.listaLunaApartament.aggregate({
-    where: { listaId: { in: ultimeleListe } },
-    _sum:  { totalDePlata: true, achitat: true },
-  });
-  const totalDePlata      = listaAgg._sum.totalDePlata ?? 0;
-  const totalIncasatLista = listaAgg._sum.achitat ?? 0;
-
-  // Restanțe furnizori = total facturi − total plătit
-  const [facturiAgg, platiAgg] = await Promise.all([
+  const [listaAgg, listaHeaderAgg, facturiAgg, platiAgg, platiByMetoda, incByTip, fondRestAgg, fondSold, fondNames] = await Promise.all([
+    db.listaLunaApartament.aggregate({
+      where: { listaId: { in: ultimeleListe } },
+      _sum:  { totalDePlata: true, achitat: true, rest: true, restantaVeche: true, totalLuna: true },
+    }),
+    db.listaLuna.aggregate({ where: { id: { in: ultimeleListe } }, _sum: { totalCheltuieli: true } }),
     db.factura.aggregate({ where: { organizationId: orgId }, _sum: { valoare: true } }),
     db.plata.aggregate({ where: { factura: { organizationId: orgId } }, _sum: { suma: true } }),
+    db.plata.groupBy({ by: ["metoda"], where: { factura: { organizationId: orgId } }, _sum: { suma: true } }),
+    db.incasare.groupBy({ by: ["tipPlata"], where: { organizationId: orgId }, _sum: { sumaIncasata: true } }),
+    db.fondApartament.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { restanta: true } }),
+    db.fondApartament.groupBy({ by: ["fondId"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sold: true } }),
+    db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds } }, select: { id: true, name: true } }),
   ]);
+
+  const totalDePlata       = listaAgg._sum.totalDePlata  ?? 0;
+  const totalIncasatLista  = listaAgg._sum.achitat        ?? 0;
+  const restLista          = listaAgg._sum.rest           ?? 0;
+  const restantaVecheLista = listaAgg._sum.restantaVeche  ?? 0;
+  const totalLunaLista     = listaAgg._sum.totalLuna      ?? 0;
+  const cheltuieliLista    = listaHeaderAgg._sum.totalCheltuieli ?? 0;
+
   const totalFacturi      = facturiAgg._sum.valoare ?? 0;
-  const restanteFurnizori = Math.max(0, totalFacturi - (platiAgg._sum.suma ?? 0));
+  const totalPlatit       = platiAgg._sum.suma      ?? 0;
+  const restanteFurnizori = Math.max(0, totalFacturi - totalPlatit);
+  const restanteFonduri   = fondRestAgg._sum.restanta ?? 0;
 
-  // Procente pentru inelele donut
-  const pctIncasat   = totalDePlata  > 0 ? totalIncasatLista / totalDePlata      : 0;
-  const pctRestProp  = totalDePlata  > 0 ? totalRestanteProp / totalDePlata      : (totalRestanteProp > 0 ? 1 : 0);
-  const pctRestFurn  = totalFacturi  > 0 ? restanteFurnizori / totalFacturi      : 0;
+  const metoda = (m: string) => platiByMetoda.find(x => x.metoda === m)?._sum.suma ?? 0;
+  const tip    = (t: string) => incByTip.find(x => x.tipPlata === t)?._sum.sumaIncasata ?? 0;
+  const incTotal = incByTip.reduce((s, x) => s + (x._sum.sumaIncasata ?? 0), 0);
 
-  const cercuri = [
-    { label: "Sumă de plată (lista ant.)", value: totalDePlata,      percent: 1,           color: "#a78bfa", sub: null as string | null },
-    { label: "Încasări pe listă",          value: totalIncasatLista, percent: pctIncasat,  color: "#4ade80", sub: `${Math.round(pctIncasat * 100)}% încasat` },
-    { label: "Restanțe proprietari",       value: totalRestanteProp, percent: pctRestProp, color: "#f87171", sub: null },
-    { label: "Restanțe furnizori",         value: restanteFurnizori, percent: pctRestFurn, color: "#fbbf24", sub: totalFacturi > 0 ? `${Math.round(pctRestFurn * 100)}% din facturi` : null },
-  ];
+  // Solduri fonduri agregate pe nume (între asociații), top 6
+  const nameById = new Map(fondNames.map(f => [f.id, f.name]));
+  const byName   = new Map<string, number>();
+  for (const r of fondSold) {
+    const nm = nameById.get(r.fondId) ?? "Fond";
+    byName.set(nm, (byName.get(nm) ?? 0) + (r._sum.sold ?? 0));
+  }
+  const fonduriTop = [...byName.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .map(([label, value]) => ({ label, value }));
 
-  // Ultimele asociații
-  const ultimeleAsociatii = await db.asociatie.findMany({
-    where:   { organizationId: orgId, isActive: true },
-    orderBy: { updatedAt: "desc" },
-    take:    5,
-    include: { apartamente: { where: { isActive: true }, select: { id: true } } },
-  });
-
-  // Ultimele facturi
-  const ultimeleFacturi = await db.factura.findMany({
-    where:   { organizationId: orgId },
-    orderBy: { createdAt: "desc" },
-    take:    5,
-    include: { furnizor: { select: { nume: true } } },
-  });
+  // Ultimele asociații / facturi pentru panourile de jos
+  const [ultimeleAsociatii, ultimeleFacturi] = await Promise.all([
+    db.asociatie.findMany({
+      where: { organizationId: orgId, isActive: true }, orderBy: { updatedAt: "desc" }, take: 5,
+      include: { apartamente: { where: { isActive: true }, select: { id: true } } },
+    }),
+    db.factura.findMany({
+      where: { organizationId: orgId }, orderBy: { createdAt: "desc" }, take: 5,
+      include: { furnizor: { select: { nume: true } } },
+    }),
+  ]);
 
   const kpis = [
-    { label: "Asociații active",     value: nrAsociatii,       color: "violet", icon: "🏢" },
-    { label: "Apartamente",          value: nrApartamente,     color: "cyan",   icon: "🏠" },
-    { label: "Proprietari",          value: nrProprietari,     color: "violet", icon: "👥" },
-    { label: "Facturi neachitate",   value: nrFacturiNeplatite,color: "cyan",   icon: "📄" },
+    { label: "Asociații active",   value: nrAsociatii,        color: "violet", icon: "🏢" },
+    { label: "Apartamente",        value: nrApartamente,      color: "cyan",   icon: "🏠" },
+    { label: "Proprietari",        value: nrProprietari,      color: "violet", icon: "👥" },
+    { label: "Facturi neachitate", value: nrFacturiNeplatite, color: "cyan",   icon: "📄" },
+  ];
+
+  const tabs = [
+    {
+      key: "lista", label: "Listă întreținere", unit: "lei",
+      bars: [
+        { label: "Sumă de plată",  value: totalDePlata },
+        { label: "Încasat",        value: totalIncasatLista },
+        { label: "Rest de încasat",value: restLista },
+        { label: "Restanță veche", value: restantaVecheLista },
+        { label: "Total lună",     value: totalLunaLista },
+        { label: "Cheltuieli",     value: cheltuieliLista },
+      ],
+    },
+    {
+      key: "restante", label: "Restanțe", unit: "lei",
+      bars: [
+        { label: "Proprietari",     value: totalRestanteProp },
+        { label: "Întreț. curentă", value: intretinereCurenta },
+        { label: "Furnizori",       value: restanteFurnizori },
+        { label: "Fonduri",         value: restanteFonduri },
+      ],
+    },
+    {
+      key: "incasari", label: "Încasări", unit: "lei",
+      bars: [
+        { label: "Total",  value: incTotal },
+        { label: "Casă",   value: tip("casa") },
+        { label: "Bancă",  value: tip("banca") },
+        { label: "Online", value: tip("online") },
+      ],
+    },
+    {
+      key: "facturi", label: "Facturi", unit: "lei",
+      bars: [
+        { label: "Total facturi", value: totalFacturi },
+        { label: "Plătit",        value: totalPlatit },
+        { label: "Neplătit",      value: restanteFurnizori },
+        { label: "Plăți casă",    value: metoda("casa") },
+        { label: "Plăți bancă",   value: metoda("banca") },
+      ],
+    },
+    {
+      key: "fonduri", label: "Fonduri", unit: "lei",
+      bars: fonduriTop,
+    },
+    {
+      key: "portofoliu", label: "Portofoliu", unit: "nr",
+      bars: [
+        { label: "Asociații",      value: nrAsociatii },
+        { label: "Apartamente",    value: nrApartamente },
+        { label: "Proprietari",    value: nrProprietari },
+        { label: "Fac. neplătite", value: nrFacturiNeplatite },
+      ],
+    },
   ];
 
   return (
@@ -136,16 +173,7 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
-        gap: "1rem",
-        marginBottom: "1.5rem",
-      }}>
-        {cercuri.map(c => (
-          <Donut key={c.label} label={c.label} value={c.value} percent={c.percent} color={c.color} sub={c.sub} />
-        ))}
-      </div>
+      <DashboardCharts tabs={tabs} />
 
       <div className="dashboard__grid">
         {/* Asociații recente */}
