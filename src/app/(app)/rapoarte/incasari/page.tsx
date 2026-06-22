@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import RaportIncasariClient from "./RaportIncasariClient";
 
-export const metadata = { title: "Raport încasări" };
+export const metadata = { title: "Registru încasări" };
 
 export default async function RaportIncasariPage() {
   const session = await auth();
