@@ -139,6 +139,7 @@ model Asociatie {
   listeIntretinere ListaLuna[]
   grupuri          GrupApartamente[]
   transferuri      Transfer[]
+  transferuriFonduri TransferFond[]
 
   @@index([organizationId])
 }
@@ -403,6 +404,27 @@ model Transfer {
   suma           Float
   dinCont        String   // "Casă" sau numele băncii
   inCont         String   // "Casă" sau numele băncii
+  notes          String?
+  createdAt      DateTime @default(now())
+
+  asociatie Asociatie @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+
+  @@index([asociatieId])
+  @@index([organizationId])
+}
+
+// ─── Transferuri între fonduri ────────────────────────────────────────────────
+
+model TransferFond {
+  id             String   @id @default(cuid())
+  organizationId String
+  asociatieId    String
+  data           DateTime @default(now())
+  suma           Float
+  dinFondId      String
+  dinFondName    String
+  inFondId       String
+  inFondName     String
   notes          String?
   createdAt      DateTime @default(now())
 
