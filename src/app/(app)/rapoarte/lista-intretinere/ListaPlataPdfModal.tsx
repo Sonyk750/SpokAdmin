@@ -161,11 +161,12 @@ function buildDocDef(
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
+  const floorW = Math.floor(availW); // pt întreg — suma tuturor lățimilor
 
-  // Lățimi fixe (pt) pentru coloane înguste
-  const NR_W   = Math.round(availW * 0.034); // ~3.4% din lățimea paginii
-  const SM_W   = Math.round(availW * 0.044); // Pers / CPI / Sup
-  const TOT_W  = Math.round(availW * 0.070); // TOTAL (ușor mai lat)
+  // Lățimi fixe proportionale
+  const NR_W  = Math.round(floorW * 0.035); // Nr.Ap. — îngust
+  const SM_W  = Math.round(floorW * 0.046); // Pers / CPI / Sup
+  const TOT_W = Math.round(floorW * 0.072); // TOTAL
 
   // Număr de coloane numerice variabile (consumuri, cheltuieli, fonduri, restanță)
   let varCount = 0;
@@ -183,22 +184,29 @@ function buildDocDef(
     else varCount += coloane.fonduri.filter(f => opts.fondViz[f.id] !== false).length;
   }
 
-  // Spațiu ocupat de coloanele fixe (fără Proprietar care e "*")
-  let fixedUsed = NR_W + TOT_W;
-  if (opts.showNrEnd) fixedUsed += NR_W;
-  if (coloane.nrPersone && opts.showNrPersone) fixedUsed += SM_W;
-  if (coloane.cotaParte && opts.showCotaParte) fixedUsed += SM_W;
-  if (coloane.suprafata && opts.showSuprafata) fixedUsed += SM_W;
+  // Spațiu total al coloanelor fixe (fără Proprietar)
+  let fixedSum = NR_W + TOT_W;
+  if (opts.showNrEnd) fixedSum += NR_W;
+  if (coloane.nrPersone && opts.showNrPersone) fixedSum += SM_W;
+  if (coloane.cotaParte && opts.showCotaParte) fixedSum += SM_W;
+  if (coloane.suprafata && opts.showSuprafata) fixedSum += SM_W;
 
-  // Proprietar (*) absoarbe ~22% din pagină; restul se împarte egal între coloanele numerice
-  const propEst = opts.showProprietar ? Math.round(availW * 0.22) : 0;
-  const varW    = varCount > 0
-    ? Math.max(16, Math.floor((availW - fixedUsed - propEst) / varCount))
+  // Proprietar primește 3 "unități" din spațiu; fiecare coloană numerică = 1 unitate
+  // Toate lățimile sunt numere întregi fixe (fără "*") → suma = floorW garantat
+  const propWeight  = opts.showProprietar ? 3 : 0;
+  const totalUnits  = varCount + propWeight;
+  const unitW       = totalUnits > 0
+    ? Math.max(12, Math.floor((floorW - fixedSum) / totalUnits))
     : 30;
+  const varW  = unitW;
+  // Proprietar absoarbe restul exact (inclusiv erorile de rotunjire)
+  const propW = opts.showProprietar
+    ? Math.max(20, floorW - fixedSum - varW * varCount)
+    : 0;
 
   // ── Construiește header și widths ──────────────────────────────────────────
   hdr.push(th("Nr.\nAp.", "center")); widths.push(NR_W);
-  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push("*"); }
+  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push(propW); }
   if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          widths.push(SM_W); }
   if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            widths.push(SM_W); }
   if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(SM_W); }
