@@ -54,6 +54,9 @@ export interface PdfOptions {
   showFonduri: boolean;
   fondMode: "total" | "detaliat";
   fondViz: Record<string, boolean>;
+  dataAfisare: string;    // YYYY-MM-DD
+  zileScadente: number;
+  termenPlata: string;    // YYYY-MM-DD
 }
 
 interface Props {
@@ -97,9 +100,27 @@ const FONT_SIZES = [6, 7, 8, 9, 10, 11];
 
 const fmt2 = (v: number) => v.toFixed(2);
 const fmt3 = (v: number) => v.toFixed(3);
-const fmt4 = (v: number) => v.toFixed(4);
+
+// Formatează "YYYY-MM-DD" → "DD.MM.YYYY" pentru afișare în PDF
+function fmtDate(iso: string): string {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+// Adaugă zile la o dată ISO și returnează rezultatul tot în format ISO
+function addDays(iso: string, days: number): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 // ─── Init options from current table state ────────────────────────────────────
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions {
   const consumViz: Record<string, boolean> = {};
@@ -135,6 +156,9 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
     showFonduri: coloane.fonduri.length > 0,
     fondMode,
     fondViz,
+    dataAfisare: todayIso(),
+    zileScadente: 15,
+    termenPlata: addDays(todayIso(), 15),
   };
 }
 
@@ -220,13 +244,13 @@ function buildDocDef(
     if (opts.showProprietar) cells.push({ text: row.proprietar || "—", fontSize: fs });
 
     if (coloane.nrPersone && opts.showNrPersone)  cells.push(cell(row.nrPersone, "center"));
-    if (coloane.cotaParte && opts.showCotaParte)  cells.push(cell(row.cotaParte != null ? fmt4(row.cotaParte) : "—", "center"));
+    if (coloane.cotaParte && opts.showCotaParte)  cells.push(cell(row.cotaParte != null ? fmt2(row.cotaParte) : "—", "center"));
     if (coloane.suprafata && opts.showSuprafata)  cells.push(cell(row.suprafata != null ? fmt2(row.suprafata) : "—", "right"));
 
     for (const c of coloane.consumuri) {
       if (opts.consumViz[c.tip]) {
         const v = row.consumByTip[c.tip];
-        cells.push(cell(v !== undefined ? fmt3(v) : "—", "right"));
+        cells.push(cell(v !== undefined ? fmt2(v) : "—", "right"));
       }
       if (c.valoareLeiKey && opts.consumLeiViz[c.tip])
         cells.push(cell(fmt2(row.cheltuieli[c.valoareLeiKey] ?? 0), "right"));
@@ -280,7 +304,7 @@ function buildDocDef(
   for (const c of coloane.consumuri) {
     if (opts.consumViz[c.tip]) {
       const t = rows.reduce((s, r) => s + (r.consumByTip[c.tip] ?? 0), 0);
-      totRow.push({ text: fmt3(t), alignment: "right", bold: true, fontSize: fs });
+      totRow.push({ text: fmt2(t), alignment: "right", bold: true, fontSize: fs });
     }
     if (c.valoareLeiKey && opts.consumLeiViz[c.tip]) {
       const t = rows.reduce((s, r) => s + (r.cheltuieli[c.valoareLeiKey!] ?? 0), 0);
@@ -359,11 +383,25 @@ function buildDocDef(
           },
         ],
       },
+      { text: "LISTĂ ÎNTREȚINERE", style: "title", alignment: "center", margin: [0, 8, 0, 6] },
       {
-        canvas: [{ type: "line", x1: 0, y1: 6, x2: lineW, y2: 6, lineWidth: 1.5, lineColor: "#222" }],
-        margin: [0, 4, 0, 0],
+        canvas: [{ type: "line", x1: 0, y1: 0, x2: lineW, y2: 0, lineWidth: 1.5, lineColor: "#222" }],
+        margin: [0, 0, 0, 0],
       },
-      { text: "LISTĂ ÎNTREȚINERE", style: "title", alignment: "center", margin: [0, 10, 0, 10] },
+      {
+        margin: [0, 5, 0, 6],
+        columns: [
+          opts.dataAfisare
+            ? { text: `Data afișării: ${fmtDate(opts.dataAfisare)}`, fontSize: fs + 1, color: "#333" }
+            : {},
+          opts.zileScadente
+            ? { text: `Zile scadente: ${opts.zileScadente}`, fontSize: fs + 1, color: "#333", alignment: "center" }
+            : {},
+          opts.termenPlata
+            ? { text: `Termen de plată: ${fmtDate(opts.termenPlata)}`, fontSize: fs + 1, bold: true, color: "#1d4ed8", alignment: "right" }
+            : {},
+        ],
+      },
       {
         table: { headerRows: 1, widths, body },
         layout: {
@@ -703,6 +741,57 @@ export default function ListaPlataPdfModal({
                   />
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Date listă */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <SectionLabel>Date listă</SectionLabel>
+            <div style={{ marginBottom: "0.5rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.25rem" }}>Data afișării</div>
+              <input
+                type="date"
+                className="input"
+                value={opts.dataAfisare}
+                style={{ width: "100%", fontSize: "0.8rem" }}
+                onChange={e => {
+                  const d = e.target.value;
+                  setOpts(prev => ({
+                    ...prev,
+                    dataAfisare: d,
+                    termenPlata: d ? addDays(d, prev.zileScadente) : prev.termenPlata,
+                  }));
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: "0.5rem" }}>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.25rem" }}>Zile scadente</div>
+              <input
+                type="number"
+                className="input"
+                value={opts.zileScadente}
+                min={1}
+                max={365}
+                style={{ width: "100%", fontSize: "0.8rem" }}
+                onChange={e => {
+                  const z = Math.max(1, parseInt(e.target.value) || 1);
+                  setOpts(prev => ({
+                    ...prev,
+                    zileScadente: z,
+                    termenPlata: prev.dataAfisare ? addDays(prev.dataAfisare, z) : prev.termenPlata,
+                  }));
+                }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.25rem" }}>Termen de plată</div>
+              <input
+                type="date"
+                className="input"
+                value={opts.termenPlata}
+                style={{ width: "100%", fontSize: "0.8rem" }}
+                onChange={e => upd("termenPlata", e.target.value)}
+              />
             </div>
           </div>
 
