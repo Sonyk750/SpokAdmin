@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import ListaPlataPdfModal from "./ListaPlataPdfModal";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,10 +108,11 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   const [luna,     setLuna]     = useState(defaultLuna);
   const [an,       setAn]       = useState(defaultAn);
 
-  const [fondMode, setFondMode] = useState<FondMode>("detaliat");
-  const [data,     setData]     = useState<ListaData | null>(null);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
+  const [fondMode,     setFondMode]     = useState<FondMode>("detaliat");
+  const [data,         setData]         = useState<ListaData | null>(null);
+  const [loading,      setLoading]      = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
+  const [showPdfModal, setShowPdfModal] = useState(false);
 
   // ── Draggable column state (cheltuiala + totalLuna only) ──────────────────
   const [movCols,     setMovCols]     = useState<MovCol[]>([]);
@@ -284,7 +286,12 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
           <p className="page-sub">Situația lunară pe apartamente — cheltuieli și restanțe</p>
         </div>
         {data && (
-          <button className="btn btn--secondary" onClick={() => window.print()}>⎙ Tipărire</button>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <button className="btn btn--secondary" onClick={() => window.print()}>⎙ Tipărire</button>
+            <button className="btn btn--primary" onClick={() => setShowPdfModal(true)}>
+              ⬇ Descarcă PDF
+            </button>
+          </div>
         )}
       </div>
 
@@ -534,6 +541,19 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
             </div>
           )}
         </>
+      )}
+
+      {showPdfModal && data && coloane && asociatieId && (
+        <ListaPlataPdfModal
+          rows={rows}
+          coloane={coloane}
+          movCols={movCols}
+          fondMode={fondMode}
+          asociatieId={asociatieId}
+          luna={luna}
+          an={an}
+          onClose={() => setShowPdfModal(false)}
+        />
       )}
     </div>
   );
