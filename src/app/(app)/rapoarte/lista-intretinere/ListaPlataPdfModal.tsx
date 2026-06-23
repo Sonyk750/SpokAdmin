@@ -33,6 +33,7 @@ interface MovCol {
 }
 
 export interface PdfOptions {
+  pageSize: string;
   orientation: "portrait" | "landscape";
   fontSize: number;
   fontFamily: string;
@@ -74,6 +75,15 @@ const LUNI = [
   "Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie",
 ];
 
+// Portrait dimensions (width × height) in pt
+const PAGE_SIZES: Record<string, { w: number; h: number; label: string }> = {
+  A3:     { w: 841.89,  h: 1190.55, label: "A3" },
+  A4:     { w: 595.28,  h: 841.89,  label: "A4" },
+  A5:     { w: 419.53,  h: 595.28,  label: "A5" },
+  LETTER: { w: 612,     h: 792,     label: "Letter" },
+  LEGAL:  { w: 612,     h: 1008,    label: "Legal" },
+};
+
 const FONT_OPTIONS = [
   { value: "Roboto",    label: "Roboto" },
   { value: "Helvetica", label: "Helvetica" },
@@ -102,6 +112,7 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
   for (const f of coloane.fonduri) fondViz[f.id] = true;
 
   return {
+    pageSize: "A4",
     orientation: "landscape",
     fontSize: 7,
     fontFamily: "Roboto",
@@ -301,11 +312,12 @@ function buildDocDef(
     asoc?.email ? `Email: ${asoc.email}` : null,
   ].filter(Boolean).join("   |   ");
 
-  const pageW = opts.orientation === "landscape" ? 841.89 : 595.28;
+  const size = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
+  const pageW = opts.orientation === "landscape" ? size.h : size.w;
   const lineW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
 
   return {
-    pageSize: "A4",
+    pageSize: opts.pageSize,
     pageOrientation: opts.orientation,
     pageMargins: [pt(opts.marginLeft), pt(opts.marginTop), pt(opts.marginRight), pt(opts.marginBottom)],
     content: [
@@ -464,6 +476,7 @@ export default function ListaPlataPdfModal({
   }, [asociatieId]);
 
   // Generate preview (debounced)
+  // pdfmake 0.3.x: getDataUrl() / getBlob() / getBase64() sunt async — returnează Promise, fără callback
   const generatePreview = useCallback(async (currentOpts: PdfOptions, currentAsoc: AsocInfo | null) => {
     const myId = ++genIdRef.current;
     setLoadingPdf(true);
@@ -472,20 +485,9 @@ export default function ListaPlataPdfModal({
       const pm = await getPdfMake();
       if (myId !== genIdRef.current) return;
       const docDef = buildDocDef(currentOpts, rows, coloane, movCols, currentAsoc, luna, an);
-      await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("Timeout generare PDF (30s)")), 30000);
-        try {
-          pm.createPdf(docDef).getDataUrl((dataUrl: string) => {
-            clearTimeout(timer);
-            if (myId !== genIdRef.current) { resolve(); return; }
-            setPreviewUrl(dataUrl);
-            resolve();
-          });
-        } catch (err) {
-          clearTimeout(timer);
-          reject(err);
-        }
-      });
+      const dataUrl: string = await pm.createPdf(docDef).getDataUrl();
+      if (myId !== genIdRef.current) return;
+      setPreviewUrl(dataUrl);
     } catch (e: any) {
       if (myId === genIdRef.current) setPreviewError(e?.message ?? String(e));
     } finally {
@@ -606,6 +608,22 @@ export default function ListaPlataPdfModal({
           {/* Format pagină */}
           <div style={{ marginBottom: "1.25rem" }}>
             <SectionLabel>Format pagină</SectionLabel>
+
+            {/* Dimensiune hârtie */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "0.6rem" }}>
+              {Object.entries(PAGE_SIZES).map(([key, ps]) => (
+                <button
+                  key={key}
+                  onClick={() => upd("pageSize", key)}
+                  className={opts.pageSize === key ? "btn btn--primary" : "btn btn--secondary"}
+                  style={{ fontSize: "0.75rem", padding: "0.3rem 0.6rem", minWidth: 44 }}
+                >
+                  {ps.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Orientare */}
             <div style={{ display: "flex", gap: "0.5rem" }}>
               {(["landscape", "portrait"] as const).map(o => (
                 <button
