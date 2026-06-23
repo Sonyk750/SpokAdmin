@@ -52,6 +52,7 @@ export interface PdfOptions {
   showFonduri: boolean;
   fondMode: "total" | "detaliat";
   fondViz: Record<string, boolean>;
+  colWidths: Record<string, number>; // key → lățime în pt
 }
 
 interface Props {
@@ -97,9 +98,68 @@ const fmt2 = (v: number) => v.toFixed(2);
 const fmt3 = (v: number) => v.toFixed(3);
 const fmt4 = (v: number) => v.toFixed(4);
 
+// ─── Column width helpers ──────────────────────────────────────────────────────
+
+// Default lățimi (pt) per cheie coloană
+const DEFAULT_WIDTHS: Record<string, number> = {
+  nr: 22, pers: 24, cpi: 28, sup: 34,
+  totalLuna: 36, rest: 42, fond: 40, total: 44,
+};
+
+function initColWidths(coloane: Coloane, movCols: MovCol[]): Record<string, number> {
+  const w: Record<string, number> = { ...DEFAULT_WIDTHS };
+  for (const c of coloane.consumuri) {
+    w[`c:${c.tip}`]  = 36;
+    if (c.valoareLeiKey) w[`cl:${c.tip}`] = 36;
+  }
+  for (const col of movCols) {
+    if (col.kind === "chelt") w[`ch:${col.cheltKey!}`] = 40;
+  }
+  for (const f of coloane.fonduri) {
+    w[`f:${f.id}`] = 40;
+  }
+  return w;
+}
+
+interface ColDef { key: string; label: string; defaultW: number; }
+
+function getVisibleColDefs(opts: PdfOptions, coloane: Coloane, movCols: MovCol[]): ColDef[] {
+  const defs: ColDef[] = [];
+  defs.push({ key: "nr", label: "Nr. Ap.", defaultW: 22 });
+  // Proprietar e întotdeauna "*" (auto)
+  if (coloane.nrPersone && opts.showNrPersone)  defs.push({ key: "pers", label: "Nr. persoane", defaultW: 24 });
+  if (coloane.cotaParte && opts.showCotaParte)   defs.push({ key: "cpi",  label: "Cotă parte",   defaultW: 28 });
+  if (coloane.suprafata && opts.showSuprafata)   defs.push({ key: "sup",  label: "Suprafață",     defaultW: 34 });
+
+  for (const c of coloane.consumuri) {
+    if (opts.consumViz[c.tip])                        defs.push({ key: `c:${c.tip}`,  label: `${c.label} (${c.unit})`, defaultW: 36 });
+    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  defs.push({ key: `cl:${c.tip}`, label: `${c.label} (lei)`,        defaultW: 36 });
+  }
+
+  for (const col of movCols) {
+    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!]) defs.push({ key: `ch:${col.cheltKey!}`, label: col.cheltLabel ?? "", defaultW: 40 });
+    if (col.kind === "totalLuna" && opts.showTotalLuna)        defs.push({ key: "totalLuna", label: "Total lună", defaultW: 36 });
+  }
+
+  if (coloane.hasRestantaIntretinere && opts.showRestanta) defs.push({ key: "rest", label: "Rest. întreținere", defaultW: 42 });
+
+  if (coloane.fonduri.length > 0 && opts.showFonduri) {
+    if (opts.fondMode === "total") {
+      defs.push({ key: "fond", label: "Fonduri rest.", defaultW: 40 });
+    } else {
+      for (const f of coloane.fonduri) {
+        if (opts.fondViz[f.id] !== false) defs.push({ key: `f:${f.id}`, label: f.name, defaultW: 40 });
+      }
+    }
+  }
+
+  defs.push({ key: "total", label: "TOTAL", defaultW: 44 });
+  return defs;
+}
+
 // ─── Init options from current table state ────────────────────────────────────
 
-function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions {
+function initOpts(coloane: Coloane, fondMode: "total" | "detaliat", movCols: MovCol[]): PdfOptions {
   const consumViz: Record<string, boolean> = {};
   const consumLeiViz: Record<string, boolean> = {};
   for (const c of coloane.consumuri) {
@@ -131,6 +191,7 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
     showFonduri: coloane.fonduri.length > 0,
     fondMode,
     fondViz,
+    colWidths: initColWidths(coloane, movCols),
   };
 }
 
@@ -153,35 +214,37 @@ function buildDocDef(
   const widths: (number | string)[] = [];
   const hdr: any[] = [];
 
-  hdr.push(th("Nr.\nAp.", "center")); widths.push(22);
+  const cw = (key: string, def: number) => opts.colWidths[key] ?? def;
+
+  hdr.push(th("Nr.\nAp.", "center")); widths.push(cw("nr", 22));
   hdr.push(th("Proprietar", "left")); widths.push("*");
-  if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center")); widths.push(24); }
-  if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));   widths.push(28); }
-  if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(34); }
+  if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          widths.push(cw("pers", 24)); }
+  if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            widths.push(cw("cpi",  28)); }
+  if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(cw("sup",  34)); }
 
   for (const c of coloane.consumuri) {
-    if (opts.consumViz[c.tip])                         { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); widths.push(36); }
-    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])   { hdr.push(th(`${c.label}\n(lei)`, "right"));        widths.push(36); }
+    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); widths.push(cw(`c:${c.tip}`,  36)); }
+    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       widths.push(cw(`cl:${c.tip}`, 36)); }
   }
 
   for (const col of movCols) {
-    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); widths.push(40); }
-    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        widths.push(36); }
+    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); widths.push(cw(`ch:${col.cheltKey!}`, 40)); }
+    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        widths.push(cw("totalLuna", 36)); }
   }
 
-  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); widths.push(42); }
+  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); widths.push(cw("rest", 42)); }
 
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total") {
-      hdr.push(th("Fond.\nrest.", "right")); widths.push(40);
+      hdr.push(th("Fond.\nrest.", "right")); widths.push(cw("fond", 40));
     } else {
       for (const f of coloane.fonduri) {
-        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); widths.push(40); }
+        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); widths.push(cw(`f:${f.id}`, 40)); }
       }
     }
   }
 
-  hdr.push(th("TOTAL\n(lei)", "right")); widths.push(44);
+  hdr.push(th("TOTAL\n(lei)", "right")); widths.push(cw("total", 44));
 
   // Count fixed-left columns (for TOTAL row colSpan)
   let fixN = 2;
@@ -457,7 +520,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function ListaPlataPdfModal({
   rows, coloane, movCols, fondMode, asociatieId, luna, an, onClose,
 }: Props) {
-  const [opts, setOpts] = useState<PdfOptions>(() => initOpts(coloane, fondMode));
+  const [opts, setOpts] = useState<PdfOptions>(() => initOpts(coloane, fondMode, movCols));
   const [asoc, setAsoc] = useState<AsocInfo | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
@@ -802,6 +865,41 @@ export default function ListaPlataPdfModal({
                 )}
               </>
             )}
+          </div>
+
+          {/* Lățimi coloane */}
+          <div style={{ marginTop: "0.5rem" }}>
+            <SectionLabel>Lățimi coloane (pt)</SectionLabel>
+            <div style={{ fontSize: "0.7rem", color: "#475569", marginBottom: "0.5rem" }}>
+              Proprietar — lățime automată
+            </div>
+            {getVisibleColDefs(opts, coloane, movCols).map(col => (
+              <div key={col.key} style={{
+                display: "flex", alignItems: "center", gap: "0.4rem",
+                marginBottom: "0.25rem",
+              }}>
+                <span style={{
+                  flex: 1, fontSize: "0.75rem", color: "#cbd5e1",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                }}>
+                  {col.label}
+                </span>
+                <input
+                  type="number"
+                  min={8}
+                  max={400}
+                  value={opts.colWidths[col.key] ?? col.defaultW}
+                  className="input"
+                  style={{ width: 54, fontSize: "0.75rem", padding: "0.2rem 0.35rem", textAlign: "right" }}
+                  onChange={e => {
+                    const v = parseInt(e.target.value, 10);
+                    if (v >= 8 && v <= 400) {
+                      setOpts(prev => ({ ...prev, colWidths: { ...prev.colWidths, [col.key]: v } }));
+                    }
+                  }}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
