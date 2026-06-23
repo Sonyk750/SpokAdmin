@@ -179,15 +179,16 @@ function buildDocDef(
   if (coloane.suprafata && opts.showSuprafata) fixN++;
 
   // Data rows
-  const dataRows: any[][] = rows.map((row, ri) => {
+  const dataRows: any[][] = rows.map((row) => {
     const cells: any[] = [];
-    const bg = ri % 2 === 1 ? "#F5F5F5" : null;
-    const cell = (text: string | number, al = "right", bold = false, color?: string): any => ({
-      text: String(text), alignment: al, bold, fontSize: fs, color, fillColor: bg,
-    });
+    const cell = (text: string | number, al = "right", bold = false, color?: string): any => {
+      const obj: any = { text: String(text), alignment: al, bold, fontSize: fs };
+      if (color) obj.color = color;
+      return obj;
+    };
 
-    cells.push({ text: row.numar, alignment: "center", bold: true, fontSize: fs, fillColor: bg });
-    cells.push({ text: row.proprietar || "—", fontSize: fs, fillColor: bg });
+    cells.push({ text: row.numar, alignment: "center", bold: true, fontSize: fs });
+    cells.push({ text: row.proprietar || "—", fontSize: fs });
 
     if (coloane.nrPersone && opts.showNrPersone)  cells.push(cell(row.nrPersone, "center"));
     if (coloane.cotaParte && opts.showCotaParte)  cells.push(cell(row.cotaParte != null ? fmt4(row.cotaParte) : "—", "center"));
@@ -400,12 +401,11 @@ async function getPdfMake() {
   const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
   const pm = pdfMake.default ?? pdfMake;
   pm.vfs = pdfFonts.default ?? pdfFonts;
-  pm.fonts = {
-    Roboto:    { normal: "Roboto-Regular.ttf", bold: "Roboto-Medium.ttf", italics: "Roboto-Italic.ttf", bolditalics: "Roboto-MediumItalic.ttf" },
-    Helvetica: { normal: "Helvetica", bold: "Helvetica-Bold", italics: "Helvetica-Oblique", bolditalics: "Helvetica-BoldOblique" },
-    Times:     { normal: "Times-Roman", bold: "Times-Bold", italics: "Times-Italic", bolditalics: "Times-BoldItalic" },
-    Courier:   { normal: "Courier", bold: "Courier-Bold", italics: "Courier-Oblique", bolditalics: "Courier-BoldOblique" },
-  };
+  // Add standard PDF fonts without replacing Roboto defaults
+  if (!pm.fonts) pm.fonts = {};
+  pm.fonts.Helvetica = { normal: "Helvetica", bold: "Helvetica-Bold", italics: "Helvetica-Oblique",  bolditalics: "Helvetica-BoldOblique" };
+  pm.fonts.Times     = { normal: "Times-Roman", bold: "Times-Bold", italics: "Times-Italic",         bolditalics: "Times-BoldItalic" };
+  pm.fonts.Courier   = { normal: "Courier",    bold: "Courier-Bold", italics: "Courier-Oblique",     bolditalics: "Courier-BoldOblique" };
   return pm;
 }
 
@@ -451,8 +451,8 @@ export default function ListaPlataPdfModal({
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const genIdRef  = useRef(0);
-  const blobRef   = useRef<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const genIdRef    = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch association info
@@ -467,24 +467,27 @@ export default function ListaPlataPdfModal({
   const generatePreview = useCallback(async (currentOpts: PdfOptions, currentAsoc: AsocInfo | null) => {
     const myId = ++genIdRef.current;
     setLoadingPdf(true);
+    setPreviewError(null);
     try {
       const pm = await getPdfMake();
       if (myId !== genIdRef.current) return;
       const docDef = buildDocDef(currentOpts, rows, coloane, movCols, currentAsoc, luna, an);
-      await new Promise<void>(resolve => {
-        pm.createPdf(docDef).getBlob((blob: Blob) => {
-          if (myId !== genIdRef.current) { resolve(); return; }
-          const url = URL.createObjectURL(blob);
-          setPreviewUrl(prev => {
-            if (prev) URL.revokeObjectURL(prev);
-            return url;
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("Timeout generare PDF (30s)")), 30000);
+        try {
+          pm.createPdf(docDef).getDataUrl((dataUrl: string) => {
+            clearTimeout(timer);
+            if (myId !== genIdRef.current) { resolve(); return; }
+            setPreviewUrl(dataUrl);
+            resolve();
           });
-          blobRef.current = url;
-          resolve();
-        });
+        } catch (err) {
+          clearTimeout(timer);
+          reject(err);
+        }
       });
-    } catch (e) {
-      console.error("PDF preview error:", e);
+    } catch (e: any) {
+      if (myId === genIdRef.current) setPreviewError(e?.message ?? String(e));
     } finally {
       if (myId === genIdRef.current) setLoadingPdf(false);
     }
@@ -495,13 +498,6 @@ export default function ListaPlataPdfModal({
     debounceRef.current = setTimeout(() => generatePreview(opts, asoc), 450);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [opts, asoc, generatePreview]);
-
-  // Revoke blob URL on unmount
-  useEffect(() => {
-    return () => {
-      if (blobRef.current) URL.revokeObjectURL(blobRef.current);
-    };
-  }, []);
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -809,7 +805,13 @@ export default function ListaPlataPdfModal({
             </div>
           )}
 
-          {previewUrl ? (
+          {previewError ? (
+            <div style={{ color: "#f87171", textAlign: "center", alignSelf: "center", padding: "2rem", maxWidth: 420 }}>
+              <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>⚠️</div>
+              <div style={{ fontWeight: 700, marginBottom: "0.5rem" }}>Eroare generare PDF</div>
+              <div style={{ fontSize: "0.8rem", color: "#94a3b8", wordBreak: "break-word" }}>{previewError}</div>
+            </div>
+          ) : previewUrl ? (
             <iframe
               src={previewUrl}
               style={{ width: "100%", height: "100%", border: "none" }}
