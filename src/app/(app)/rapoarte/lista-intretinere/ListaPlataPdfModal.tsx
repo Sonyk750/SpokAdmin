@@ -157,78 +157,43 @@ function buildDocDef(
   const widths: (number | string)[] = [];
   const hdr: any[] = [];
 
-  // ── Calcul automat lățimi — umple întreaga pagină ─────────────────────────
+  // ── Lățimi coloane: fixe pentru Nr/Proprietar/TOTAL, "*" pentru tot restul ─
+  // pdfmake împarte automat spațiul rămas între coloanele cu "*" → nu poate depăși pagina
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
-  const floorW = Math.floor(availW); // pt întreg — suma tuturor lățimilor
+  const floorW = Math.floor(availW);
 
-  // Lățimi fixe proportionale
-  const NR_W  = Math.round(floorW * 0.035); // Nr.Ap. — îngust
-  const SM_W  = Math.round(floorW * 0.046); // Pers / CPI / Sup
-  const TOT_W = Math.round(floorW * 0.072); // TOTAL
-
-  // Număr de coloane numerice variabile (consumuri, cheltuieli, fonduri, restanță)
-  let varCount = 0;
-  for (const c of coloane.consumuri) {
-    if (opts.consumViz[c.tip]) varCount++;
-    if (c.valoareLeiKey && opts.consumLeiViz[c.tip]) varCount++;
-  }
-  for (const col of movCols) {
-    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!]) varCount++;
-    if (col.kind === "totalLuna" && opts.showTotalLuna) varCount++;
-  }
-  if (coloane.hasRestantaIntretinere && opts.showRestanta) varCount++;
-  if (coloane.fonduri.length > 0 && opts.showFonduri) {
-    if (opts.fondMode === "total") varCount++;
-    else varCount += coloane.fonduri.filter(f => opts.fondViz[f.id] !== false).length;
-  }
-
-  // Spațiu total al coloanelor fixe (fără Proprietar)
-  let fixedSum = NR_W + TOT_W;
-  if (opts.showNrEnd) fixedSum += NR_W;
-  if (coloane.nrPersone && opts.showNrPersone) fixedSum += SM_W;
-  if (coloane.cotaParte && opts.showCotaParte) fixedSum += SM_W;
-  if (coloane.suprafata && opts.showSuprafata) fixedSum += SM_W;
-
-  // Proprietar primește 3 "unități" din spațiu; fiecare coloană numerică = 1 unitate
-  // Toate lățimile sunt numere întregi fixe (fără "*") → suma = floorW garantat
-  const propWeight  = opts.showProprietar ? 3 : 0;
-  const totalUnits  = varCount + propWeight;
-  const unitW       = totalUnits > 0
-    ? Math.max(12, Math.floor((floorW - fixedSum) / totalUnits))
-    : 30;
-  const varW  = unitW;
-  // Proprietar absoarbe restul exact (inclusiv erorile de rotunjire)
-  const propW = opts.showProprietar
-    ? Math.max(20, floorW - fixedSum - varW * varCount)
-    : 0;
+  const NR_W   = Math.round(floorW * 0.035); // ~3.5% — Nr.Ap.
+  const SM_W   = Math.round(floorW * 0.046); // ~4.6% — Pers / CPI / Sup
+  const TOT_W  = Math.round(floorW * 0.075); // ~7.5% — TOTAL
+  const PROP_W = Math.round(floorW * 0.20);  // ~20%  — Proprietar (fix)
 
   // ── Construiește header și widths ──────────────────────────────────────────
   hdr.push(th("Nr.\nAp.", "center")); widths.push(NR_W);
-  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push(propW); }
+  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push(PROP_W); }
   if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          widths.push(SM_W); }
   if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            widths.push(SM_W); }
   if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(SM_W); }
 
   for (const c of coloane.consumuri) {
-    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); widths.push(varW); }
-    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       widths.push(varW); }
+    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); widths.push("*"); }
+    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       widths.push("*"); }
   }
 
   for (const col of movCols) {
-    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); widths.push(varW); }
-    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        widths.push(varW); }
+    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); widths.push("*"); }
+    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        widths.push("*"); }
   }
 
-  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); widths.push(varW); }
+  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); widths.push("*"); }
 
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total") {
-      hdr.push(th("Fond.\nrest.", "right")); widths.push(varW);
+      hdr.push(th("Fond.\nrest.", "right")); widths.push("*");
     } else {
       for (const f of coloane.fonduri) {
-        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); widths.push(varW); }
+        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); widths.push("*"); }
       }
     }
   }
