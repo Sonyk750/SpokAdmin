@@ -41,6 +41,8 @@ export interface PdfOptions {
   marginRight: number;
   marginTop: number;
   marginBottom: number;
+  showProprietar: boolean;
+  showNrEnd: boolean;
   showNrPersone: boolean;
   showCotaParte: boolean;
   showSuprafata: boolean;
@@ -180,6 +182,8 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat", movCols: Mov
     marginRight: 10,
     marginTop: 14,
     marginBottom: 24,
+    showProprietar: true,
+    showNrEnd: false,
     showNrPersone: coloane.nrPersone,
     showCotaParte: coloane.cotaParte,
     showSuprafata: coloane.suprafata,
@@ -217,7 +221,7 @@ function buildDocDef(
   const cw = (key: string, def: number) => opts.colWidths[key] ?? def;
 
   hdr.push(th("Nr.\nAp.", "center")); widths.push(cw("nr", 22));
-  hdr.push(th("Proprietar", "left")); widths.push("*");
+  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push("*"); }
   if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          widths.push(cw("pers", 24)); }
   if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            widths.push(cw("cpi",  28)); }
   if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(cw("sup",  34)); }
@@ -245,9 +249,10 @@ function buildDocDef(
   }
 
   hdr.push(th("TOTAL\n(lei)", "right")); widths.push(cw("total", 44));
+  if (opts.showNrEnd) { hdr.push(th("Nr.\nAp.", "center")); widths.push(cw("nr", 22)); }
 
   // Count fixed-left columns (for TOTAL row colSpan)
-  let fixN = 2;
+  let fixN = 1 + (opts.showProprietar ? 1 : 0);
   if (coloane.nrPersone && opts.showNrPersone) fixN++;
   if (coloane.cotaParte && opts.showCotaParte) fixN++;
   if (coloane.suprafata && opts.showSuprafata) fixN++;
@@ -262,7 +267,7 @@ function buildDocDef(
     };
 
     cells.push({ text: row.numar, alignment: "center", bold: true, fontSize: fs });
-    cells.push({ text: row.proprietar || "—", fontSize: fs });
+    if (opts.showProprietar) cells.push({ text: row.proprietar || "—", fontSize: fs });
 
     if (coloane.nrPersone && opts.showNrPersone)  cells.push(cell(row.nrPersone, "center"));
     if (coloane.cotaParte && opts.showCotaParte)  cells.push(cell(row.cotaParte != null ? fmt4(row.cotaParte) : "—", "center"));
@@ -306,6 +311,7 @@ function buildDocDef(
     }
 
     cells.push(cell(fmt2(row.total), "right", true));
+    if (opts.showNrEnd) cells.push({ text: row.numar, alignment: "center", bold: true, fontSize: fs });
     return cells;
   });
 
@@ -364,6 +370,7 @@ function buildDocDef(
 
   const totTotal = rows.reduce((s, r) => s + r.total, 0);
   totRow.push({ text: fmt2(totTotal), alignment: "right", bold: true, fontSize: fs + 1, fillColor: "#E8E8E8" });
+  if (opts.showNrEnd) totRow.push({ text: "", fontSize: fs });
 
   const body = [hdr, ...dataRows, totRow];
 
@@ -754,6 +761,9 @@ export default function ListaPlataPdfModal({
           {/* Coloane */}
           <div>
             <SectionLabel>Coloane în PDF</SectionLabel>
+
+            <ChkRow label="Proprietar"     checked={opts.showProprietar} onChange={v => upd("showProprietar", v)} />
+            <ChkRow label="Nr. Ap. la sfârșit" checked={opts.showNrEnd} onChange={v => upd("showNrEnd", v)} />
 
             {coloane.nrPersone && (
               <ChkRow label="Nr. persoane"  checked={opts.showNrPersone}  onChange={v => upd("showNrPersone", v)} />
