@@ -50,11 +50,6 @@ async function getPdfMake() {
   const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any
   const pm = pdfMake.default ?? pdfMake
   pm.vfs = pdfFonts.default ?? pdfFonts
-  if (!pm.fonts) pm.fonts = {}
-  pm.fonts.Times = {
-    normal: "Times-Roman", bold: "Times-Bold",
-    italics: "Times-Italic", bolditalics: "Times-BoldItalic",
-  }
   return pm
 }
 
@@ -86,7 +81,7 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, domic
   return {
     pageSize: "A4",
     pageMargins: [70, 70, 70, 70],
-    defaultStyle: { font: "Times", fontSize: 12, lineHeight: 1.4 },
+    defaultStyle: { font: "Roboto", fontSize: 12, lineHeight: 1.4 },
     content: [
       {
         columns: [
@@ -180,7 +175,7 @@ function buildContractMunca(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
   return {
     pageSize: "A4",
     pageMargins: [65, 65, 65, 65],
-    defaultStyle: { font: "Times", fontSize: 10.5, lineHeight: 1.45 },
+    defaultStyle: { font: "Roboto", fontSize: 10.5, lineHeight: 1.45 },
     content: [
       { text: "CONTRACT INDIVIDUAL DE MUNCĂ", style: "titlu" },
       { text: `nr. ___ / ${fmtData(dataDoc)}`, alignment: "center", marginBottom: 16 },
@@ -339,7 +334,7 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
   return {
     pageSize: "A4",
     pageMargins: [70, 70, 70, 70],
-    defaultStyle: { font: "Times", fontSize: 12, lineHeight: 1.4 },
+    defaultStyle: { font: "Roboto", fontSize: 12, lineHeight: 1.4 },
     content: [
       {
         columns: [
