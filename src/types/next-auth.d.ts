@@ -8,8 +8,9 @@ declare module "next-auth" {
       name?:          string | null;
       email?:         string | null;
       image?:         string | null;
-      role:           string;
+      role:           string;        // SUPER_ADMIN | USER
       organizationId: string | null;
+      orgRole:        string | null; // OWNER | MEMBER | null
     };
   }
 }
@@ -19,5 +20,6 @@ declare module "next-auth/jwt" {
     id:             string;
     role:           string;
     organizationId: string | null;
+    orgRole:        string | null;
   }
 }

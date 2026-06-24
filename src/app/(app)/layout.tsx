@@ -5,6 +5,7 @@ import Sidebar from "./_components/Sidebar";
 import AppHeader from "./_components/AppHeader";
 import { AsociatieProvider } from "@/lib/AsociatieContext";
 import { SidebarProvider } from "@/lib/SidebarContext";
+import { isSuperAdmin, canManageOrg } from "@/lib/roles";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -27,11 +28,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       : [],
   ]);
 
+  const canManageUsers = isSuperAdmin(session.user.role) ||
+    canManageOrg(session.user.role, session.user.orgRole);
+
   return (
     <SidebarProvider>
       <AsociatieProvider asociatii={asociatii}>
         <div className="app-layout">
-          <Sidebar />
+          <Sidebar
+            userRole={session.user.role}
+            canManageUsers={canManageUsers}
+          />
           <div className="app-body">
             <AppHeader
               userName={session.user.name}

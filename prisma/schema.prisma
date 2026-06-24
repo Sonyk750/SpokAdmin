@@ -8,6 +8,7 @@ datasource db {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ NextAuth Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
+// role: SUPER_ADMIN | USER
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -17,13 +18,16 @@ model User {
   image         String?
   role          String    @default("USER")
   isActive      Boolean   @default(true)
+  isSuspended   Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  memberships OrganizationMember[]
-  spvToken    SpvToken?
+  accounts     Account[]
+  sessions     Session[]
+  memberships  OrganizationMember[]
+  asocUsers    AsociatieUser[]
+  invitations  UserInvitation[]     @relation("InvitationCreator")
+  spvToken     SpvToken?
 }
 
 model Account {
@@ -85,6 +89,8 @@ model Organization {
   members     OrganizationMember[]
   asociatii   Asociatie[]
   furnizori   Furnizor[]
+  asocUsers   AsociatieUser[]
+  invitations UserInvitation[]
 }
 
 model OrganizationMember {
@@ -144,8 +150,58 @@ model Asociatie {
   spvInvoices      SpvInvoice[]
   angajati         Angajat[]
   statePlata       StatPlata[]
+  asocUsers        AsociatieUser[]
+  invitations      UserInvitation[]
 
   @@index([organizationId])
+}
+
+// ─── Utilizatori la nivel de asociație ────────────────────────────────────────
+// role: PRESEDINTE | CENZOR | PROPRIETAR
+
+model AsociatieUser {
+  id             String   @id @default(cuid())
+  organizationId String
+  asociatieId    String
+  userId         String
+  role           String   // PRESEDINTE | CENZOR | PROPRIETAR
+  apartamentId   String?  // pentru PROPRIETAR
+  permissions    String?  // JSON granular (scalabil)
+  isSuspended    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asociatie    Asociatie    @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([asociatieId, userId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([asociatieId])
+}
+
+model UserInvitation {
+  id             String    @id @default(cuid())
+  organizationId String
+  asociatieId    String?
+  email          String
+  name           String?
+  role           String    // PRESEDINTE | CENZOR | PROPRIETAR
+  apartamentId   String?
+  token          String    @unique @default(cuid())
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  createdById    String
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asociatie    Asociatie?   @relation(fields: [asociatieId], references: [id], onDelete: SetNull)
+  createdBy    User         @relation("InvitationCreator", fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([token])
+  @@index([email])
 }
 
 model GrupApartamente {

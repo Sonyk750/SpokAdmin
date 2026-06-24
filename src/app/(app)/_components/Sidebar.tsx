@@ -8,7 +8,7 @@ import { useSidebar } from "@/lib/SidebarContext";
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 
-type Leaf  = { type: "link";  href: string; label: string };
+type Leaf  = { type: "link";  href: string; label: string; adminOnly?: boolean };
 type Label = { type: "label"; label: string };
 type Group = { type: "group"; label: string; key: string; children: (Leaf | Label)[] };
 type Item  = Leaf | Group;
@@ -89,13 +89,19 @@ const nav: Item[] = [
       { type: "link",  href: "/spv/setari",             label: "Setări SPV" },
     ],
   },
-  { type: "link", href: "/utilizatori", label: "Utilizatori" },
-  { type: "link", href: "/initializare", label: "Inițializare" },
+  { type: "link", href: "/utilizatori",  label: "Utilizatori",  adminOnly: true },
+  { type: "link", href: "/initializare", label: "Inițializare", adminOnly: true },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Sidebar() {
+export default function Sidebar({
+  userRole = "USER",
+  canManageUsers = false,
+}: {
+  userRole?: string
+  canManageUsers?: boolean
+}) {
   const pathname = usePathname();
   const { isOpen, close } = useSidebar();
 
@@ -130,6 +136,7 @@ export default function Sidebar() {
         <nav className="sidebar__nav">
           {nav.map((item) => {
             if (item.type === "link") {
+              if (item.adminOnly && !canManageUsers) return null;
               return (
                 <Link
                   key={item.href}

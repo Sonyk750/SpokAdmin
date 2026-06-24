@@ -29,7 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
 
-        if (!user || !user.password || !user.isActive) return null;
+        if (!user || !user.password || !user.isActive || user.isSuspended) return null;
 
         const ok = await bcrypt.compare(credentials.password as string, user.password);
         if (!ok) return null;
@@ -41,6 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           image:          user.image,
           role:           user.role,
           organizationId: user.memberships[0]?.organizationId ?? null,
+          orgRole:        user.memberships[0]?.role ?? null,
         };
       },
     }),
