@@ -3,10 +3,18 @@ import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import DashboardCharts from "./DashboardCharts";
+import { isSuperAdmin } from "@/lib/roles";
 
 export default async function DashboardPage() {
   const session = await auth();
-  if (!session?.user?.organizationId) redirect("/login");
+  if (!session?.user) redirect("/login");
+
+  // SUPER_ADMIN fără organizație vede pagina de administrare globală
+  if (isSuperAdmin(session.user.role) && !session.user.organizationId) {
+    redirect("/utilizatori");
+  }
+
+  if (!session.user.organizationId) redirect("/login");
 
   const orgId = session.user.organizationId;
 
