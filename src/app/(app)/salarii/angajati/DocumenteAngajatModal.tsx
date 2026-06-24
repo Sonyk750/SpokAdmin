@@ -20,23 +20,23 @@ interface Angajat {
 }
 
 interface Asociatie {
-  name:            string
-  address:         string | null
-  city:            string | null
-  sector:          string | null
-  cui:             string | null
-  phone:           string | null
-  email:           string | null
-  adminName:       string | null
-  presedinteName:  string | null
+  name:           string
+  address:        string | null
+  city:           string | null
+  sector:         string | null
+  cui:            string | null
+  phone:          string | null
+  email:          string | null
+  adminName:      string | null
+  presedinteName: string | null
 }
 
 type DocType = "cerere-angajare" | "contract-munca" | "cerere-demisie"
 
 interface Props {
-  angajat:    Angajat
+  angajat:     Angajat
   asociatieId: string
-  onClose:    () => void
+  onClose:     () => void
 }
 
 const DOC_LABELS: Record<DocType, string> = {
@@ -51,7 +51,10 @@ async function getPdfMake() {
   const pm = pdfMake.default ?? pdfMake
   pm.vfs = pdfFonts.default ?? pdfFonts
   if (!pm.fonts) pm.fonts = {}
-  pm.fonts.Times = { normal: "Times-Roman", bold: "Times-Bold", italics: "Times-Italic", bolditalics: "Times-BoldItalic" }
+  pm.fonts.Times = {
+    normal: "Times-Roman", bold: "Times-Bold",
+    italics: "Times-Italic", bolditalics: "Times-BoldItalic",
+  }
   return pm
 }
 
@@ -63,10 +66,10 @@ function fmtData(iso: string) {
 
 function today() { return new Date().toISOString().split("T")[0] }
 
-function addDays(iso: string, days: number) {
+function addZileL(iso: string, zile: number) {
   const d = new Date(iso)
   let added = 0
-  while (added < days) {
+  while (added < zile) {
     d.setDate(d.getDate() + 1)
     const zi = d.getDay()
     if (zi !== 0 && zi !== 6) added++
@@ -74,9 +77,9 @@ function addDays(iso: string, days: number) {
   return d.toISOString().split("T")[0]
 }
 
-// ─── Document generators ──────────────────────────────────────────────────────
+// ─── Document builders ────────────────────────────────────────────────────────
 
-function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adresa: string, domiciliu: string): any {
+function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, domiciliu: string): any {
   const numeComplet = `${a.prenume ?? ""} ${a.nume}`.trim()
   const adresaAsoc  = [asoc.address, asoc.city, asoc.sector].filter(Boolean).join(", ")
 
@@ -91,7 +94,7 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
           {
             width: "45%",
             stack: [
-              { text: "Către,", style: "normal" },
+              { text: "Către," },
               { text: asoc.name, bold: true },
               { text: adresaAsoc || " " },
             ],
@@ -104,13 +107,13 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
         text: [
           "Subsemnatul/a ",
           { text: numeComplet, bold: true },
-          `, posesor/posesoare al/a CNP `,
+          ", posesor/posesoare al/a CNP ",
           { text: a.cnp || "_________________", bold: true },
-          `, domiciliat/ă în `,
+          ", domiciliat/ă în ",
           domiciliu || "_________________________________________",
-          `, tel. `,
+          ", tel. ",
           a.telefon || "_______________",
-          `, e-mail `,
+          ", e-mail ",
           a.email || "_______________",
           ",",
         ],
@@ -122,9 +125,11 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
           { text: asoc.name, bold: true },
           " în funcția de ",
           { text: a.functie || "_______________", bold: true },
-          `, în baza unui ${a.tipContract === "CIM" ? "Contract Individual de Muncă" : a.tipContract}`,
-          ` cu normă ${a.normaDeLucru >= 8 ? "întreagă (8 ore/zi)" : `parțială (${a.normaDeLucru} ore/zi)`}`,
-          `, cu un salariu brut lunar de `,
+          ", în baza unui ",
+          a.tipContract === "CIM" ? "Contract Individual de Muncă" : a.tipContract,
+          " cu normă ",
+          a.normaDeLucru >= 8 ? "întreagă (8 ore/zi)" : `parțială (${a.normaDeLucru} ore/zi)`,
+          ", cu un salariu brut lunar de ",
           { text: `${a.salariuBrut.toFixed(2)} RON`, bold: true },
           ", începând cu data de ",
           { text: a.dataAngajare ? fmtData(a.dataAngajare) : "___________", bold: true },
@@ -132,10 +137,7 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
         ],
         marginBottom: 12,
       },
-      {
-        text: "Anexez prezentei cereri următoarele documente:",
-        marginBottom: 6,
-      },
+      { text: "Anexez prezentei cereri următoarele documente:", marginBottom: 6 },
       {
         ul: [
           "Copie buletin/carte de identitate",
@@ -156,8 +158,7 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
       },
     ],
     styles: {
-      titlu:  { fontSize: 14, bold: true, alignment: "center" },
-      normal: { fontSize: 12 },
+      titlu: { fontSize: 14, bold: true, alignment: "center" },
     },
   }
 }
@@ -165,13 +166,16 @@ function buildCerereAngajare(a: Angajat, asoc: Asociatie, dataDoc: string, adres
 function buildContractMunca(a: Angajat, asoc: Asociatie, dataDoc: string, preavizZile: number): any {
   const numeComplet = `${a.prenume ?? ""} ${a.nume}`.trim()
   const adresaAsoc  = [asoc.address, asoc.city, asoc.sector].filter(Boolean).join(", ")
-  const dataIncetare = a.dataIncetare ? fmtData(a.dataIncetare) : "nedeterminată"
-  const durataText   = a.dataIncetare ? `determinată, până la data de ${fmtData(a.dataIncetare)}` : "nedeterminată"
+  const durataText  = a.dataIncetare
+    ? `determinată, până la data de ${fmtData(a.dataIncetare)}`
+    : "nedeterminată"
 
-  const section = (nr: string, titlu: string, continut: any[]) => [
-    { text: `Art. ${nr} — ${titlu}`, bold: true, marginTop: 12, marginBottom: 4 },
-    ...continut,
-  ]
+  function art(nr: string, titlu: string, rows: any[]) {
+    return [
+      { text: `Art. ${nr} — ${titlu}`, bold: true, marginTop: 12, marginBottom: 4 },
+      ...rows,
+    ]
+  }
 
   return {
     pageSize: "A4",
@@ -180,7 +184,10 @@ function buildContractMunca(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
     content: [
       { text: "CONTRACT INDIVIDUAL DE MUNCĂ", style: "titlu" },
       { text: `nr. ___ / ${fmtData(dataDoc)}`, alignment: "center", marginBottom: 16 },
-      { text: "încheiat în temeiul art. 10 din Legea nr. 53/2003 — Codul muncii, republicată", alignment: "center", italics: true, marginBottom: 20 },
+      {
+        text: "încheiat în temeiul art. 10 din Legea nr. 53/2003 — Codul muncii, republicată",
+        alignment: "center", italics: true, marginBottom: 20,
+      },
 
       { text: "I. PĂRȚILE CONTRACTULUI", style: "sectiune" },
       {
@@ -196,87 +203,97 @@ function buildContractMunca(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
         ],
         marginBottom: 8,
       },
-      {
-        text: [
-          { text: "și", bold: true },
-        ],
-        marginBottom: 8,
-      },
+      { text: "și", bold: true, marginBottom: 8 },
       {
         text: [
           { text: "Salariatul/Salariata: ", bold: true },
           numeComplet,
-          a.cnp ? `, CNP ${a.cnp}` : "",
-          a.telefon ? `, tel. ${a.telefon}` : "",
-          a.email   ? `, e-mail ${a.email}` : "",
+          a.cnp      ? `, CNP ${a.cnp}` : "",
+          a.telefon  ? `, tel. ${a.telefon}` : "",
+          a.email    ? `, e-mail ${a.email}` : "",
           ".",
         ],
         marginBottom: 16,
       },
 
       { text: "II. OBIECTUL CONTRACTULUI", style: "sectiune" },
-      ...section("1", "Felul muncii", [
+      ...art("1", "Felul muncii", [
         { text: ["Salariatul/Salariata va ocupa funcția/postul de ", { text: a.functie || "_______________", bold: true }, "."] },
       ]),
-      ...section("2", "Locul de muncă", [
+      ...art("2", "Locul de muncă", [
         { text: ["Locul de muncă este la sediul angajatorului: ", { text: adresaAsoc || "_______________________", bold: true }, "."] },
       ]),
 
       { text: "III. DURATA CONTRACTULUI", style: "sectiune" },
-      ...section("3", "Durata", [
+      ...art("3", "Durata", [
         { text: ["Contractul se încheie pe durată ", { text: durataText, bold: true }, "."] },
-        { text: ["Data de începere a activității: ", { text: a.dataAngajare ? fmtData(a.dataAngajare) : "___________", bold: true }, "."] },
+        { text: ["Data de începere: ", { text: a.dataAngajare ? fmtData(a.dataAngajare) : "___________", bold: true }, "."] },
       ]),
 
       { text: "IV. TIMPUL DE MUNCĂ", style: "sectiune" },
-      ...section("4", "Durata muncii", [
+      ...art("4", "Durata muncii", [
         {
           text: [
             "Norma de lucru: ",
             { text: `${a.normaDeLucru} ore/zi`, bold: true },
             ` (${a.normaDeLucru >= 8 ? "normă întreagă" : "normă parțială"})`,
-            ", program de lucru stabilit de angajator conform regulamentului intern.",
+            ", program stabilit de angajator conform regulamentului intern.",
           ],
         },
       ]),
 
       { text: "V. SALARIUL", style: "sectiune" },
-      ...section("5", "Salariul de bază", [
+      ...art("5", "Salariul de bază", [
         {
           text: [
             "Salariul brut lunar este de ",
             { text: `${a.salariuBrut.toFixed(2)} RON`, bold: true },
             ". Plata salariului se face ",
-            a.contBancar ? `prin virament bancar în contul ${a.contBancar} deschis la ${a.banca || "___"}` : "în numerar / prin virament bancar",
+            a.contBancar
+              ? `prin virament bancar în contul ${a.contBancar} deschis la ${a.banca || "___"}`
+              : "în numerar / prin virament bancar",
             ", lunar, conform legislației în vigoare.",
           ],
         },
-        { text: "Sporurile, indemnizațiile și alte adaosuri se acordă conform dispozițiilor legale și contractului colectiv de muncă aplicabil.", marginTop: 4 },
+        {
+          text: "Sporurile și adaosurile se acordă conform dispozițiilor legale și contractului colectiv de muncă aplicabil.",
+          marginTop: 4,
+        },
       ]),
 
       { text: "VI. CONCEDIUL", style: "sectiune" },
-      ...section("6", "Concediul de odihnă", [
+      ...art("6", "Concediul de odihnă", [
         { text: "Durata concediului de odihnă anual este de minimum 20 de zile lucrătoare, conform Codului muncii." },
       ]),
 
       { text: "VII. PREAVIZUL", style: "sectiune" },
-      ...section("7", "Preaviz", [
-        { text: [`Durata preavizului la încetarea contractului din inițiativa salariatului este de `, { text: `${preavizZile} zile lucrătoare`, bold: true }, `. Durata preavizului la concediere este de minimum 20 de zile lucrătoare.`] },
+      ...art("7", "Preaviz", [
+        {
+          text: [
+            "Durata preavizului la demisie este de ",
+            { text: `${preavizZile} zile lucrătoare`, bold: true },
+            ". Durata preavizului la concediere este de minimum 20 de zile lucrătoare.",
+          ],
+        },
       ]),
 
       { text: "VIII. CLAUZE SPECIFICE", style: "sectiune" },
-      ...section("8", "Clauza de confidențialitate", [
-        { text: "Salariatul se obligă să păstreze confidențialitatea datelor și informațiilor la care are acces în exercitarea atribuțiilor de serviciu, pe toată durata contractului și după încetarea acestuia." },
+      ...art("8", "Clauza de confidențialitate", [
+        {
+          text: "Salariatul se obligă să păstreze confidențialitatea datelor și informațiilor la care are acces, pe toată durata contractului și după încetarea acestuia.",
+        },
       ]),
 
-      { text: "IX. DREPTURI ȘI OBLIGAȚII GENERALE", style: "sectiune" },
-      ...section("9", "Dispoziții generale", [
-        { text: "Drepturile și obligațiile privind relațiile de muncă dintre angajator și salariat se completează cu prevederile Legii nr. 53/2003 — Codul muncii, republicată, cu modificările și completările ulterioare, și ale contractului colectiv de muncă aplicabil." },
+      { text: "IX. DREPTURI ȘI OBLIGAȚII", style: "sectiune" },
+      ...art("9", "Dispoziții generale", [
+        {
+          text: "Drepturile și obligațiile se completează cu prevederile Legii nr. 53/2003 — Codul muncii, republicată, și ale contractului colectiv de muncă aplicabil.",
+        },
       ]),
 
       { text: "X. DISPOZIȚII FINALE", style: "sectiune" },
-      ...section("10", "Modificarea contractului", [
-        { text: "Orice modificare a clauzelor prezentului contract se face numai prin act adițional semnat de ambele părți." },
+      ...art("10", "Modificarea contractului", [
+        { text: "Orice modificare se face numai prin act adițional semnat de ambele părți." },
         { text: "Prezentul contract a fost încheiat în două exemplare, câte unul pentru fiecare parte.", marginTop: 4 },
       ]),
 
@@ -315,9 +332,9 @@ function buildContractMunca(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
 }
 
 function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavizZile: number): any {
-  const numeComplet    = `${a.prenume ?? ""} ${a.nume}`.trim()
-  const adresaAsoc     = [asoc.address, asoc.city, asoc.sector].filter(Boolean).join(", ")
-  const dataIncetare   = addDays(dataDoc, preavizZile)
+  const numeComplet  = `${a.prenume ?? ""} ${a.nume}`.trim()
+  const adresaAsoc   = [asoc.address, asoc.city, asoc.sector].filter(Boolean).join(", ")
+  const dataIncetare = addZileL(dataDoc, preavizZile)
 
   return {
     pageSize: "A4",
@@ -330,10 +347,10 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
           {
             width: "45%",
             stack: [
-              { text: "Către,", style: "normal" },
+              { text: "Către," },
               { text: asoc.name, bold: true },
               { text: adresaAsoc || " " },
-              asoc.adminName ? { text: `În atenția: ${asoc.adminName}` } : {},
+              { text: asoc.adminName ? `În atenția: ${asoc.adminName}` : " " },
             ],
           },
         ],
@@ -344,12 +361,12 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
         text: [
           "Subsemnatul/a ",
           { text: numeComplet, bold: true },
-          a.cnp ? [", CNP ", { text: a.cnp, bold: true }] : "",
+          a.cnp ? `, CNP ${a.cnp}` : "",
           ", angajat/ă la ",
           { text: asoc.name, bold: true },
           " în funcția de ",
           { text: a.functie || "_______________", bold: true },
-          a.dataAngajare ? [", începând cu data de ", { text: fmtData(a.dataAngajare), bold: true }] : "",
+          a.dataAngajare ? `, începând cu data de ${fmtData(a.dataAngajare)}` : "",
           ",",
         ],
         marginBottom: 12,
@@ -384,14 +401,10 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
       },
       {
         columns: [
+          { text: `Data: ${fmtData(dataDoc)}` },
           {
             stack: [
-              { text: `Data: ${fmtData(dataDoc)}` },
-            ],
-          },
-          {
-            stack: [
-              { text: `${numeComplet}`, alignment: "right" },
+              { text: numeComplet, alignment: "right" },
               { text: "Semnătura: ___________________________", alignment: "right" },
             ],
           },
@@ -407,14 +420,13 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
       { text: "CONFIRMARE PRIMIRE (angajator)", bold: true, marginBottom: 8 },
       {
         columns: [
-          { text: `Am primit prezenta demisie la data de: ___________` },
+          { text: "Am primit prezenta demisie la data de: ___________" },
           { text: "Semnătura: ___________________________", alignment: "right" },
         ],
       },
     ],
     styles: {
-      titlu:  { fontSize: 14, bold: true, alignment: "center" },
-      normal: { fontSize: 12 },
+      titlu: { fontSize: 14, bold: true, alignment: "center" },
     },
   }
 }
@@ -422,31 +434,36 @@ function buildCerereDemisie(a: Angajat, asoc: Asociatie, dataDoc: string, preavi
 // ─── Modal ────────────────────────────────────────────────────────────────────
 
 export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }: Props) {
-  const [docType,     setDocType]     = useState<DocType>("cerere-angajare")
-  const [asoc,        setAsoc]        = useState<Asociatie | null>(null)
-  const [loading,     setLoading]     = useState(true)
-  const [generating,  setGenerating]  = useState(false)
-  const [dataDoc,     setDataDoc]     = useState(today())
-  const [preaviz,     setPreaviz]     = useState(20)
-  const [domiciliu,   setDomiciliu]   = useState("")
-  const [adresaExtra, setAdresaExtra] = useState("")
+  const [docType,    setDocType]    = useState<DocType>("cerere-angajare")
+  const [asoc,       setAsoc]       = useState<Asociatie | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [err,        setErr]        = useState("")
+  const [dataDoc,    setDataDoc]    = useState(today())
+  const [preaviz,    setPreaviz]    = useState(20)
+  const [domiciliu,  setDomiciliu]  = useState("")
 
   useEffect(() => {
     fetch(`/api/asociatii/${asociatieId}`)
       .then(r => r.json())
-      .then(d => { setAsoc(d); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(d => {
+        if (d?.name) setAsoc(d)
+        else setErr("Nu s-au putut încărca datele asociației.")
+        setLoading(false)
+      })
+      .catch(() => { setErr("Eroare la încărcarea datelor asociației."); setLoading(false) })
   }, [asociatieId])
 
   async function handleGenereaza() {
     if (!asoc) return
     setGenerating(true)
+    setErr("")
     try {
       const pm  = await getPdfMake()
       let   doc: any
 
       if (docType === "cerere-angajare") {
-        doc = buildCerereAngajare(angajat, asoc, dataDoc, adresaExtra, domiciliu)
+        doc = buildCerereAngajare(angajat, asoc, dataDoc, domiciliu)
       } else if (docType === "contract-munca") {
         doc = buildContractMunca(angajat, asoc, dataDoc, preaviz)
       } else {
@@ -454,8 +471,9 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
       }
 
       const numeAngajat = `${angajat.prenume ?? ""}_${angajat.nume}`.replace(/\s+/g, "_")
-      const numeFisier  = `${docType}_${numeAngajat}.pdf`
-      pm.createPdf(doc).download(numeFisier)
+      pm.createPdf(doc).download(`${docType}_${numeAngajat}.pdf`)
+    } catch (e: any) {
+      setErr(`Eroare generare PDF: ${e?.message ?? String(e)}`)
     } finally {
       setGenerating(false)
     }
@@ -473,11 +491,10 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
 
         <div className="modal__body">
           {loading ? (
-            <p className="spv-card__loading">Se încarcă datele asociației...</p>
+            <p style={{ color: "#9ca3af" }}>Se încarcă datele asociației...</p>
           ) : (
             <div className="form-grid form-grid--2">
 
-              {/* Tip document */}
               <div className="form-field form-field--full">
                 <label className="form-field__label">Tip document</label>
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
@@ -494,7 +511,6 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
                 </div>
               </div>
 
-              {/* Data document */}
               <div className="form-field">
                 <label className="form-field__label">Data documentului</label>
                 <input
@@ -506,7 +522,6 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
                 />
               </div>
 
-              {/* Preaviz (contract + demisie) */}
               {(docType === "contract-munca" || docType === "cerere-demisie") && (
                 <div className="form-field">
                   <label className="form-field__label">Preaviz (zile lucrătoare)</label>
@@ -521,10 +536,9 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
                 </div>
               )}
 
-              {/* Domiciliu angajat (cerere angajare) */}
               {docType === "cerere-angajare" && (
                 <div className="form-field form-field--full">
-                  <label className="form-field__label">Domiciliu angajat (pentru cerere)</label>
+                  <label className="form-field__label">Domiciliu angajat</label>
                   <input
                     className="input"
                     value={domiciliu}
@@ -534,7 +548,6 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
                 </div>
               )}
 
-              {/* Sumar */}
               <div className="form-field form-field--full">
                 <div className="sal-doc-preview">
                   <p className="sal-doc-preview__titlu">{DOC_LABELS[docType]}</p>
@@ -570,12 +583,18 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
                     {docType === "cerere-demisie" && (
                       <div className="info-row">
                         <span className="info-row__label">Ultima zi de muncă</span>
-                        <span className="info-row__value">{fmtData(addDays(dataDoc, preaviz))}</span>
+                        <span className="info-row__value">{fmtData(addZileL(dataDoc, preaviz))}</span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
+
+              {err && (
+                <div className="form-field form-field--full">
+                  <p style={{ color: "#f87171", fontSize: "0.85rem", margin: 0 }}>{err}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -585,7 +604,7 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
           <button
             className="btn btn--primary"
             onClick={handleGenereaza}
-            disabled={generating || loading}
+            disabled={generating || loading || !asoc}
           >
             {generating ? "Se generează..." : "⬇ Descarcă PDF"}
           </button>
