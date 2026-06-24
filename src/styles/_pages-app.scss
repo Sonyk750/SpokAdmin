@@ -1324,3 +1324,180 @@
   &--violet { background: $violet-subtle; color: $violet-light; }
   &--gray   { background: rgba(255,255,255,0.06); color: $text-faint; }
 }
+
+// ─── SPV / e-Factură ──────────────────────────────────────────────────────────
+
+.spv-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: $radius-lg;
+  font-size: 0.875rem;
+
+  &--success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); color: #6ee7b7; }
+  &--error   { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.2);  color: #f87171; }
+
+  &__close {
+    background: none; border: none; cursor: pointer;
+    color: inherit; opacity: 0.6; font-size: 0.875rem; padding: 0;
+    &:hover { opacity: 1; }
+  }
+}
+
+.spv-warn {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: rgba(234,179,8,0.05);
+  border: 1px solid rgba(234,179,8,0.2);
+  border-radius: $radius-lg;
+  font-size: 0.875rem;
+
+  &__icon  { font-size: 1.25rem; flex-shrink: 0; margin-top: 0.1rem; }
+  &__title { color: #fde047; font-weight: 600; margin-bottom: 0.375rem; }
+  &__desc  { color: rgba(253,224,71,0.7); font-size: 0.8125rem; margin-bottom: 0.75rem; }
+  &__code  {
+    display: block;
+    background: rgba(0,0,0,0.3);
+    border-radius: $radius-sm;
+    padding: 0.375rem 0.75rem;
+    font-family: monospace;
+    font-size: 0.8125rem;
+    color: #d1d5db;
+    margin-bottom: 0.5rem;
+  }
+  &__uri   { font-size: 0.75rem; color: rgba(253,224,71,0.6); }
+}
+
+.spv-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.spv-card {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+
+  &__label   { font-size: 0.625rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: $text-faint; }
+  &__loading { color: $text-faint; font-size: 0.875rem; }
+  &__meta    { font-size: 0.8125rem; color: $text-muted; }
+  &__warn    { font-size: 0.8125rem; color: #fde047; }
+  &__note    { font-size: 0.75rem; color: $text-faint; line-height: 1.5; }
+  &__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+}
+
+.btn--sm {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+}
+
+.spv-status {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-weight: 600;
+  font-size: 0.9375rem;
+
+  &__dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+
+    &--green { background: #4ade80; box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+    &--gray  { background: #6b7280; }
+  }
+
+  &--ok  { color: #4ade80; }
+  &--off { color: $text-muted; }
+}
+
+.spv-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.spv-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: $text-secondary;
+
+  &__num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.375rem;
+    height: 1.375rem;
+    border-radius: 50%;
+    background: $violet-subtle;
+    color: $violet-light;
+    font-size: 0.625rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+}
+
+.spv-perms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.spv-perm {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+
+  &__icon { font-size: 1.125rem; flex-shrink: 0; }
+
+  strong { display: block; color: $text-primary; margin-bottom: 0.125rem; }
+  p      { color: $text-muted; margin: 0; font-size: 0.75rem; }
+}
+
+.spv-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.spv-date-input {
+  background: $bg-input;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-sm;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: $text-secondary;
+  color-scheme: dark;
+
+  &:focus { outline: none; border-color: $violet; }
+}
+
+.spv-date-sep {
+  color: $text-faint;
+  font-size: 0.8125rem;
+}
+
+.spv-count {
+  font-size: 0.8125rem;
+  color: $text-muted;
+}
+
+.spv-loading {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: $text-faint;
+  font-size: 0.9375rem;
+}

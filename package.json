@@ -19,6 +19,7 @@
     "@stripe/stripe-js": "^9.8.0",
     "@types/pdfmake": "^0.3.3",
     "bcryptjs": "^3.0.3",
+    "fflate": "^0.8.3",
     "next": "16.2.7",
     "next-auth": "^5.0.0-beta.31",
     "pdfmake": "^0.3.11",
