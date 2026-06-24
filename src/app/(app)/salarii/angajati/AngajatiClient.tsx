@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { useAsociatie } from "@/lib/AsociatieContext"
+import DocumenteAngajatModal from "./DocumenteAngajatModal"
 
 interface Angajat {
   id:                string
@@ -36,8 +37,9 @@ export default function AngajatiClient() {
 
   const [angajati, setAngajati] = useState<Angajat[]>([])
   const [loading,  setLoading]  = useState(true)
-  const [modal,    setModal]    = useState<"adauga" | "editeaza" | null>(null)
-  const [selected, setSelected] = useState<Angajat | null>(null)
+  const [modal,       setModal]       = useState<"adauga" | "editeaza" | null>(null)
+  const [selected,    setSelected]    = useState<Angajat | null>(null)
+  const [docAngajat,  setDocAngajat]  = useState<Angajat | null>(null)
   const [form,     setForm]     = useState({ ...emptyForm })
   const [saving,   setSaving]   = useState(false)
   const [err,      setErr]      = useState("")
@@ -194,6 +196,7 @@ export default function AngajatiClient() {
                   </td>
                   <td>
                     <div style={{ display: "flex", gap: "0.375rem" }}>
+                      <button onClick={() => setDocAngajat(a)} className="btn-action" title="Generează documente HR">Documente</button>
                       <button onClick={() => openEditeaza(a)} className="btn-action">Editează</button>
                       {a.isActive
                         ? <button onClick={() => handleDeactivate(a)} className="btn-action btn-action--danger">Dezactivează</button>
@@ -220,6 +223,14 @@ export default function AngajatiClient() {
             )}
           </table>
         </div>
+      )}
+
+      {docAngajat && asociatieId && (
+        <DocumenteAngajatModal
+          angajat={docAngajat}
+          asociatieId={asociatieId}
+          onClose={() => setDocAngajat(null)}
+        />
       )}
 
       {modal && (

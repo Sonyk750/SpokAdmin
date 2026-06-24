@@ -1662,3 +1662,21 @@
   gap: 1.25rem;
   @media (max-width: 768px) { grid-template-columns: 1fr; }
 }
+
+// ─── Documente HR modal ───────────────────────────────────────────────────────
+
+.sal-doc-preview {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+
+  &__titlu {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: $violet;
+    margin-bottom: 0.75rem;
+  }
+}
