@@ -223,7 +223,7 @@ export default function AngajatiClient() {
       )}
 
       {modal && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) closeModal() }}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal__header">
               <h2 className="modal__title">{modal === "adauga" ? "Angajat nou" : "Editează angajat"}</h2>
