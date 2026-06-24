@@ -6,7 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── NextAuth ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ NextAuth â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model User {
   id            String    @id @default(cuid())
@@ -62,7 +62,7 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-// ─── Organizație (firma de administrare — tenant SaaS) ──────────────────────
+// â”€â”€â”€ OrganizaÈ›ie (firma de administrare â€” tenant SaaS) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Organization {
   id                   String    @id @default(cuid())
@@ -101,14 +101,14 @@ model OrganizationMember {
   @@index([userId])
 }
 
-// ─── Asociații de proprietari ─────────────────────────────────────────────────
+// â”€â”€â”€ AsociaÈ›ii de proprietari â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Asociatie {
   id               String   @id @default(cuid())
   organizationId   String
   name             String
   address          String?
-  city             String   @default("București")
+  city             String   @default("BucureÈ™ti")
   sector           String?
   cui              String?
   regCom           String?
@@ -123,8 +123,8 @@ model Asociatie {
   nrApartamente    Int      @default(0)
   nrScari          Int      @default(1)
   anConstructie    Int?
-  blocuriJson      String?  // JSON — configurare blocuri/scări
-  wizardData       String?  // JSON — configurare completă din wizard
+  blocuriJson      String?  // JSON â€” configurare blocuri/scÄƒri
+  wizardData       String?  // JSON â€” configurare completÄƒ din wizard
   wizardStep       Int      @default(0)
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
@@ -142,6 +142,8 @@ model Asociatie {
   transferuri      Transfer[]
   transferuriFonduri TransferFond[]
   spvInvoices      SpvInvoice[]
+  angajati         Angajat[]
+  statePlata       StatPlata[]
 
   @@index([organizationId])
 }
@@ -161,7 +163,7 @@ model GrupApartamente {
   @@index([organizationId])
 }
 
-// ─── Apartamente ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Apartamente â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Apartament {
   id             String   @id @default(cuid())
@@ -190,7 +192,7 @@ model Apartament {
   @@index([organizationId])
 }
 
-// ─── Proprietari ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Proprietari â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Proprietar {
   id             String   @id @default(cuid())
@@ -226,8 +228,8 @@ model ApartamentProprietar {
   @@unique([apartamentId, proprietarId])
 }
 
-// ─── Solduri per apartament ───────────────────────────────────────────────────
-// Un rând per apartament — se actualizează la fiecare operație
+// â”€â”€â”€ Solduri per apartament â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Un rÃ¢nd per apartament â€” se actualizeazÄƒ la fiecare operaÈ›ie
 
 model SoldApartament {
   id                  String   @id @default(cuid())
@@ -242,7 +244,7 @@ model SoldApartament {
   @@index([asociatieId])
 }
 
-// ─── Fonduri ──────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Fonduri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model FondAsociatie {
   id          String   @id @default(cuid())
@@ -274,7 +276,7 @@ model FondApartament {
   @@index([asociatieId])
 }
 
-// ─── Furnizori ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Furnizori â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Furnizor {
   id             String   @id @default(cuid())
@@ -308,7 +310,7 @@ model FurnizorAsociatie {
   @@unique([furnizorId, asociatieId])
 }
 
-// ─── Facturi ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Facturi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Factura {
   id              String    @id @default(cuid())
@@ -341,7 +343,7 @@ model Factura {
   @@index([organizationId])
 }
 
-// ─── Plăți facturi ────────────────────────────────────────────────────────────
+// â”€â”€â”€ PlÄƒÈ›i facturi â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Plata {
   id        String   @id @default(cuid())
@@ -357,7 +359,7 @@ model Plata {
   @@index([facturaId])
 }
 
-// ─── Încasări proprietari ─────────────────────────────────────────────────────
+// â”€â”€â”€ ÃŽncasÄƒri proprietari â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model IncasareSerie {
   id             String   @id @default(cuid())
@@ -396,7 +398,7 @@ model Incasare {
   @@index([apartamentId])
 }
 
-// ─── Transferuri între conturi (casă ↔ bancă) ─────────────────────────────────
+// â”€â”€â”€ Transferuri Ã®ntre conturi (casÄƒ â†” bancÄƒ) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Transfer {
   id             String   @id @default(cuid())
@@ -404,8 +406,8 @@ model Transfer {
   asociatieId    String
   data           DateTime @default(now())
   suma           Float
-  dinCont        String   // "Casă" sau numele băncii
-  inCont         String   // "Casă" sau numele băncii
+  dinCont        String   // "CasÄƒ" sau numele bÄƒncii
+  inCont         String   // "CasÄƒ" sau numele bÄƒncii
   notes          String?
   createdAt      DateTime @default(now())
 
@@ -415,7 +417,7 @@ model Transfer {
   @@index([organizationId])
 }
 
-// ─── Transferuri între fonduri ────────────────────────────────────────────────
+// â”€â”€â”€ Transferuri Ã®ntre fonduri â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model TransferFond {
   id             String   @id @default(cuid())
@@ -436,7 +438,7 @@ model TransferFond {
   @@index([organizationId])
 }
 
-// ─── Lista de întreținere lunară ──────────────────────────────────────────────
+// â”€â”€â”€ Lista de Ã®ntreÈ›inere lunarÄƒ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model ListaLuna {
   id             String   @id @default(cuid())
@@ -445,7 +447,7 @@ model ListaLuna {
   luna           Int
   an             Int
   status         String   @default("draft") // draft / publicata / inchisa
-  coloane        String?  // JSON — definițiile coloanelor de cheltuieli
+  coloane        String?  // JSON â€” definiÈ›iile coloanelor de cheltuieli
   totalCheltuieli Float   @default(0)
   publicatAt     DateTime?
   inchisaAt      DateTime?
@@ -468,7 +470,7 @@ model ListaLunaApartament {
   nrPersone   Int    @default(1)
   suprafata   Float?
   cotaParte   Float?
-  valoriJson  String?  // JSON — valorile pe coloane
+  valoriJson  String?  // JSON â€” valorile pe coloane
   totalLuna   Float  @default(0)
   restantaVeche Float @default(0)
   totalDePlata Float @default(0)
@@ -482,7 +484,7 @@ model ListaLunaApartament {
   @@index([listaId])
 }
 
-// ─── Contoare ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Contoare â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model Contor {
   id             String   @id @default(cuid())
@@ -491,7 +493,7 @@ model Contor {
   organizationId String
   tip            String   // apa_rece / apa_calda / electric / gaz
   locatie        String?  // bucatarie / baie / baie_mica / general / gradina / custom
-  denumire       String?  // eticheta afișată (mai ales pentru contoare custom)
+  denumire       String?  // eticheta afiÈ™atÄƒ (mai ales pentru contoare custom)
   numarSerie     String?
   furnizor       String?  // ISTA / Techem / Cagero / manual
   isActive       Boolean  @default(true)
@@ -523,7 +525,7 @@ model CitireContor {
   @@index([contorId])
 }
 
-// ─── SPV / e-Factură ──────────────────────────────────────────────────────────
+// â”€â”€â”€ SPV / e-FacturÄƒ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 model SpvToken {
   id           String    @id @default(cuid())
@@ -558,4 +560,83 @@ model SpvInvoice {
 
   @@index([asociatieId])
   @@index([organizationId])
+}
+
+// ─── Salarii ──────────────────────────────────────────────────────────────────
+
+model Angajat {
+  id                 String    @id @default(cuid())
+  organizationId     String
+  asociatieId        String
+  nume               String
+  prenume            String?
+  cnp                String?
+  functie            String?
+  tipContract        String    @default("CIM")
+  dataAngajare       DateTime?
+  dataIncetare       DateTime?
+  salariuBrut        Float     @default(0)
+  deducerePersonala  Float     @default(0)
+  normaDeLucru       Float     @default(8)
+  contBancar         String?
+  banca              String?
+  email              String?
+  telefon            String?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  asociatie  Asociatie       @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  randuri    StatPlataRand[]
+
+  @@index([asociatieId])
+  @@index([organizationId])
+}
+
+model StatPlata {
+  id             String   @id @default(cuid())
+  organizationId String
+  asociatieId    String
+  luna           Int
+  an             Int
+  status         String   @default("draft")
+  totalBrut      Float    @default(0)
+  totalNet       Float    @default(0)
+  totalCas       Float    @default(0)
+  totalCass      Float    @default(0)
+  totalImpozit   Float    @default(0)
+  totalCam       Float    @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  asociatie Asociatie       @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  randuri   StatPlataRand[]
+
+  @@unique([asociatieId, luna, an])
+  @@index([asociatieId])
+  @@index([organizationId])
+}
+
+model StatPlataRand {
+  id            String  @id @default(cuid())
+  statPlataId   String
+  angajatId     String
+  zileLucrate   Int     @default(22)
+  zileLibere    Int     @default(0)
+  oreSupliment  Float   @default(0)
+  salariuBrut   Float   @default(0)
+  deducere      Float   @default(0)
+  cas           Float   @default(0)
+  cass          Float   @default(0)
+  impozit       Float   @default(0)
+  altRetineri   Float   @default(0)
+  cam           Float   @default(0)
+  salariuNet    Float   @default(0)
+
+  statPlata StatPlata @relation(fields: [statPlataId], references: [id], onDelete: Cascade)
+  angajat   Angajat   @relation(fields: [angajatId],   references: [id])
+
+  @@unique([statPlataId, angajatId])
+  @@index([statPlataId])
 }

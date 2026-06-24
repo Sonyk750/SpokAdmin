@@ -39,6 +39,17 @@ const nav: Item[] = [
     ],
   },
   {
+    type: "group", label: "Salarii", key: "salarii",
+    children: [
+      { type: "label", label: "LUNAR" },
+      { type: "link",  href: "/salarii/state-de-plata",  label: "State de plată" },
+      { type: "link",  href: "/salarii/op-buget-stat",   label: "OP buget de stat" },
+      { type: "link",  href: "/salarii/declaratii",      label: "Declarații D112" },
+      { type: "label", label: "SETĂRI" },
+      { type: "link",  href: "/salarii/angajati",        label: "Angajați" },
+    ],
+  },
+  {
     type: "group", label: "Transferuri", key: "transferuri",
     children: [
       { type: "link", href: "/transferuri/intre-conturi", label: "Între conturi" },
