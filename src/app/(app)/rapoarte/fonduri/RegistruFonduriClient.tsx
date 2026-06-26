@@ -36,7 +36,7 @@ interface ApartamentItem {
   id: string;
   numar: string;
   scara: string | null;
-  proprietari: { proprietar: { nume: string; prenume: string } }[];
+  proprietar: string;
 }
 
 const fmt2 = (v: number) => v.toFixed(2);
@@ -263,12 +263,12 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
     Promise.all([
       fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()),
       fetch(`/api/asociatii/${asociatieId}/apartamente`).then(r => r.json()),
-    ]).then(([d, aps]: [AsocInfo, ApartamentItem[]]) => {
+    ]).then(([d, apsResp]: [AsocInfo, { apartamente: ApartamentItem[] }]) => {
       setAsoc(d);
       const f = Array.isArray(d.fonduri) ? d.fonduri : [];
       setFonduri(f);
       setFondId(prev => (prev && f.some(x => x.id === prev)) ? prev : (f[0]?.id ?? ""));
-      setApartamente(Array.isArray(aps) ? aps : []);
+      setApartamente(Array.isArray(apsResp?.apartamente) ? apsResp.apartamente : []);
       setApartamentId("");
     }).catch(() => { setFonduri([]); setFondId(""); setApartamente([]); setApartamentId(""); });
   }, [asociatieId]);
@@ -317,8 +317,7 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
     if (!apartamentId || apartamentId === "detaliat") return "";
     const a = apartamente.find(x => x.id === apartamentId);
     if (!a) return "";
-    const prop = a.proprietari[0]?.proprietar;
-    return `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
+    return `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${a.proprietar ? ` — ${a.proprietar}` : ""}`;
   })();
 
   async function handleDownloadPdf() {
@@ -396,14 +395,11 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
             <label className="form-field__label">Apartament</label>
             <select className="input" value={apartamentId} onChange={e => setApartamentId(e.target.value)} style={{ minWidth: "240px" }}>
               <option value="">Asociație</option>
-              {apartamente.map(a => {
-                const prop = a.proprietari[0]?.proprietar;
-                return (
-                  <option key={a.id} value={a.id}>
-                    {`Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`}
-                  </option>
-                );
-              })}
+              {apartamente.map(a => (
+                <option key={a.id} value={a.id}>
+                  {`Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${a.proprietar ? ` — ${a.proprietar}` : ""}`}
+                </option>
+              ))}
               <option value="detaliat">Toate apartamentele (detaliat)</option>
             </select>
           </div>
