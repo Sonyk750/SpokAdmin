@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-// Contribuțiile către un fond dintr-o încasare (pozițiile cu tip "fond" + avans repartizat pe fond)
 function contribFond(pozitiiJson: string | null, avansJson: string | null, fondId: string): number {
   let sum = 0;
   try {
@@ -16,7 +15,6 @@ function contribFond(pozitiiJson: string | null, avansJson: string | null, fondI
   return sum;
 }
 
-// Registru fonduri — mișcările unui fond: contribuții încasate + transferuri între fonduri.
 export async function GET(req: NextRequest) {
   const session = await auth();
   const orgId = session?.user?.organizationId;
@@ -28,6 +26,8 @@ export async function GET(req: NextRequest) {
   const dataStart    = searchParams.get("dataStart");
   const dataEnd      = searchParams.get("dataEnd");
   const apartamentId = searchParams.get("apartamentId") || null;
+  const detaliat     = searchParams.get("detaliat") === "true";
+
   if (!asociatieId || !fondId || !dataStart || !dataEnd)
     return NextResponse.json({ error: "Parametri lipsă" }, { status: 400 });
 
@@ -37,18 +37,64 @@ export async function GET(req: NextRequest) {
   });
   if (!fond) return NextResponse.json({ error: "Fond negăsit" }, { status: 404 });
 
-  // Sold acumulat de bază (din inițializare) — punct de pornire
+  const start = new Date(dataStart);
+  const end   = new Date(dataEnd + "T23:59:59");
+
+  // ── Mod DETALIAT: sumar per apartament (sold + restanță + contribuții) ───
+  if (detaliat) {
+    const [apartamente, incasariPerioad] = await Promise.all([
+      db.apartament.findMany({
+        where:   { asociatieId, organizationId: orgId, isActive: true },
+        orderBy: { numar: "asc" },
+        select: {
+          id: true, numar: true, scara: true,
+          proprietari: {
+            where:   { isMain: true },
+            include: { proprietar: { select: { nume: true, prenume: true } } },
+            take:    1,
+          },
+          fonduri: { where: { fondId } },
+        },
+      }),
+      db.incasare.findMany({
+        where:  { asociatieId, organizationId: orgId, data: { gte: start, lte: end } },
+        select: { apartamentId: true, pozitiiJson: true, avansJson: true },
+      }),
+    ]);
+
+    const contribMap = new Map<string, number>();
+    for (const i of incasariPerioad) {
+      const c = contribFond(i.pozitiiJson, i.avansJson, fondId);
+      if (c > 0) contribMap.set(i.apartamentId, (contribMap.get(i.apartamentId) ?? 0) + c);
+    }
+
+    return NextResponse.json({
+      fondName: fond.name,
+      detaliat: apartamente.map(a => {
+        const fa   = a.fonduri[0];
+        const prop = a.proprietari[0]?.proprietar;
+        return {
+          apartamentId:       a.id,
+          numar:              a.numar,
+          scara:              a.scara,
+          proprietar:         prop ? `${prop.nume} ${prop.prenume}` : "",
+          sold:               fa?.sold     ?? 0,
+          restanta:           fa?.restanta ?? 0,
+          contributiiPerioda: contribMap.get(a.id) ?? 0,
+        };
+      }),
+    });
+  }
+
+  // ── Mod NORMAL sau per APARTAMENT ────────────────────────────────────────
   const baseAgg = await db.fondApartament.aggregate({
     where: { asociatieId, fondId, ...(apartamentId ? { apartamentId } : {}) },
     _sum:  { sold: true },
   });
   const baseSold = baseAgg._sum.sold ?? 0;
 
-  const start = new Date(dataStart);
-  const end   = new Date(dataEnd + "T23:59:59");
-
   const incasariWhere = { asociatieId, organizationId: orgId, ...(apartamentId ? { apartamentId } : {}) };
-  const [incasari, transferuri] = await Promise.all([
+  const [incasari, transferuri, fondAp] = await Promise.all([
     db.incasare.findMany({
       where:  incasariWhere,
       select: { id: true, apartamentId: true, data: true, serie: true, numarDocument: true, nrApartament: true, proprietarNume: true, pozitiiJson: true, avansJson: true, createdAt: true },
@@ -57,9 +103,12 @@ export async function GET(req: NextRequest) {
       where:  { asociatieId, organizationId: orgId, OR: [{ dinFondId: fondId }, { inFondId: fondId }] },
       select: { id: true, data: true, suma: true, dinFondId: true, dinFondName: true, inFondId: true, inFondName: true, notes: true, createdAt: true },
     }),
+    apartamentId ? db.fondApartament.findFirst({
+      where:  { apartamentId, fondId, asociatieId },
+      select: { sold: true, restanta: true },
+    }) : Promise.resolve(null),
   ]);
 
-  // Sold inițial la începutul perioadei = bază + contribuții + transferuri (înainte de start)
   let soldInitial = baseSold;
   for (const i of incasari) if (i.data < start) soldInitial += contribFond(i.pozitiiJson, i.avansJson, fondId);
   for (const t of transferuri) if (t.data < start) soldInitial += (t.inFondId === fondId ? t.suma : 0) - (t.dinFondId === fondId ? t.suma : 0);
@@ -101,8 +150,10 @@ export async function GET(req: NextRequest) {
   ops.sort((a, b) => a._dataMs - b._dataMs || a._createdMs - b._createdMs);
 
   return NextResponse.json({
-    fondName: fond.name,
+    fondName:   fond.name,
     soldInitial,
+    soldAp:     fondAp?.sold     ?? null,
+    restantaAp: fondAp?.restanta ?? null,
     operatiuni: ops.map(({ _dataMs, _createdMs, ...o }) => o),
   });
 }

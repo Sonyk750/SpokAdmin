@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 
 interface Operatiune {
@@ -13,6 +13,16 @@ interface Operatiune {
   iesire:        number;
   apartamentId?: string;
   nrApartament?: string;
+}
+
+interface DetaliatItem {
+  apartamentId:       string;
+  numar:              string;
+  scara:              string | null;
+  proprietar:         string;
+  sold:               number;
+  restanta:           number;
+  contributiiPerioda: number;
 }
 
 interface AsocInfo {
@@ -44,86 +54,46 @@ function withRunningBalance(soldInitial: number, ops: Operatiune[]) {
   return ops.map(op => { sold += op.intrare - op.iesire; return { ...op, sold }; });
 }
 
-async function generateAndDownloadPdfDetaliat(
+// PDF pentru modul detaliat (tabel sumar per apartament)
+async function generatePdfDetaliat(
   asoc: AsocInfo | null, fondName: string,
-  grupe: { label: string; numar: string; ops: Operatiune[]; totalIntrari: number; totalIesiri: number }[],
-  transferuri: Operatiune[], dataStart: string, dataEnd: string,
+  data: DetaliatItem[], dataStart: string, dataEnd: string,
 ) {
   const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
   const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
   (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
 
-  const adresa = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ");
+  const adresa  = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ");
   const contact = [asoc?.cui ? `CUI: ${asoc.cui}` : null, asoc?.phone ? `Tel: ${asoc.phone}` : null, asoc?.email ? `Email: ${asoc.email}` : null].filter(Boolean).join("   |   ");
 
-  const totalIntrariGlobal = grupe.reduce((s, g) => s + g.totalIntrari, 0) + transferuri.reduce((s, t) => s + t.intrare, 0);
-  const totalIesiriGlobal  = grupe.reduce((s, g) => s + g.totalIesiri, 0)  + transferuri.reduce((s, t) => s + t.iesire, 0);
+  const totalSold     = data.reduce((s, a) => s + a.sold, 0);
+  const totalRestanta = data.reduce((s, a) => s + a.restanta, 0);
+  const totalContrib  = data.reduce((s, a) => s + a.contributiiPerioda, 0);
 
-  const COL_WIDTHS = [20, 44, 52, "*", 46, 46];
-
-  const headerRow = [
-    { text: "Nr.", style: "th", alignment: "center" },
-    { text: "Data", style: "th", alignment: "center" },
-    { text: "Document", style: "th", alignment: "center" },
-    { text: "Explicație", style: "th" },
-    { text: "Intrări\n(lei)", style: "th", alignment: "right" },
-    { text: "Ieșiri\n(lei)", style: "th", alignment: "right" },
+  const tableBody: any[][] = [
+    [
+      { text: "Nr.", style: "th", alignment: "center" },
+      { text: "Ap.", style: "th", alignment: "center" },
+      { text: "Proprietar", style: "th" },
+      { text: "Sold\n(lei)", style: "th", alignment: "right" },
+      { text: "Restanță\n(lei)", style: "th", alignment: "right" },
+      { text: `Contribuții\n${roDate(dataStart)}–${roDate(dataEnd)}`, style: "th", alignment: "right" },
+    ],
+    ...data.map((a, idx) => [
+      { text: String(idx + 1), alignment: "center", fontSize: 8 },
+      { text: `${a.numar}${a.scara ? `/${a.scara}` : ""}`, alignment: "center", fontSize: 8 },
+      { text: a.proprietar, fontSize: 8 },
+      { text: fmt2(a.sold),    alignment: "right", fontSize: 8 },
+      { text: fmt2(a.restanta), alignment: "right", fontSize: 8, color: a.restanta > 0 ? "#c0392b" : undefined },
+      { text: a.contributiiPerioda ? fmt2(a.contributiiPerioda) : "—", alignment: "right", fontSize: 8 },
+    ]),
+    [
+      { text: "TOTAL", colSpan: 3, alignment: "right", bold: true, fontSize: 9, border: [true, true, false, true] }, {}, {},
+      { text: fmt2(totalSold),    alignment: "right", bold: true, fontSize: 9 },
+      { text: fmt2(totalRestanta), alignment: "right", bold: true, fontSize: 9, color: totalRestanta > 0 ? "#c0392b" : undefined },
+      { text: fmt2(totalContrib), alignment: "right", bold: true, fontSize: 9 },
+    ],
   ];
-
-  const tableBody: any[][] = [headerRow];
-
-  for (const g of grupe) {
-    // header grup
-    tableBody.push([{ text: g.label, colSpan: 6, bold: true, fontSize: 8, fillColor: "#DDDDDD", border: [true, true, true, false] }, {}, {}, {}, {}, {}]);
-    if (g.ops.length === 0) {
-      tableBody.push([{ text: "—", colSpan: 6, fontSize: 8, italics: true, color: "#888", alignment: "center", border: [true, false, true, false] }, {}, {}, {}, {}, {}]);
-    } else {
-      g.ops.forEach((op, idx) => {
-        tableBody.push([
-          { text: String(idx + 1), alignment: "center", fontSize: 8 },
-          { text: roDate(op.data), alignment: "center", fontSize: 8 },
-          { text: op.document, alignment: "center", fontSize: 8 },
-          { text: felLabel(op.fel), fontSize: 8 },
-          { text: op.intrare ? fmt2(op.intrare) : "", alignment: "right", fontSize: 8 },
-          { text: op.iesire ? fmt2(op.iesire) : "", alignment: "right", fontSize: 8 },
-        ]);
-      });
-    }
-    // subtotal
-    tableBody.push([
-      { text: `Total ${g.label}`, colSpan: 4, alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF", border: [true, false, false, true] }, {}, {}, {},
-      { text: g.totalIntrari ? fmt2(g.totalIntrari) : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
-      { text: g.totalIesiri  ? fmt2(g.totalIesiri)  : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
-    ]);
-  }
-
-  if (transferuri.length > 0) {
-    const totTrIn  = transferuri.reduce((s, t) => s + t.intrare, 0);
-    const totTrOut = transferuri.reduce((s, t) => s + t.iesire, 0);
-    tableBody.push([{ text: "Transferuri", colSpan: 6, bold: true, fontSize: 8, fillColor: "#DDDDDD", border: [true, true, true, false] }, {}, {}, {}, {}, {}]);
-    transferuri.forEach((op, idx) => {
-      tableBody.push([
-        { text: String(idx + 1), alignment: "center", fontSize: 8 },
-        { text: roDate(op.data), alignment: "center", fontSize: 8 },
-        { text: op.document, alignment: "center", fontSize: 8 },
-        { text: op.detalii, fontSize: 8 },
-        { text: op.intrare ? fmt2(op.intrare) : "", alignment: "right", fontSize: 8 },
-        { text: op.iesire ? fmt2(op.iesire) : "", alignment: "right", fontSize: 8 },
-      ]);
-    });
-    tableBody.push([
-      { text: "Total transferuri", colSpan: 4, alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF", border: [true, false, false, true] }, {}, {}, {},
-      { text: totTrIn  ? fmt2(totTrIn)  : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
-      { text: totTrOut ? fmt2(totTrOut) : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
-    ]);
-  }
-
-  // rând TOTAL final
-  tableBody.push([
-    { text: "TOTAL", colSpan: 4, alignment: "right", bold: true, fontSize: 9, border: [true, true, false, true] }, {}, {}, {},
-    { text: fmt2(totalIntrariGlobal), alignment: "right", bold: true, fontSize: 9 },
-    { text: fmt2(totalIesiriGlobal), alignment: "right", bold: true, fontSize: 9 },
-  ]);
 
   const docDefinition: any = {
     pageSize: "A4", pageOrientation: "portrait", pageMargins: [30, 40, 30, 70],
@@ -131,20 +101,19 @@ async function generateAndDownloadPdfDetaliat(
       { columns: [
         { stack: [
           { text: asoc?.name ?? "", bold: true, fontSize: 13 },
-          adresa ? { text: adresa, fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
+          adresa  ? { text: adresa,  fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
           contact ? { text: contact, fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
         ], width: "*" },
         { stack: [{ text: "Perioada", fontSize: 9, color: "#666" }, { text: `${roDate(dataStart)} — ${roDate(dataEnd)}`, bold: true, fontSize: 10 }], width: "auto", alignment: "right" },
       ] },
       { canvas: [{ type: "line", x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 0] },
-      { text: "REGISTRU FOND — DETALIAT PE APARTAMENTE", style: "title", alignment: "center", margin: [0, 14, 0, 4] },
+      { text: "SITUAȚIE FOND — TOATE APARTAMENTELE", style: "title", alignment: "center", margin: [0, 14, 0, 4] },
       { text: fondName, alignment: "center", fontSize: 11, bold: true, color: "#333", margin: [0, 0, 0, 12] },
       {
-        table: { headerRows: 1, widths: COL_WIDTHS, body: tableBody },
+        table: { headerRows: 1, widths: [20, 30, "*", 55, 55, 70], body: tableBody },
         layout: {
-          hLineWidth: (r: number, node: any) => (r === 0 || r === node.table.body.length) ? 1 : 0.5,
-          vLineWidth: () => 0.5,
-          hLineColor: () => "#999", vLineColor: () => "#999",
+          fillColor: (r: number) => r === 0 ? "#DDDDDD" : r % 2 === 1 ? "#F5F5F5" : null,
+          hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => "#999", vLineColor: () => "#999",
           paddingTop: () => 3, paddingBottom: () => 3, paddingLeft: () => 4, paddingRight: () => 4,
         },
       },
@@ -166,10 +135,11 @@ async function generateAndDownloadPdfDetaliat(
 
   const safe = fondName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
   const pm = pdfMake.default ?? pdfMake;
-  pm.createPdf(docDefinition).download(`registru-fond-${safe}-detaliat-${dataStart}-${dataEnd}.pdf`);
+  pm.createPdf(docDefinition).download(`situatie-fond-${safe}-detaliat-${dataStart}-${dataEnd}.pdf`);
 }
 
-async function generateAndDownloadPdf(
+// PDF pentru modul normal / per apartament
+async function generatePdfNormal(
   asoc: AsocInfo | null, fondName: string, soldInitial: number,
   ops: Operatiune[], dataStart: string, dataEnd: string,
   apartamentLabel?: string,
@@ -183,7 +153,7 @@ async function generateAndDownloadPdf(
   const totalIesiri  = ops.reduce((s, o) => s + o.iesire, 0);
   const soldFinal    = soldInitial + totalIntrari - totalIesiri;
 
-  const adresa = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ");
+  const adresa  = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ");
   const contact = [asoc?.cui ? `CUI: ${asoc.cui}` : null, asoc?.phone ? `Tel: ${asoc.phone}` : null, asoc?.email ? `Email: ${asoc.email}` : null].filter(Boolean).join("   |   ");
 
   const tableBody: any[][] = [
@@ -207,14 +177,14 @@ async function generateAndDownloadPdf(
       { text: row.document, alignment: "center", fontSize: 8 },
       { stack: [{ text: felLabel(row.fel), fontSize: 7, color: felColorPdf(row.fel), bold: true }, { text: row.detalii, fontSize: 8, margin: [0, 1, 0, 0] }] },
       { text: row.intrare ? fmt2(row.intrare) : "", alignment: "right", fontSize: 8 },
-      { text: row.iesire ? fmt2(row.iesire) : "", alignment: "right", fontSize: 8 },
+      { text: row.iesire  ? fmt2(row.iesire)  : "", alignment: "right", fontSize: 8 },
       { text: fmt2(row.sold), alignment: "right", fontSize: 8 },
     ]),
     [
       { text: "TOTAL", colSpan: 4, alignment: "right", bold: true, fontSize: 9, border: [true, true, false, true] }, {}, {}, {},
       { text: fmt2(totalIntrari), alignment: "right", bold: true, fontSize: 9 },
-      { text: fmt2(totalIesiri), alignment: "right", bold: true, fontSize: 9 },
-      { text: fmt2(soldFinal), alignment: "right", bold: true, fontSize: 9 },
+      { text: fmt2(totalIesiri),  alignment: "right", bold: true, fontSize: 9 },
+      { text: fmt2(soldFinal),    alignment: "right", bold: true, fontSize: 9 },
     ],
   ];
 
@@ -224,7 +194,7 @@ async function generateAndDownloadPdf(
       { columns: [
         { stack: [
           { text: asoc?.name ?? "", bold: true, fontSize: 13 },
-          adresa ? { text: adresa, fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
+          adresa  ? { text: adresa,  fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
           contact ? { text: contact, fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
         ], width: "*" },
         { stack: [{ text: "Perioada", fontSize: 9, color: "#666" }, { text: `${roDate(dataStart)} — ${roDate(dataEnd)}`, bold: true, fontSize: 10 }], width: "auto", alignment: "right" },
@@ -257,7 +227,7 @@ async function generateAndDownloadPdf(
     defaultStyle: { font: "Roboto" },
   };
 
-  const safe = fondName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+  const safe  = fondName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
   const apSafe = apartamentLabel ? "-" + apartamentLabel.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() : "";
   const pm = pdfMake.default ?? pdfMake;
   pm.createPdf(docDefinition).download(`registru-fond-${safe}${apSafe}-${dataStart}-${dataEnd}.pdf`);
@@ -274,14 +244,22 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   const [dataStart, setDataStart] = useState(defaultStart);
   const [dataEnd, setDataEnd] = useState(defaultEnd);
   const [fondName, setFondName] = useState("");
+  // mod normal
   const [soldInitial, setSoldInitial] = useState(0);
+  const [soldAp, setSoldAp] = useState<number | null>(null);
+  const [restantaAp, setRestantaAp] = useState<number | null>(null);
   const [ops, setOps] = useState<Operatiune[]>([]);
+  // mod detaliat
+  const [detaliatData, setDetaliatData] = useState<DetaliatItem[] | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!asociatieId) { setAsoc(null); setFonduri([]); setFondId(""); setApartamente([]); setApartamentId(""); return; }
+    if (!asociatieId) {
+      setAsoc(null); setFonduri([]); setFondId(""); setApartamente([]); setApartamentId(""); return;
+    }
     Promise.all([
       fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()),
       fetch(`/api/asociatii/${asociatieId}/apartamente`).then(r => r.json()),
@@ -296,18 +274,33 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   }, [asociatieId]);
 
   const fetchData = useCallback(async () => {
-    if (!asociatieId || !fondId) { setOps([]); setSoldInitial(0); return; }
+    if (!asociatieId || !fondId) { setOps([]); setSoldInitial(0); setDetaliatData(null); return; }
     setLoading(true); setError(null);
-    const params = new URLSearchParams({ asociatieId, fondId, dataStart, dataEnd });
-    // "detaliat" = fetch toate, grupăm pe client; nu trimitem ca filtru la API
-    if (apartamentId && apartamentId !== "detaliat") params.set("apartamentId", apartamentId);
+
     try {
-      const res = await fetch(`/api/rapoarte/registru-fonduri?${params}`);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Eroare server");
-      setFondName(json.fondName ?? "");
-      setSoldInitial(json.soldInitial ?? 0);
-      setOps(json.operatiuni ?? []);
+      if (apartamentId === "detaliat") {
+        // ── Mod detaliat: sumar per apartament ──
+        const params = new URLSearchParams({ asociatieId, fondId, dataStart, dataEnd, detaliat: "true" });
+        const res  = await fetch(`/api/rapoarte/registru-fonduri?${params}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Eroare server");
+        setFondName(json.fondName ?? "");
+        setDetaliatData(json.detaliat ?? []);
+        setOps([]); setSoldInitial(0); setSoldAp(null); setRestantaAp(null);
+      } else {
+        // ── Mod normal / per apartament ──
+        setDetaliatData(null);
+        const params = new URLSearchParams({ asociatieId, fondId, dataStart, dataEnd });
+        if (apartamentId) params.set("apartamentId", apartamentId);
+        const res  = await fetch(`/api/rapoarte/registru-fonduri?${params}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Eroare server");
+        setFondName(json.fondName ?? "");
+        setSoldInitial(json.soldInitial ?? 0);
+        setSoldAp(json.soldAp ?? null);
+        setRestantaAp(json.restantaAp ?? null);
+        setOps(json.operatiuni ?? []);
+      }
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, [asociatieId, fondId, apartamentId, dataStart, dataEnd]);
@@ -318,7 +311,7 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   const totalIntrari = ops.reduce((s, o) => s + o.intrare, 0);
   const totalIesiri  = ops.reduce((s, o) => s + o.iesire, 0);
   const soldFinal    = soldInitial + totalIntrari - totalIesiri;
-  const numeFond = fondName || fonduri.find(f => f.id === fondId)?.name || "";
+  const numeFond     = fondName || fonduri.find(f => f.id === fondId)?.name || "";
 
   const apartamentLabel = (() => {
     if (!apartamentId || apartamentId === "detaliat") return "";
@@ -328,46 +321,15 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
     return `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
   })();
 
-  // Grupare pe apartament pentru modul "detaliat"
-  const grupate = useMemo(() => {
-    if (apartamentId !== "detaliat") return null;
-
-    // pornesc cu TOATE apartamentele (chiar dacă nu au contribuții în perioadă)
-    const map = new Map<string, { label: string; numar: string; ops: Operatiune[]; totalIntrari: number; totalIesiri: number }>();
-    for (const a of apartamente) {
-      const prop = a.proprietari[0]?.proprietar;
-      const label = `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
-      map.set(a.id, { label, numar: a.numar, ops: [], totalIntrari: 0, totalIesiri: 0 });
-    }
-
-    const transfers: Operatiune[] = [];
-    for (const op of ops) {
-      if (op.fel === "transfer") { transfers.push(op); continue; }
-      const key = op.apartamentId ?? "";
-      if (map.has(key)) {
-        const g = map.get(key)!;
-        g.ops.push(op);
-        g.totalIntrari += op.intrare;
-        g.totalIesiri += op.iesire;
-      }
-    }
-
-    const sorted = [...map.values()].sort((a, b) =>
-      a.numar.localeCompare(b.numar, undefined, { numeric: true })
-    );
-    return { grupe: sorted, transferuri: transfers };
-  }, [ops, apartamentId, apartamente]);
-
   async function handleDownloadPdf() {
     if (!asociatieId || !fondId) return;
     setPdfLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/asociatii/${asociatieId}`);
-      const freshAsoc: AsocInfo = await res.json();
-      if (grupate) {
-        await generateAndDownloadPdfDetaliat(freshAsoc, numeFond, grupate.grupe, grupate.transferuri, dataStart, dataEnd);
+      const freshAsoc: AsocInfo = await fetch(`/api/asociatii/${asociatieId}`).then(r => r.json());
+      if (detaliatData) {
+        await generatePdfDetaliat(freshAsoc, numeFond, detaliatData, dataStart, dataEnd);
       } else {
-        await generateAndDownloadPdf(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd, apartamentLabel || undefined);
+        await generatePdfNormal(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd, apartamentLabel || undefined);
       }
     } catch (e: any) { setError(`Eroare PDF: ${e?.message ?? String(e)}`); }
     finally { setPdfLoading(false); }
@@ -391,6 +353,11 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
       </div>
     );
   }
+
+  // Totaluri pentru modul detaliat (sumar)
+  const detTotalSold     = detaliatData?.reduce((s, a) => s + a.sold, 0) ?? 0;
+  const detTotalRestanta = detaliatData?.reduce((s, a) => s + a.restanta, 0) ?? 0;
+  const detTotalContrib  = detaliatData?.reduce((s, a) => s + a.contributiiPerioda, 0) ?? 0;
 
   return (
     <>
@@ -431,8 +398,11 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
               <option value="">Asociație</option>
               {apartamente.map(a => {
                 const prop = a.proprietari[0]?.proprietar;
-                const label = `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
-                return <option key={a.id} value={a.id}>{label}</option>;
+                return (
+                  <option key={a.id} value={a.id}>
+                    {`Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`}
+                  </option>
+                );
               })}
               <option value="detaliat">Toate apartamentele (detaliat)</option>
             </select>
@@ -453,6 +423,7 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
         {error && <div className="wizard__error">{error}</div>}
       </div>
 
+      {/* ── Panou sumar ── */}
       <div className="dash-panel" style={{ margin: "0 1.5rem 1rem", padding: "1rem 1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Fond</div>
@@ -464,152 +435,153 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
             <div style={{ fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>{apartamentLabel}</div>
           </div>
         )}
-        <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold inițial</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(soldInitial)} lei</div>
-        </div>
-        <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Intrări</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIntrari)} lei</div>
-        </div>
-        <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Ieșiri</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#f87171" }}>{fmt2(totalIesiri)} lei</div>
-        </div>
-        <div>
-          <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold final</div>
-          <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#22d3ee" }}>{fmt2(soldFinal)} lei</div>
-        </div>
+        {detaliatData ? (
+          <>
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Total sold</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(detTotalSold)} lei</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Total restanță</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#f87171" }}>{fmt2(detTotalRestanta)} lei</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Contribuții perioadă</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(detTotalContrib)} lei</div>
+            </div>
+          </>
+        ) : (
+          <>
+            {soldAp !== null && (
+              <div>
+                <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold fond</div>
+                <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(soldAp)} lei</div>
+              </div>
+            )}
+            {restantaAp !== null && (
+              <div>
+                <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Restanță fond</div>
+                <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#f87171" }}>{fmt2(restantaAp)} lei</div>
+              </div>
+            )}
+            {soldAp === null && (
+              <div>
+                <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold inițial</div>
+                <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(soldInitial)} lei</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Intrări</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIntrari)} lei</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Ieșiri</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#f87171" }}>{fmt2(totalIesiri)} lei</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold final</div>
+              <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#22d3ee" }}>{fmt2(soldFinal)} lei</div>
+            </div>
+          </>
+        )}
       </div>
 
-      {ops.length === 0 && !loading ? (
-        <div className="empty-state">
-          <span className="empty-state__icon">💼</span>
-          <div className="empty-state__title">Nicio mișcare pentru acest fond în perioada selectată</div>
-        </div>
-      ) : grupate ? (
-        /* ── VIEW DETALIAT (grupat pe apartament) ── */
+      {/* ── Tabel detaliat: sumar per apartament ── */}
+      {detaliatData && (
         <div className="table-wrap" style={{ margin: "0 0 1.5rem" }}>
           <table className="data-table" style={{ fontSize: "0.8125rem" }}>
             <thead>
               <tr>
                 <th style={{ width: 40, textAlign: "center" }}>Nr.</th>
-                <th>Data</th>
-                <th>Document</th>
-                <th>Explicație</th>
-                <th style={{ textAlign: "right" }}>Intrări (lei)</th>
-                <th style={{ textAlign: "right" }}>Ieșiri (lei)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {grupate.grupe.map((g, gi) => (
-                <>
-                  {/* Header grup apartament */}
-                  <tr key={`gh-${gi}`} style={{ background: "#1e293b" }}>
-                    <td colSpan={6} style={{ fontWeight: 700, color: "#a78bfa", padding: "0.5rem 0.75rem", fontSize: "0.8rem", letterSpacing: "0.02em" }}>
-                      {g.label}
-                    </td>
-                  </tr>
-                  {g.ops.map((op, idx) => (
-                    <tr key={op.id}>
-                      <td style={{ color: "#64748b", textAlign: "center" }}>{idx + 1}</td>
-                      <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(op.data)}</td>
-                      <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{op.document}</td>
-                      <td style={{ color: "#94a3b8" }}>
-                        <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: felColor(op.fel) }}>{felLabel(op.fel)}</span>
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{op.intrare ? fmt2(op.intrare) : ""}</td>
-                      <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{op.iesire ? fmt2(op.iesire) : ""}</td>
-                    </tr>
-                  ))}
-                  {/* Subtotal apartament */}
-                  <tr key={`gs-${gi}`} style={{ background: "#0f172a" }}>
-                    <td colSpan={4} style={{ textAlign: "right", fontWeight: 700, color: "#64748b", fontSize: "0.75rem" }}>Total {g.label}</td>
-                    <td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>{g.totalIntrari ? fmt2(g.totalIntrari) : ""}</td>
-                    <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{g.totalIesiri ? fmt2(g.totalIesiri) : ""}</td>
-                  </tr>
-                </>
-              ))}
-              {/* Transferuri */}
-              {grupate.transferuri.length > 0 && (
-                <>
-                  <tr style={{ background: "#1e293b" }}>
-                    <td colSpan={6} style={{ fontWeight: 700, color: "#22d3ee", padding: "0.5rem 0.75rem", fontSize: "0.8rem" }}>Transferuri</td>
-                  </tr>
-                  {grupate.transferuri.map((op, idx) => (
-                    <tr key={op.id}>
-                      <td style={{ color: "#64748b", textAlign: "center" }}>{idx + 1}</td>
-                      <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(op.data)}</td>
-                      <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{op.document}</td>
-                      <td style={{ color: "#94a3b8" }}>
-                        <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: felColor(op.fel) }}>{felLabel(op.fel)}</span>
-                        <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 1 }}>{op.detalii}</span>
-                      </td>
-                      <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{op.intrare ? fmt2(op.intrare) : ""}</td>
-                      <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{op.iesire ? fmt2(op.iesire) : ""}</td>
-                    </tr>
-                  ))}
-                </>
-              )}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={4} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>TOTAL</td>
-                <td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(totalIntrari)}</td>
-                <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(totalIesiri)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      ) : (
-        /* ── VIEW NORMAL (asociație sau apartament singular) ── */
-        <div className="table-wrap" style={{ margin: "0 0 1.5rem" }}>
-          <table className="data-table" style={{ fontSize: "0.8125rem" }}>
-            <thead>
-              <tr>
-                <th style={{ width: 40, textAlign: "center" }}>Nr.</th>
-                <th>Data</th>
-                <th>Document</th>
-                <th>Explicație</th>
-                <th style={{ textAlign: "right" }}>Intrări (lei)</th>
-                <th style={{ textAlign: "right" }}>Ieșiri (lei)</th>
+                <th>Ap.</th>
+                <th>Proprietar</th>
                 <th style={{ textAlign: "right" }}>Sold (lei)</th>
+                <th style={{ textAlign: "right" }}>Restanță (lei)</th>
+                <th style={{ textAlign: "right" }}>Contribuții perioadă (lei)</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td /><td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(dataStart)}</td><td style={{ color: "#64748b" }}>—</td>
-                <td style={{ fontStyle: "italic", color: "#94a3b8" }}>Sold inițial</td><td /><td />
-                <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa", whiteSpace: "nowrap" }}>{fmt2(soldInitial)}</td>
-              </tr>
-              {rows.map((row, idx) => (
-                <tr key={row.id}>
+              {detaliatData.map((a, idx) => (
+                <tr key={a.apartamentId}>
                   <td style={{ color: "#64748b", textAlign: "center" }}>{idx + 1}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(row.data)}</td>
-                  <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{row.document}</td>
-                  <td style={{ color: "#94a3b8" }}>
-                    <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: felColor(row.fel) }}>{felLabel(row.fel)}</span>
-                    <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 1 }}>{row.detalii}</span>
+                  <td style={{ fontWeight: 600, color: "#a78bfa" }}>{a.numar}{a.scara ? `/${a.scara}` : ""}</td>
+                  <td style={{ color: "#e2e8f0" }}>{a.proprietar || "—"}</td>
+                  <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa", whiteSpace: "nowrap" }}>{fmt2(a.sold)}</td>
+                  <td style={{ textAlign: "right", fontWeight: 700, color: a.restanta > 0 ? "#f87171" : "#64748b", whiteSpace: "nowrap" }}>{fmt2(a.restanta)}</td>
+                  <td style={{ textAlign: "right", fontWeight: 700, color: a.contributiiPerioda > 0 ? "#4ade80" : "#64748b", whiteSpace: "nowrap" }}>
+                    {a.contributiiPerioda > 0 ? fmt2(a.contributiiPerioda) : "—"}
                   </td>
-                  <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{row.intrare ? fmt2(row.intrare) : ""}</td>
-                  <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{row.iesire ? fmt2(row.iesire) : ""}</td>
-                  <td style={{ textAlign: "right", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap" }}>{fmt2(row.sold)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={4} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>TOTAL</td>
-                <td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(totalIntrari)}</td>
-                <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(totalIesiri)}</td>
-                <td style={{ textAlign: "right", fontWeight: 800, color: "#22d3ee", whiteSpace: "nowrap" }}>{fmt2(soldFinal)}</td>
+                <td colSpan={3} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>TOTAL</td>
+                <td style={{ textAlign: "right", fontWeight: 800, color: "#a78bfa", whiteSpace: "nowrap" }}>{fmt2(detTotalSold)}</td>
+                <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(detTotalRestanta)}</td>
+                <td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(detTotalContrib)}</td>
               </tr>
             </tfoot>
           </table>
         </div>
       )}
 
-      {/* Print zone */}
+      {/* ── Tabel normal / per apartament ── */}
+      {!detaliatData && (
+        ops.length === 0 && !loading ? (
+          <div className="empty-state">
+            <span className="empty-state__icon">💼</span>
+            <div className="empty-state__title">Nicio mișcare pentru acest fond în perioada selectată</div>
+          </div>
+        ) : (
+          <div className="table-wrap" style={{ margin: "0 0 1.5rem" }}>
+            <table className="data-table" style={{ fontSize: "0.8125rem" }}>
+              <thead>
+                <tr>
+                  <th style={{ width: 40, textAlign: "center" }}>Nr.</th>
+                  <th>Data</th>
+                  <th>Document</th>
+                  <th>Explicație</th>
+                  <th style={{ textAlign: "right" }}>Intrări (lei)</th>
+                  <th style={{ textAlign: "right" }}>Ieșiri (lei)</th>
+                  <th style={{ textAlign: "right" }}>Sold (lei)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td /><td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(dataStart)}</td><td style={{ color: "#64748b" }}>—</td>
+                  <td style={{ fontStyle: "italic", color: "#94a3b8" }}>Sold inițial</td><td /><td />
+                  <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa", whiteSpace: "nowrap" }}>{fmt2(soldInitial)}</td>
+                </tr>
+                {rows.map((row, idx) => (
+                  <tr key={row.id}>
+                    <td style={{ color: "#64748b", textAlign: "center" }}>{idx + 1}</td>
+                    <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(row.data)}</td>
+                    <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{row.document}</td>
+                    <td style={{ color: "#94a3b8" }}>
+                      <span style={{ fontSize: "0.6875rem", fontWeight: 700, color: felColor(row.fel) }}>{felLabel(row.fel)}</span>
+                      <span style={{ display: "block", color: "#64748b", fontSize: "0.78rem", marginTop: 1 }}>{row.detalii}</span>
+                    </td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{row.intrare ? fmt2(row.intrare) : ""}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{row.iesire ? fmt2(row.iesire) : ""}</td>
+                    <td style={{ textAlign: "right", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap" }}>{fmt2(row.sold)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={4} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>TOTAL</td>
+                  <td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(totalIntrari)}</td>
+                  <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(totalIesiri)}</td>
+                  <td style={{ textAlign: "right", fontWeight: 800, color: "#22d3ee", whiteSpace: "nowrap" }}>{fmt2(soldFinal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )
+      )}
+
+      {/* ── Print zone ── */}
       <div id="print-zone">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #000", paddingBottom: "6pt", marginBottom: "10pt" }}>
           <div>
@@ -621,110 +593,86 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
             <div style={{ fontSize: "10pt", fontWeight: "bold" }}>{roDate(dataStart)} — {roDate(dataEnd)}</div>
           </div>
         </div>
-        <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 2pt" }}>Registru fond</div>
-        <div style={{ textAlign: "center", fontSize: "11pt", fontWeight: "bold", color: "#333", marginBottom: apartamentLabel ? "4pt" : "12pt" }}>{numeFond}</div>
-        {apartamentLabel && <div style={{ textAlign: "center", fontSize: "10pt", color: "#444", marginBottom: "12pt" }}>{apartamentLabel}</div>}
 
-        {grupate ? (
-          /* Print view detaliat */
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
-            <thead>
-              <tr>
-                {["Nr.", "Data", "Document", "Explicație", "Intrări (lei)", "Ieșiri (lei)"].map((h, i) => (
-                  <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "4pt 5pt", textAlign: i >= 4 ? "right" : i <= 2 ? "center" : "left", fontWeight: "bold" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {grupate.grupe.map((g, gi) => (
-                <>
-                  <tr key={`pgh-${gi}`} style={{ background: "#d8d8d8" }}>
-                    <td colSpan={6} style={{ border: "1px solid #555", padding: "3pt 5pt", fontWeight: "bold" }}>{g.label}</td>
-                  </tr>
-                  {g.ops.map((op, idx) => (
-                    <tr key={op.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{idx + 1}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{roDate(op.data)}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{op.document}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}><b>{felLabel(op.fel)}</b></td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{op.intrare ? fmt2(op.intrare) : ""}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{op.iesire ? fmt2(op.iesire) : ""}</td>
-                    </tr>
+        {detaliatData ? (
+          <>
+            <div style={{ textAlign: "center", fontSize: "14pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 2pt" }}>Situație fond — toate apartamentele</div>
+            <div style={{ textAlign: "center", fontSize: "11pt", fontWeight: "bold", color: "#333", marginBottom: "12pt" }}>{numeFond}</div>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
+              <thead>
+                <tr>
+                  {["Nr.", "Ap.", "Proprietar", "Sold (lei)", "Restanță (lei)", "Contribuții perioadă (lei)"].map((h, i) => (
+                    <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "4pt 5pt", textAlign: i >= 3 ? "right" : i <= 1 ? "center" : "left", fontWeight: "bold" }}>{h}</th>
                   ))}
-                  <tr key={`pgs-${gi}`} style={{ background: "#efefef" }}>
-                    <td colSpan={4} style={{ border: "1px solid #999", padding: "3pt 8pt", textAlign: "right", fontWeight: "bold" }}>Total {g.label}</td>
-                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", fontWeight: "bold" }}>{g.totalIntrari ? fmt2(g.totalIntrari) : ""}</td>
-                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", fontWeight: "bold" }}>{g.totalIesiri ? fmt2(g.totalIesiri) : ""}</td>
-                  </tr>
-                </>
-              ))}
-              {grupate.transferuri.length > 0 && (
-                <>
-                  <tr style={{ background: "#d8d8d8" }}>
-                    <td colSpan={6} style={{ border: "1px solid #555", padding: "3pt 5pt", fontWeight: "bold" }}>Transferuri</td>
-                  </tr>
-                  {grupate.transferuri.map((op, idx) => (
-                    <tr key={op.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{idx + 1}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{roDate(op.data)}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{op.document}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}><b>{felLabel(op.fel)}:</b> {op.detalii}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{op.intrare ? fmt2(op.intrare) : ""}</td>
-                      <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{op.iesire ? fmt2(op.iesire) : ""}</td>
-                    </tr>
-                  ))}
-                </>
-              )}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={4} style={{ borderTop: "2px solid #000", padding: "4pt 8pt", textAlign: "right", fontWeight: "bold" }}>TOTAL</td>
-                <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIntrari)}</td>
-                <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIesiri)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        ) : (
-          /* Print view normal */
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
-            <thead>
-              <tr>
-                {["Nr.\ncrt.", "Data", "Document", "Explicație", "Intrări\n(lei)", "Ieșiri\n(lei)", "Sold\n(lei)"].map((h, i) => (
-                  <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "4pt 5pt", textAlign: i >= 4 ? "right" : i <= 2 ? "center" : "left", fontWeight: "bold", whiteSpace: "pre-line" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr style={{ background: "#efefef" }}>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{roDate(dataStart)}</td>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>—</td>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt", fontStyle: "italic" }}>Sold inițial</td>
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
-                <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(soldInitial)}</td>
-              </tr>
-              {rows.map((row, idx) => (
-                <tr key={row.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{idx + 1}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{roDate(row.data)}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{row.document}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}><b>{felLabel(row.fel)}:</b> {row.detalii}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{row.intrare ? fmt2(row.intrare) : ""}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{row.iesire ? fmt2(row.iesire) : ""}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{fmt2(row.sold)}</td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={4} style={{ borderTop: "2px solid #000", padding: "4pt 8pt", textAlign: "right", fontWeight: "bold" }}>TOTAL</td>
-                <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIntrari)}</td>
-                <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIesiri)}</td>
-                <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(soldFinal)}</td>
-              </tr>
-            </tfoot>
-          </table>
+              </thead>
+              <tbody>
+                {detaliatData.map((a, idx) => (
+                  <tr key={a.apartamentId} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{idx + 1}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{a.numar}{a.scara ? `/${a.scara}` : ""}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}>{a.proprietar || "—"}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{fmt2(a.sold)}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{fmt2(a.restanta)}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{a.contributiiPerioda > 0 ? fmt2(a.contributiiPerioda) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} style={{ borderTop: "2px solid #000", padding: "4pt 8pt", textAlign: "right", fontWeight: "bold" }}>TOTAL</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(detTotalSold)}</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(detTotalRestanta)}</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(detTotalContrib)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
+        ) : (
+          <>
+            <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 2pt" }}>Registru fond</div>
+            <div style={{ textAlign: "center", fontSize: "11pt", fontWeight: "bold", color: "#333", marginBottom: apartamentLabel ? "4pt" : "12pt" }}>{numeFond}</div>
+            {apartamentLabel && <div style={{ textAlign: "center", fontSize: "10pt", color: "#444", marginBottom: "12pt" }}>{apartamentLabel}</div>}
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
+              <thead>
+                <tr>
+                  {["Nr.\ncrt.", "Data", "Document", "Explicație", "Intrări\n(lei)", "Ieșiri\n(lei)", "Sold\n(lei)"].map((h, i) => (
+                    <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "4pt 5pt", textAlign: i >= 4 ? "right" : i <= 2 ? "center" : "left", fontWeight: "bold", whiteSpace: "pre-line" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ background: "#efefef" }}>
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{roDate(dataStart)}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>—</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", fontStyle: "italic" }}>Sold inițial</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt" }} />
+                  <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(soldInitial)}</td>
+                </tr>
+                {rows.map((row, idx) => (
+                  <tr key={row.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center" }}>{idx + 1}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{roDate(row.data)}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "center", whiteSpace: "nowrap" }}>{row.document}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt" }}><b>{felLabel(row.fel)}:</b> {row.detalii}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{row.intrare ? fmt2(row.intrare) : ""}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{row.iesire ? fmt2(row.iesire) : ""}</td>
+                    <td style={{ border: "1px solid #999", padding: "3pt 5pt", textAlign: "right" }}>{fmt2(row.sold)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={4} style={{ borderTop: "2px solid #000", padding: "4pt 8pt", textAlign: "right", fontWeight: "bold" }}>TOTAL</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIntrari)}</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIesiri)}</td>
+                  <td style={{ borderTop: "2px solid #000", padding: "4pt 5pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(soldFinal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
         )}
 
         <div style={{ marginTop: "24pt", borderTop: "1px solid #aaa", paddingTop: "10pt", display: "flex", justifyContent: "space-between" }}>
