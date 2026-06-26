@@ -44,6 +44,131 @@ function withRunningBalance(soldInitial: number, ops: Operatiune[]) {
   return ops.map(op => { sold += op.intrare - op.iesire; return { ...op, sold }; });
 }
 
+async function generateAndDownloadPdfDetaliat(
+  asoc: AsocInfo | null, fondName: string,
+  grupe: { label: string; numar: string; ops: Operatiune[]; totalIntrari: number; totalIesiri: number }[],
+  transferuri: Operatiune[], dataStart: string, dataEnd: string,
+) {
+  const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
+  const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
+  (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
+
+  const adresa = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city].filter(Boolean).join(", ");
+  const contact = [asoc?.cui ? `CUI: ${asoc.cui}` : null, asoc?.phone ? `Tel: ${asoc.phone}` : null, asoc?.email ? `Email: ${asoc.email}` : null].filter(Boolean).join("   |   ");
+
+  const totalIntrariGlobal = grupe.reduce((s, g) => s + g.totalIntrari, 0) + transferuri.reduce((s, t) => s + t.intrare, 0);
+  const totalIesiriGlobal  = grupe.reduce((s, g) => s + g.totalIesiri, 0)  + transferuri.reduce((s, t) => s + t.iesire, 0);
+
+  const COL_WIDTHS = [20, 44, 52, "*", 46, 46];
+
+  const headerRow = [
+    { text: "Nr.", style: "th", alignment: "center" },
+    { text: "Data", style: "th", alignment: "center" },
+    { text: "Document", style: "th", alignment: "center" },
+    { text: "Explicație", style: "th" },
+    { text: "Intrări\n(lei)", style: "th", alignment: "right" },
+    { text: "Ieșiri\n(lei)", style: "th", alignment: "right" },
+  ];
+
+  const tableBody: any[][] = [headerRow];
+
+  for (const g of grupe) {
+    // header grup
+    tableBody.push([{ text: g.label, colSpan: 6, bold: true, fontSize: 8, fillColor: "#DDDDDD", border: [true, true, true, false] }, {}, {}, {}, {}, {}]);
+    if (g.ops.length === 0) {
+      tableBody.push([{ text: "—", colSpan: 6, fontSize: 8, italics: true, color: "#888", alignment: "center", border: [true, false, true, false] }, {}, {}, {}, {}, {}]);
+    } else {
+      g.ops.forEach((op, idx) => {
+        tableBody.push([
+          { text: String(idx + 1), alignment: "center", fontSize: 8 },
+          { text: roDate(op.data), alignment: "center", fontSize: 8 },
+          { text: op.document, alignment: "center", fontSize: 8 },
+          { text: felLabel(op.fel), fontSize: 8 },
+          { text: op.intrare ? fmt2(op.intrare) : "", alignment: "right", fontSize: 8 },
+          { text: op.iesire ? fmt2(op.iesire) : "", alignment: "right", fontSize: 8 },
+        ]);
+      });
+    }
+    // subtotal
+    tableBody.push([
+      { text: `Total ${g.label}`, colSpan: 4, alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF", border: [true, false, false, true] }, {}, {}, {},
+      { text: g.totalIntrari ? fmt2(g.totalIntrari) : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
+      { text: g.totalIesiri  ? fmt2(g.totalIesiri)  : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
+    ]);
+  }
+
+  if (transferuri.length > 0) {
+    const totTrIn  = transferuri.reduce((s, t) => s + t.intrare, 0);
+    const totTrOut = transferuri.reduce((s, t) => s + t.iesire, 0);
+    tableBody.push([{ text: "Transferuri", colSpan: 6, bold: true, fontSize: 8, fillColor: "#DDDDDD", border: [true, true, true, false] }, {}, {}, {}, {}, {}]);
+    transferuri.forEach((op, idx) => {
+      tableBody.push([
+        { text: String(idx + 1), alignment: "center", fontSize: 8 },
+        { text: roDate(op.data), alignment: "center", fontSize: 8 },
+        { text: op.document, alignment: "center", fontSize: 8 },
+        { text: op.detalii, fontSize: 8 },
+        { text: op.intrare ? fmt2(op.intrare) : "", alignment: "right", fontSize: 8 },
+        { text: op.iesire ? fmt2(op.iesire) : "", alignment: "right", fontSize: 8 },
+      ]);
+    });
+    tableBody.push([
+      { text: "Total transferuri", colSpan: 4, alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF", border: [true, false, false, true] }, {}, {}, {},
+      { text: totTrIn  ? fmt2(totTrIn)  : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
+      { text: totTrOut ? fmt2(totTrOut) : "—", alignment: "right", bold: true, fontSize: 8, fillColor: "#EFEFEF" },
+    ]);
+  }
+
+  // rând TOTAL final
+  tableBody.push([
+    { text: "TOTAL", colSpan: 4, alignment: "right", bold: true, fontSize: 9, border: [true, true, false, true] }, {}, {}, {},
+    { text: fmt2(totalIntrariGlobal), alignment: "right", bold: true, fontSize: 9 },
+    { text: fmt2(totalIesiriGlobal), alignment: "right", bold: true, fontSize: 9 },
+  ]);
+
+  const docDefinition: any = {
+    pageSize: "A4", pageOrientation: "portrait", pageMargins: [30, 40, 30, 70],
+    content: [
+      { columns: [
+        { stack: [
+          { text: asoc?.name ?? "", bold: true, fontSize: 13 },
+          adresa ? { text: adresa, fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
+          contact ? { text: contact, fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
+        ], width: "*" },
+        { stack: [{ text: "Perioada", fontSize: 9, color: "#666" }, { text: `${roDate(dataStart)} — ${roDate(dataEnd)}`, bold: true, fontSize: 10 }], width: "auto", alignment: "right" },
+      ] },
+      { canvas: [{ type: "line", x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 0] },
+      { text: "REGISTRU FOND — DETALIAT PE APARTAMENTE", style: "title", alignment: "center", margin: [0, 14, 0, 4] },
+      { text: fondName, alignment: "center", fontSize: 11, bold: true, color: "#333", margin: [0, 0, 0, 12] },
+      {
+        table: { headerRows: 1, widths: COL_WIDTHS, body: tableBody },
+        layout: {
+          hLineWidth: (r: number, node: any) => (r === 0 || r === node.table.body.length) ? 1 : 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#999", vLineColor: () => "#999",
+          paddingTop: () => 3, paddingBottom: () => 3, paddingLeft: () => 4, paddingRight: () => 4,
+        },
+      },
+    ],
+    footer: () => ({
+      margin: [30, 10, 30, 0],
+      stack: [
+        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: "#aaa" }] },
+        { margin: [0, 8, 0, 0], columns: [
+          { stack: [{ text: "ADMINISTRATOR", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.adminName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+          { stack: [{ text: "CENZOR", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.cenzorName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+          { stack: [{ text: "PREȘEDINTE", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.presedinteName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+        ] },
+      ],
+    }),
+    styles: { title: { fontSize: 13, bold: true, characterSpacing: 1 }, th: { bold: true, fontSize: 9 } },
+    defaultStyle: { font: "Roboto" },
+  };
+
+  const safe = fondName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+  const pm = pdfMake.default ?? pdfMake;
+  pm.createPdf(docDefinition).download(`registru-fond-${safe}-detaliat-${dataStart}-${dataEnd}.pdf`);
+}
+
 async function generateAndDownloadPdf(
   asoc: AsocInfo | null, fondName: string, soldInitial: number,
   ops: Operatiune[], dataStart: string, dataEnd: string,
@@ -206,25 +331,32 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   // Grupare pe apartament pentru modul "detaliat"
   const grupate = useMemo(() => {
     if (apartamentId !== "detaliat") return null;
-    const map = new Map<string, { label: string; ops: Operatiune[]; totalIntrari: number; totalIesiri: number }>();
+
+    // pornesc cu TOATE apartamentele (chiar dacă nu au contribuții în perioadă)
+    const map = new Map<string, { label: string; numar: string; ops: Operatiune[]; totalIntrari: number; totalIesiri: number }>();
+    for (const a of apartamente) {
+      const prop = a.proprietari[0]?.proprietar;
+      const label = `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
+      map.set(a.id, { label, numar: a.numar, ops: [], totalIntrari: 0, totalIesiri: 0 });
+    }
+
     const transfers: Operatiune[] = [];
     for (const op of ops) {
       if (op.fel === "transfer") { transfers.push(op); continue; }
-      const key = op.apartamentId ?? op.detalii;
-      if (!map.has(key)) map.set(key, { label: op.detalii, ops: [], totalIntrari: 0, totalIesiri: 0 });
-      const g = map.get(key)!;
-      g.ops.push(op);
-      g.totalIntrari += op.intrare;
-      g.totalIesiri += op.iesire;
+      const key = op.apartamentId ?? "";
+      if (map.has(key)) {
+        const g = map.get(key)!;
+        g.ops.push(op);
+        g.totalIntrari += op.intrare;
+        g.totalIesiri += op.iesire;
+      }
     }
-    // sortare apartamente după număr
-    const sorted = [...map.entries()].sort((a, b) => {
-      const na = a[1].ops[0]?.nrApartament ?? "";
-      const nb = b[1].ops[0]?.nrApartament ?? "";
-      return na.localeCompare(nb, undefined, { numeric: true });
-    });
-    return { grupe: sorted.map(([, g]) => g), transferuri: transfers };
-  }, [ops, apartamentId]);
+
+    const sorted = [...map.values()].sort((a, b) =>
+      a.numar.localeCompare(b.numar, undefined, { numeric: true })
+    );
+    return { grupe: sorted, transferuri: transfers };
+  }, [ops, apartamentId, apartamente]);
 
   async function handleDownloadPdf() {
     if (!asociatieId || !fondId) return;
@@ -232,7 +364,11 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
     try {
       const res = await fetch(`/api/asociatii/${asociatieId}`);
       const freshAsoc: AsocInfo = await res.json();
-      await generateAndDownloadPdf(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd, apartamentLabel || undefined);
+      if (grupate) {
+        await generateAndDownloadPdfDetaliat(freshAsoc, numeFond, grupate.grupe, grupate.transferuri, dataStart, dataEnd);
+      } else {
+        await generateAndDownloadPdf(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd, apartamentLabel || undefined);
+      }
     } catch (e: any) { setError(`Eroare PDF: ${e?.message ?? String(e)}`); }
     finally { setPdfLoading(false); }
   }
