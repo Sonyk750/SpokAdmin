@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
   const [incasari, transferuri] = await Promise.all([
     db.incasare.findMany({
       where:  incasariWhere,
-      select: { id: true, data: true, serie: true, numarDocument: true, nrApartament: true, proprietarNume: true, pozitiiJson: true, avansJson: true, createdAt: true },
+      select: { id: true, apartamentId: true, data: true, serie: true, numarDocument: true, nrApartament: true, proprietarNume: true, pozitiiJson: true, avansJson: true, createdAt: true },
     }),
     apartamentId ? Promise.resolve([]) : db.transferFond.findMany({
       where:  { asociatieId, organizationId: orgId, OR: [{ dinFondId: fondId }, { inFondId: fondId }] },
@@ -67,6 +67,7 @@ export async function GET(req: NextRequest) {
   type Op = {
     id: string; data: string; fel: "contributie" | "transfer";
     document: string; detalii: string; intrare: number; iesire: number;
+    apartamentId?: string; nrApartament?: string;
     _dataMs: number; _createdMs: number;
   };
   const ops: Op[] = [];
@@ -80,6 +81,7 @@ export async function GET(req: NextRequest) {
       document: `${i.serie} ${i.numarDocument}`,
       detalii:  `Ap. ${i.nrApartament}${i.proprietarNume ? " — " + i.proprietarNume : ""}`,
       intrare: c, iesire: 0,
+      apartamentId: i.apartamentId, nrApartament: i.nrApartament,
       _dataMs: i.data.getTime(), _createdMs: i.createdAt.getTime(),
     });
   }
