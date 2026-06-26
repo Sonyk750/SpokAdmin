@@ -45,6 +45,7 @@ function withRunningBalance(soldInitial: number, ops: Operatiune[]) {
 async function generateAndDownloadPdf(
   asoc: AsocInfo | null, fondName: string, soldInitial: number,
   ops: Operatiune[], dataStart: string, dataEnd: string,
+  apartamentLabel?: string,
 ) {
   const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
   const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
@@ -103,7 +104,8 @@ async function generateAndDownloadPdf(
       ] },
       { canvas: [{ type: "line", x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 0] },
       { text: "REGISTRU FOND", style: "title", alignment: "center", margin: [0, 14, 0, 4] },
-      { text: fondName, alignment: "center", fontSize: 11, bold: true, color: "#333", margin: [0, 0, 0, 12] },
+      { text: fondName, alignment: "center", fontSize: 11, bold: true, color: "#333", margin: [0, 0, 0, apartamentLabel ? 4 : 12] },
+      ...(apartamentLabel ? [{ text: apartamentLabel, alignment: "center" as const, fontSize: 10, color: "#444", margin: [0, 0, 0, 12] }] : []),
       {
         table: { headerRows: 1, widths: [22, 48, 55, "*", 50, 50, 55], body: tableBody },
         layout: {
@@ -129,8 +131,9 @@ async function generateAndDownloadPdf(
   };
 
   const safe = fondName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+  const apSafe = apartamentLabel ? "-" + apartamentLabel.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() : "";
   const pm = pdfMake.default ?? pdfMake;
-  pm.createPdf(docDefinition).download(`registru-fond-${safe}-${dataStart}-${dataEnd}.pdf`);
+  pm.createPdf(docDefinition).download(`registru-fond-${safe}${apSafe}-${dataStart}-${dataEnd}.pdf`);
 }
 
 export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { defaultStart: string; defaultEnd: string }) {
@@ -188,6 +191,13 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   const totalIesiri  = ops.reduce((s, o) => s + o.iesire, 0);
   const soldFinal    = soldInitial + totalIntrari - totalIesiri;
   const numeFond = fondName || fonduri.find(f => f.id === fondId)?.name || "";
+  const apartamentLabel = (() => {
+    if (!apartamentId) return "";
+    const a = apartamente.find(x => x.id === apartamentId);
+    if (!a) return "";
+    const prop = a.proprietari[0]?.proprietar;
+    return `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
+  })();
 
   async function handleDownloadPdf() {
     if (!asociatieId || !fondId) return;
@@ -195,7 +205,7 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
     try {
       const res = await fetch(`/api/asociatii/${asociatieId}`);
       const freshAsoc: AsocInfo = await res.json();
-      await generateAndDownloadPdf(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd);
+      await generateAndDownloadPdf(freshAsoc, numeFond, soldInitial, ops, dataStart, dataEnd, apartamentLabel || undefined);
     } catch (e: any) { setError(`Eroare PDF: ${e?.message ?? String(e)}`); }
     finally { setPdfLoading(false); }
   }
@@ -254,11 +264,11 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">Apartament</label>
-            <select className="input" value={apartamentId} onChange={e => setApartamentId(e.target.value)} style={{ minWidth: "180px" }}>
-              <option value="">Toate apartamentele</option>
+            <select className="input" value={apartamentId} onChange={e => setApartamentId(e.target.value)} style={{ minWidth: "220px" }}>
+              <option value="">Asociație (toate)</option>
               {apartamente.map(a => {
                 const prop = a.proprietari[0]?.proprietar;
-                const label = prop ? `${a.numar}${a.scara ? `/${a.scara}` : ""} — ${prop.nume} ${prop.prenume}` : `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}`;
+                const label = `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}${prop ? ` — ${prop.nume} ${prop.prenume}` : ""}`;
                 return <option key={a.id} value={a.id}>{label}</option>;
               })}
             </select>
@@ -284,6 +294,12 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
           <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Fond</div>
           <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#e2e8f0" }}>{numeFond}</div>
         </div>
+        {apartamentLabel && (
+          <div>
+            <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Apartament</div>
+            <div style={{ fontSize: "1rem", fontWeight: 700, color: "#e2e8f0" }}>{apartamentLabel}</div>
+          </div>
+        )}
         <div>
           <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Sold inițial</div>
           <div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(soldInitial)} lei</div>
@@ -367,7 +383,8 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
           </div>
         </div>
         <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 2pt" }}>Registru fond</div>
-        <div style={{ textAlign: "center", fontSize: "11pt", fontWeight: "bold", color: "#333", marginBottom: "12pt" }}>{numeFond}</div>
+        <div style={{ textAlign: "center", fontSize: "11pt", fontWeight: "bold", color: "#333", marginBottom: apartamentLabel ? "4pt" : "12pt" }}>{numeFond}</div>
+        {apartamentLabel && <div style={{ textAlign: "center", fontSize: "10pt", color: "#444", marginBottom: "12pt" }}>{apartamentLabel}</div>}
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
           <thead>
             <tr>
