@@ -23,10 +23,11 @@ export async function GET(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
-  const asociatieId = searchParams.get("asociatieId");
-  const fondId      = searchParams.get("fondId");
-  const dataStart   = searchParams.get("dataStart");
-  const dataEnd     = searchParams.get("dataEnd");
+  const asociatieId  = searchParams.get("asociatieId");
+  const fondId       = searchParams.get("fondId");
+  const dataStart    = searchParams.get("dataStart");
+  const dataEnd      = searchParams.get("dataEnd");
+  const apartamentId = searchParams.get("apartamentId") || null;
   if (!asociatieId || !fondId || !dataStart || !dataEnd)
     return NextResponse.json({ error: "Parametri lipsă" }, { status: 400 });
 
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
 
   // Sold acumulat de bază (din inițializare) — punct de pornire
   const baseAgg = await db.fondApartament.aggregate({
-    where: { asociatieId, fondId },
+    where: { asociatieId, fondId, ...(apartamentId ? { apartamentId } : {}) },
     _sum:  { sold: true },
   });
   const baseSold = baseAgg._sum.sold ?? 0;
@@ -46,12 +47,13 @@ export async function GET(req: NextRequest) {
   const start = new Date(dataStart);
   const end   = new Date(dataEnd + "T23:59:59");
 
+  const incasariWhere = { asociatieId, organizationId: orgId, ...(apartamentId ? { apartamentId } : {}) };
   const [incasari, transferuri] = await Promise.all([
     db.incasare.findMany({
-      where:  { asociatieId, organizationId: orgId },
+      where:  incasariWhere,
       select: { id: true, data: true, serie: true, numarDocument: true, nrApartament: true, proprietarNume: true, pozitiiJson: true, avansJson: true, createdAt: true },
     }),
-    db.transferFond.findMany({
+    apartamentId ? Promise.resolve([]) : db.transferFond.findMany({
       where:  { asociatieId, organizationId: orgId, OR: [{ dinFondId: fondId }, { inFondId: fondId }] },
       select: { id: true, data: true, suma: true, dinFondId: true, dinFondName: true, inFondId: true, inFondName: true, notes: true, createdAt: true },
     }),

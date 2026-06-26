@@ -20,6 +20,13 @@ interface AsocInfo {
   fonduri?: { id: string; name: string }[];
 }
 
+interface ApartamentItem {
+  id: string;
+  numar: string;
+  scara: string | null;
+  proprietari: { proprietar: { nume: string; prenume: string } }[];
+}
+
 const fmt2 = (v: number) => v.toFixed(2);
 
 const felLabel = (fel: Operatiune["fel"]) => fel === "contributie" ? "Contribuție" : "Transfer";
@@ -132,6 +139,8 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   const [asoc, setAsoc] = useState<AsocInfo | null>(null);
   const [fonduri, setFonduri] = useState<{ id: string; name: string }[]>([]);
   const [fondId, setFondId] = useState("");
+  const [apartamente, setApartamente] = useState<ApartamentItem[]>([]);
+  const [apartamentId, setApartamentId] = useState("");
   const [dataStart, setDataStart] = useState(defaultStart);
   const [dataEnd, setDataEnd] = useState(defaultEnd);
   const [fondName, setFondName] = useState("");
@@ -142,19 +151,25 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!asociatieId) { setAsoc(null); setFonduri([]); setFondId(""); return; }
-    fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then((d: AsocInfo) => {
+    if (!asociatieId) { setAsoc(null); setFonduri([]); setFondId(""); setApartamente([]); setApartamentId(""); return; }
+    Promise.all([
+      fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()),
+      fetch(`/api/asociatii/${asociatieId}/apartamente`).then(r => r.json()),
+    ]).then(([d, aps]: [AsocInfo, ApartamentItem[]]) => {
       setAsoc(d);
       const f = Array.isArray(d.fonduri) ? d.fonduri : [];
       setFonduri(f);
       setFondId(prev => (prev && f.some(x => x.id === prev)) ? prev : (f[0]?.id ?? ""));
-    }).catch(() => { setFonduri([]); setFondId(""); });
+      setApartamente(Array.isArray(aps) ? aps : []);
+      setApartamentId("");
+    }).catch(() => { setFonduri([]); setFondId(""); setApartamente([]); setApartamentId(""); });
   }, [asociatieId]);
 
   const fetchData = useCallback(async () => {
     if (!asociatieId || !fondId) { setOps([]); setSoldInitial(0); return; }
     setLoading(true); setError(null);
     const params = new URLSearchParams({ asociatieId, fondId, dataStart, dataEnd });
+    if (apartamentId) params.set("apartamentId", apartamentId);
     try {
       const res = await fetch(`/api/rapoarte/registru-fonduri?${params}`);
       const json = await res.json();
@@ -164,7 +179,7 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
       setOps(json.operatiuni ?? []);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
-  }, [asociatieId, fondId, dataStart, dataEnd]);
+  }, [asociatieId, fondId, apartamentId, dataStart, dataEnd]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -235,6 +250,17 @@ export default function RegistruFonduriClient({ defaultStart, defaultEnd }: { de
             <label className="form-field__label">Fond</label>
             <select className="input" value={fondId} onChange={e => setFondId(e.target.value)} style={{ minWidth: "200px" }}>
               {fonduri.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label className="form-field__label">Apartament</label>
+            <select className="input" value={apartamentId} onChange={e => setApartamentId(e.target.value)} style={{ minWidth: "180px" }}>
+              <option value="">Toate apartamentele</option>
+              {apartamente.map(a => {
+                const prop = a.proprietari[0]?.proprietar;
+                const label = prop ? `${a.numar}${a.scara ? `/${a.scara}` : ""} — ${prop.nume} ${prop.prenume}` : `Ap. ${a.numar}${a.scara ? `/${a.scara}` : ""}`;
+                return <option key={a.id} value={a.id}>{label}</option>;
+              })}
             </select>
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
