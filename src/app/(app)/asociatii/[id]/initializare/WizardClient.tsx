@@ -642,8 +642,8 @@ export default function WizardClient({
         dataRows.forEach(row => {
           const numar       = String(row[0] ?? "").trim();
           const numeComplet = String(row[1] ?? "").trim();
-          const telefon     = String(row[2] ?? "").trim();
-          const email       = String(row[3] ?? "").trim();
+          const email       = String(row[2] ?? "").trim();
+          const telefon     = String(row[3] ?? "").trim();
           const idx = next.findIndex(p => p.numar === numar);
           if (idx >= 0) {
             next[idx] = {
@@ -1093,8 +1093,8 @@ export default function WizardClient({
                   <span style={{ color: "#cbd5e1" }}>
                     Coloana 1: Nr. apartament &nbsp;·&nbsp;
                     Coloana 2: Nume și prenume &nbsp;·&nbsp;
-                    Coloana 3: Telefon &nbsp;·&nbsp;
-                    Coloana 4: Email
+                    Coloana 3: Email &nbsp;·&nbsp;
+                    Coloana 4: Telefon
                   </span><br />
                   Primul rând cu text (antet) este ignorat automat.
                 </div>
