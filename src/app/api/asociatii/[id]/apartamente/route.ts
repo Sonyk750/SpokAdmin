@@ -122,9 +122,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     results.push({ id: upserted.id, numar: upserted.numar });
   }
 
+  // Dezactivează apartamentele care nu mai sunt în lista trimisă
+  const numaruriTrimise = results.map(r => r.numar);
+  await db.apartament.updateMany({
+    where: {
+      asociatieId: id,
+      numar:       { notIn: numaruriTrimise },
+      isActive:    true,
+    },
+    data: { isActive: false },
+  });
+
   await db.asociatie.update({
     where: { id },
-    data:  { wizardStep: 2, nrApartamente: results.length }, // step 2 = apartamente
+    data:  { wizardStep: 2, nrApartamente: results.length },
   });
 
   return NextResponse.json({ apartamente: results });
