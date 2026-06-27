@@ -644,13 +644,14 @@ export default function WizardClient({
           const numeComplet = String(row[1] ?? "").trim();
           const email       = String(row[2] ?? "").trim();
           const telefon     = String(row[3] ?? "").trim();
+          const numeValid    = numeComplet !== "" && !/\d/.test(numeComplet);
+          const telefonValid = telefon !== "" && !/[a-zA-ZăâîșțĂÂÎȘȚ]/.test(telefon);
           const idx = next.findIndex(p => p.numar === numar);
           if (idx >= 0) {
             next[idx] = {
               ...next[idx],
-              numeComplet: numeComplet !== "" ? numeComplet : next[idx].numeComplet,
-              telefon:     telefon     !== "" ? telefon     : next[idx].telefon,
-              // Suprascrie complet emailurile cu ce vine din XLS (curăță date greșite din importuri anterioare)
+              numeComplet: numeValid    ? numeComplet : next[idx].numeComplet,
+              telefon:     telefonValid ? telefon     : next[idx].telefon,
               emailuri:    email !== "" ? [email] : next[idx].emailuri,
             };
           }
