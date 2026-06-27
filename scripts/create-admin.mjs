@@ -11,11 +11,11 @@ const bcrypt = require("bcryptjs");
 const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL });
 const db = new PrismaClient({ adapter });
 
-const EMAIL    = "office@decoimob.ro";
+const EMAIL    = "office@spokadmin.ro";
 const PASSWORD = "Sonyk750/-";
 const NAME     = "Octav Ene";
-const ORG_NAME = "DecoImob";
-const ORG_SLUG = "decoimob";
+const ORG_NAME = "SpokAdmin";
+const ORG_SLUG = "spokadmin";
 
 async function main() {
   // Sterg cont existent dacă există (re-seed)

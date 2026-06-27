@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import "../styles/globals.scss";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://decoimob.ro"),
+  metadataBase: new URL("https://spokadmin.ro"),
   title: {
-    default: "DecoImob | Administrare Imobile si Blocuri Bucuresti",
-    template: "%s | DecoImob — Administrare Imobile Bucuresti",
+    default: "SpokAdmin | Administrare Imobile si Blocuri Bucuresti",
+    template: "%s | SpokAdmin — Administrare Imobile Bucuresti",
   },
   description:
-    "DecoImob — firma de administrare imobile si blocuri in Bucuresti si Ilfov. Property management profesional: colectare chirii, mentenanta tehnica, suport juridic ANAF. 20+ ani experienta. Oferta gratuita.",
+    "SpokAdmin — firma de administrare imobile si blocuri in Bucuresti si Ilfov. Property management profesional: colectare chirii, mentenanta tehnica, suport juridic ANAF. 20+ ani experienta. Oferta gratuita.",
   keywords: [
     "administrare imobile bucuresti",
     "administrare blocuri bucuresti",
@@ -23,9 +23,9 @@ export const metadata: Metadata = {
     "servicii administrare imobile",
     "administrator autorizat bucuresti",
   ],
-  authors: [{ name: "DecoImob SRL", url: "https://decoimob.ro" }],
-  creator: "DecoImob SRL",
-  publisher: "DecoImob SRL",
+  authors: [{ name: "SpokAdmin SRL", url: "https://spokadmin.ro" }],
+  creator: "SpokAdmin SRL",
+  publisher: "SpokAdmin SRL",
   robots: {
     index: true,
     follow: true,
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ro_RO",
-    url: "https://decoimob.ro",
-    siteName: "DecoImob — Administrare Imobile Bucuresti",
-    title: "DecoImob | Firma de Administrare Imobile si Blocuri Bucuresti",
+    url: "https://spokadmin.ro",
+    siteName: "SpokAdmin — Administrare Imobile Bucuresti",
+    title: "SpokAdmin | Firma de Administrare Imobile si Blocuri Bucuresti",
     description:
       "Administrare imobile si blocuri in Bucuresti si Ilfov. Property management profesional cu 20+ ani experienta. Colectare chirii, mentenanta tehnica, suport juridic. Oferta gratuita.",
     images: [
@@ -50,19 +50,19 @@ export const metadata: Metadata = {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "DecoImob — Administrare Imobile Profesionala Bucuresti",
+        alt: "SpokAdmin — Administrare Imobile Profesionala Bucuresti",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "DecoImob | Administrare Imobile Bucuresti",
+    title: "SpokAdmin | Administrare Imobile Bucuresti",
     description:
       "Firma de administrare imobile si blocuri in Bucuresti si Ilfov. Property management profesional, 20+ ani experienta.",
     images: ["/og-image.jpg"],
   },
   alternates: {
-    canonical: "https://decoimob.ro",
+    canonical: "https://spokadmin.ro",
   },
   category: "Real Estate",
 };
@@ -72,14 +72,14 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "LocalBusiness",
-      "@id": "https://decoimob.ro/#business",
-      name: "DecoImob SRL",
-      alternateName: "DecoImob",
+      "@id": "https://spokadmin.ro/#business",
+      name: "SpokAdmin SRL",
+      alternateName: "SpokAdmin",
       description:
         "Firma de administrare imobile si blocuri in Bucuresti si Ilfov. Servicii profesionale de property management: colectare chirii, mentenanta tehnica, suport juridic ANAF, platforma digitala proprietari.",
-      url: "https://decoimob.ro",
+      url: "https://spokadmin.ro",
       telephone: "+40756362828",
-      email: "office@decoimob.ro",
+      email: "office@spokadmin.ro",
       foundingDate: "2005",
       areaServed: [
         { "@type": "City", name: "Bucuresti" },
@@ -101,7 +101,7 @@ const jsonLd = {
         opens: "09:00",
         closes: "18:00",
       },
-      sameAs: ["https://decoimob.ro"],
+      sameAs: ["https://spokadmin.ro"],
       hasOfferCatalog: {
         "@type": "OfferCatalog",
         name: "Servicii Administrare Imobile",
@@ -149,27 +149,27 @@ const jsonLd = {
     },
     {
       "@type": "WebSite",
-      "@id": "https://decoimob.ro/#website",
-      url: "https://decoimob.ro",
-      name: "DecoImob — Administrare Imobile Bucuresti",
+      "@id": "https://spokadmin.ro/#website",
+      url: "https://spokadmin.ro",
+      name: "SpokAdmin — Administrare Imobile Bucuresti",
       description: "Firma de administrare imobile si blocuri in Bucuresti si Ilfov",
-      publisher: { "@id": "https://decoimob.ro/#business" },
+      publisher: { "@id": "https://spokadmin.ro/#business" },
       inLanguage: "ro-RO",
     },
     {
       "@type": "WebPage",
-      "@id": "https://decoimob.ro/#webpage",
-      url: "https://decoimob.ro",
-      name: "Administrare Imobile Bucuresti | DecoImob — Property Management",
-      isPartOf: { "@id": "https://decoimob.ro/#website" },
-      about: { "@id": "https://decoimob.ro/#business" },
+      "@id": "https://spokadmin.ro/#webpage",
+      url: "https://spokadmin.ro",
+      name: "Administrare Imobile Bucuresti | SpokAdmin — Property Management",
+      isPartOf: { "@id": "https://spokadmin.ro/#website" },
+      about: { "@id": "https://spokadmin.ro/#business" },
       description:
-        "DecoImob ofera servicii complete de administrare imobile si blocuri in Bucuresti si Ilfov: financiar, tehnic, juridic si platforma digitala.",
+        "SpokAdmin ofera servicii complete de administrare imobile si blocuri in Bucuresti si Ilfov: financiar, tehnic, juridic si platforma digitala.",
       inLanguage: "ro-RO",
     },
     {
       "@type": "FAQPage",
-      "@id": "https://decoimob.ro/#faq",
+      "@id": "https://spokadmin.ro/#faq",
       mainEntity: [
         {
           "@type": "Question",
@@ -184,7 +184,7 @@ const jsonLd = {
           name: "Cat costa serviciile de property management?",
           acceptedAnswer: {
             "@type": "Answer",
-            text: "Costul administrarii imobilelor variaza in functie de numarul de unitati si serviciile alese. DecoImob ofera tarife transparente: 50-90 EUR/luna pentru 1-20 apartamente si 70-110 EUR/luna pentru 20-40 apartamente, fara costuri ascunse.",
+            text: "Costul administrarii imobilelor variaza in functie de numarul de unitati si serviciile alese. SpokAdmin ofera tarife transparente: 50-90 EUR/luna pentru 1-20 apartamente si 70-110 EUR/luna pentru 20-40 apartamente, fara costuri ascunse.",
           },
         },
         {

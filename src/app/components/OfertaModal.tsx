@@ -42,7 +42,7 @@ function generatePDFHTML(form: FormData): string {
 <html lang="ro">
 <head>
 <meta charset="UTF-8"/>
-<title>Oferta DecoImob — ${form.numeAsociatie || "Asociatie"}</title>
+<title>Oferta SpokAdmin — ${form.numeAsociatie || "Asociatie"}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Arial',sans-serif;font-size:12px;color:#1a1a1a;background:#f0f4fa;}
@@ -135,12 +135,12 @@ body{font-family:'Arial',sans-serif;font-size:12px;color:#1a1a1a;background:#f0f
 
 <div class="header">
   <div>
-    <div class="logo-text">Deco<span>Imob</span></div>
+    <div class="logo-text">Spok<span>Admin</span></div>
     <div class="logo-sub">Property Management</div>
   </div>
   <div class="header-right">
-    <strong>DecoImob SRL</strong>
-    office@decoimob.ro<br/>
+    <strong>SpokAdmin SRL</strong>
+    office@spokadmin.ro<br/>
     0756 362 828<br/>
     Str. C.D. Gherea 89, Sector 1, Bucuresti<br/>
     Data: ${today}
@@ -214,7 +214,7 @@ ${isPersonalizata ? `
   <h3>Oferta personalizata pentru ${form.nrApartamente} apartamente</h3>
   <p>Pentru imobile cu peste 40 de apartamente elaboram o oferta complet personalizata,<br/>adaptata dimensiunii si nevoilor specifice ale asociatiei dumneavoastra.<br/>Va invitam sa ne contactati pentru o discutie fara angajamente.</p>
   <div class="contact-grid">
-    <div class="contact-pill">office@decoimob.ro</div>
+    <div class="contact-pill">office@spokadmin.ro</div>
     <div class="contact-pill">0756 362 828</div>
   </div>
 </div>
@@ -315,7 +315,7 @@ ${isPersonalizata ? `
 </div>
 
 <div class="beneficii">
-  <div class="ben-title">Beneficii incluse in orice pachet DecoImob</div>
+  <div class="ben-title">Beneficii incluse in orice pachet SpokAdmin</div>
   <ul>
     <li>Platforma online proprietari — acces 24/7 pe orice dispozitiv</li>
     <li>Call center activ 24 ore / 7 zile</li>
@@ -332,12 +332,12 @@ ${isPersonalizata ? `
   <strong>Nota importanta:</strong> Preturile sunt exprimate in EUR si se factureaza in RON la cursul BNR din ziua facturarii, fara TVA.
   Oferta este valabila 30 de zile de la data emiterii. Contractul de administrare se incheie pe o perioada minima de 12 luni,
   cu posibilitate de prelungire automata. Pentru detalii suplimentare, negociere sau vizualizarea contractului standard,
-  va rugam sa ne contactati la <strong>office@decoimob.ro</strong> sau <strong>0756 362 828</strong>.
+  va rugam sa ne contactati la <strong>office@spokadmin.ro</strong> sau <strong>0756 362 828</strong>.
 </div>
 
 <div class="footer">
-  <div><strong>DecoImob SRL</strong> — Firma de administrare imobile Bucuresti si Ilfov — 20+ ani experienta</div>
-  <div>www.decoimob.ro &nbsp;|&nbsp; office@decoimob.ro</div>
+  <div><strong>SpokAdmin SRL</strong> — Firma de administrare imobile Bucuresti si Ilfov — 20+ ani experienta</div>
+  <div>www.spokadmin.ro &nbsp;|&nbsp; office@spokadmin.ro</div>
 </div>
 
 </div>
@@ -479,7 +479,7 @@ export default function OfertaModal({ onClose }: { onClose: () => void }) {
           <button onClick={handlePrint} style={{ flex: 1, background: "#1D6FD8", color: "#fff", border: "none", padding: "15px 24px", borderRadius: "8px", fontWeight: 700, fontSize: "14px", cursor: "pointer", minWidth: "200px" }}>
             Descarca oferta PDF
           </button>
-          <a href={`mailto:office@decoimob.ro?subject=Solicitare oferta — ${form.numeAsociatie || "Asociatie"}&body=Buna ziua,%0A%0ASolicito o oferta pentru:%0A- Asociatie: ${form.numeAsociatie}%0A- Adresa: ${form.strada}${form.sector ? ", " + form.sector : ""}, ${form.oras}%0A- Apartamente: ${form.nrApartamente}%0A- Pachet: ${form.pachet.toUpperCase()}${form.mentenanta ? " + Mentenanta" : ""}%0A- Email: ${form.email}%0A%0AVa multumesc.`}
+          <a href={`mailto:office@spokadmin.ro?subject=Solicitare oferta — ${form.numeAsociatie || "Asociatie"}&body=Buna ziua,%0A%0ASolicito o oferta pentru:%0A- Asociatie: ${form.numeAsociatie}%0A- Adresa: ${form.strada}${form.sector ? ", " + form.sector : ""}, ${form.oras}%0A- Apartamente: ${form.nrApartamente}%0A- Pachet: ${form.pachet.toUpperCase()}${form.mentenanta ? " + Mentenanta" : ""}%0A- Email: ${form.email}%0A%0AVa multumesc.`}
             style={{ flex: 1, background: "transparent", color: "#9CA3AF", border: "1px solid #1E2733", padding: "15px 24px", borderRadius: "8px", fontWeight: 600, fontSize: "14px", textAlign: "center" as const, textDecoration: "none", minWidth: "200px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             Trimite email cu oferta
           </a>

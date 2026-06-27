@@ -10,7 +10,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/_next/"],
       },
     ],
-    sitemap: "https://decoimob.ro/sitemap.xml",
-    host: "https://decoimob.ro",
+    sitemap: "https://spokadmin.ro/sitemap.xml",
+    host: "https://spokadmin.ro",
   };
 }

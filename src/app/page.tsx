@@ -22,7 +22,7 @@ const steps = [
 
 const faqs = [
   { q: "Ce inseamna administrarea unui bloc?",      a: "Administrarea unui bloc include colectarea fondului de rulment si intretinere, gestionarea furnizorilor de utilitati, coordonarea lucrarilor tehnice, tinerea evidentei contabile si comunicarea cu proprietarii. O firma de administrare profesionista preia toate aceste responsabilitati." },
-  { q: "Cat costa serviciile de property management?", a: "Costul administrarii imobilelor variaza in functie de numarul de unitati si serviciile alese. DecoImob ofera tarife transparente, fara costuri ascunse, calculate ca procent din valoarea chiriei colectate sau ca tarif fix lunar per unitate." },
+  { q: "Cat costa serviciile de property management?", a: "Costul administrarii imobilelor variaza in functie de numarul de unitati si serviciile alese. SpokAdmin ofera tarife transparente, fara costuri ascunse, calculate ca procent din valoarea chiriei colectate sau ca tarif fix lunar per unitate." },
   { q: "In ce zone din Bucuresti oferiti servicii?", a: "Oferim servicii de administrare imobile si administrare blocuri in toate sectoarele Bucurestiului si in judetul Ilfov. Portofoliul nostru include blocuri rezidentiale, imobile de birouri si ansambluri rezidentiale." },
 ];
 
@@ -36,7 +36,7 @@ const whyStats = [
 const whyFeatures = [
   { n: "01", title: "Transparenta financiara totala",  desc: "Fiecare leu colectat si cheltuit apare in raportul lunar. Acces la contabilitate in timp real, fara surprize." },
   { n: "02", title: "Raspuns in maxim 24 de ore",      desc: "Orice sesizare tehnica sau solicitare din partea chiriasilor primeste raspuns si plan de actiune in 24 de ore." },
-  { n: "03", title: "Administratori certificati",      desc: "Echipa DecoImob este formata exclusiv din administratori autorizati, cu experienta in blocuri si imobile rezidentiale." },
+  { n: "03", title: "Administratori certificati",      desc: "Echipa SpokAdmin este formata exclusiv din administratori autorizati, cu experienta in blocuri si imobile rezidentiale." },
   { n: "04", title: "Contract fara clauze ascunse",    desc: "Iti oferim un contract clar, in conformitate cu legislatia romana, fara obligatii ascunse si cu clauze de iesire simple." },
 ];
 
@@ -110,7 +110,7 @@ const packages = [
 const servicesDetail = [
   {
     number: "01", title: "Administrare Financiara", subtitle: "Inclus in toate pachetele",
-    intro: "Evidenta financiara este cea mai importanta activitate a administratiei. DecoImob gestioneaza cu rigoare fiecare leu al asociatiei tale.",
+    intro: "Evidenta financiara este cea mai importanta activitate a administratiei. SpokAdmin gestioneaza cu rigoare fiecare leu al asociatiei tale.",
     tag: "Pachet LISTE / CONTABIL / COMPLET",
     items: [
       "Plata facturilor catre furnizorii de utilitati si prestatorii de servicii",
@@ -159,7 +159,7 @@ const servicesDetail = [
   },
   {
     number: "04", title: "Platforma Digitala Proprietari", subtitle: "Inclus in toate pachetele",
-    intro: "Toti locatarii au acces 24/7 la platforma DecoImob — situatia contului, plati online, sesizari si documente, de pe orice dispozitiv.",
+    intro: "Toti locatarii au acces 24/7 la platforma SpokAdmin — situatia contului, plati online, sesizari si documente, de pe orice dispozitiv.",
     tag: "Pachet LISTE / CONTABIL / COMPLET",
     items: [
       "Acces individual cu user si parola pentru fiecare proprietar",
@@ -265,7 +265,7 @@ function IllustrationDigital() {
       <rect x="72" y="32"  width="256" height="156" rx="6"  fill="rgba(5,8,20,0.9)"/>
       <rect x="72" y="32"  width="256" height="28"  rx="6"  fill="rgba(124,58,237,0.12)"/>
       <circle cx="88" cy="46" r="5" fill={VL}/>
-      <text x="98"  y="50" fontFamily="DM Sans, sans-serif" fontWeight="700" fontSize="10" fill="#fff">DecoImob Dashboard</text>
+      <text x="98"  y="50" fontFamily="DM Sans, sans-serif" fontWeight="700" fontSize="10" fill="#fff">SpokAdmin Dashboard</text>
       <rect x="290" y="38" width="30" height="16" rx="4" fill="rgba(124,58,237,0.2)"/>
       <text x="305" y="49" fontFamily="DM Sans, sans-serif" fontSize="8"    fill={VL}     textAnchor="middle">LIVE</text>
       <rect x="80"  y="70" width="72" height="44" rx="6" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5"/>
@@ -365,7 +365,7 @@ const services = [
   { number: "01", title: "Administrare Financiara",       desc: "Colectam chiriile lunar, emitem liste de plata conforme legislatiei, gestionam fondul de rulment si furnizam rapoarte financiare detaliate. Zero intarzieri, zero erori contabile.", illustration: <IllustrationFinanciar /> },
   { number: "02", title: "Administrare Tehnica",          desc: "Coordonam lucrarile de intretinere, reparatii urgente si mentenanta preventiva prin mesteri autorizati. Fiecare interventie este documentata si raportata in timp real.", illustration: <IllustrationTehnic /> },
   { number: "03", title: "Suport Juridic si ANAF",        desc: "Redactam si gestionam contractele, asiguram reprezentarea in relatia cu ANAF, recuperam creantele restante si mediem conflictele dintre proprietari si chiriasi.", illustration: <IllustrationJuridic /> },
-  { number: "04", title: "Platforma Digitala Proprietari",desc: "Acces 24/7 la dashboard-ul DecoImob: istoric plati, documente, sesizari si rapoarte lunare. Transparenta totala, in timp real, direct de pe telefon sau laptop.", illustration: <IllustrationDigital /> },
+  { number: "04", title: "Platforma Digitala Proprietari",desc: "Acces 24/7 la dashboard-ul SpokAdmin: istoric plati, documente, sesizari si rapoarte lunare. Transparenta totala, in timp real, direct de pe telefon sau laptop.", illustration: <IllustrationDigital /> },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -451,7 +451,7 @@ export default function Home() {
               <div className="panel__header-row">
                 <div>
                   <p className="panel__label">Contacteaza-ne</p>
-                  <h2 className="panel__title">DecoImob SRL</h2>
+                  <h2 className="panel__title">SpokAdmin SRL</h2>
                   <p className="panel__subtitle">Firma de administrare imobile Bucuresti</p>
                 </div>
                 <button className="panel__close" onClick={closeContact}>×</button>
@@ -462,7 +462,7 @@ export default function Home() {
                 {[
                   { icon: "📍", label: "Adresa",  val: "Str. Constantin Dobrogeanu Gherea 89, Sector 1, Bucuresti" },
                   { icon: "📞", label: "Telefon", val: "0756 362 828", href: "tel:+40756362828" },
-                  { icon: "✉️", label: "Email",   val: "office@decoimob.ro", href: "mailto:office@decoimob.ro" },
+                  { icon: "✉️", label: "Email",   val: "office@spokadmin.ro", href: "mailto:office@spokadmin.ro" },
                   { icon: "🕐", label: "Program", val: "Luni – Vineri: 09:00 – 18:00" },
                 ].map(item => (
                   <div key={item.label} className="cinfo-row">
@@ -515,7 +515,7 @@ export default function Home() {
                     />
                   </div>
                   <a
-                    href={`mailto:office@decoimob.ro?subject=Solicitare contact — ${contactForm.nume}&body=Nume: ${contactForm.nume}%0AEmail: ${contactForm.email}%0ATelefon: ${contactForm.telefon}%0A%0AMesaj:%0A${contactForm.mesaj}`}
+                    href={`mailto:office@spokadmin.ro?subject=Solicitare contact — ${contactForm.nume}&body=Nume: ${contactForm.nume}%0AEmail: ${contactForm.email}%0ATelefon: ${contactForm.telefon}%0A%0AMesaj:%0A${contactForm.mesaj}`}
                     onClick={() => setContactSent(true)}
                     className="btn btn--primary btn--full"
                     style={{ marginTop: "0.25rem" }}
@@ -588,7 +588,7 @@ export default function Home() {
                   blocuri, complet.
                 </h1>
                 <p className="hero__sub">
-                  DecoImob este firma de administrare care preia complet gestionarea blocului sau imobilului tau — financiar, tehnic si juridic.
+                  SpokAdmin este firma de administrare care preia complet gestionarea blocului sau imobilului tau — financiar, tehnic si juridic.
                 </p>
                 <p className="hero__note">
                   Peste 1.200 de unitati administrate in Bucuresti si Ilfov. 15 ani de property management profesional. Tu nu mai ai nicio grija.
@@ -663,7 +663,7 @@ export default function Home() {
             <div className="why-grid">
               <FadeIn>
                 <div>
-                  <p className="section-label section-label--violet">De ce DecoImob</p>
+                  <p className="section-label section-label--violet">De ce SpokAdmin</p>
                   <h2 className="section-heading">
                     Nu suntem simpli administratori.<br />
                     Suntem <span className="gradient">parteneri pe termen lung.</span>
@@ -813,7 +813,7 @@ export default function Home() {
                 <span className="gradient">pe ce conteaza.</span>
               </h2>
               <p className="cta-section__sub">
-                Fie ca ai un singur apartament, un bloc de 50 de unitati sau un portofoliu rezidential, DecoImob are solutia de property management potrivita pentru tine.
+                Fie ca ai un singur apartament, un bloc de 50 de unitati sau un portofoliu rezidential, SpokAdmin are solutia de property management potrivita pentru tine.
               </p>
               <p className="cta-section__note">
                 Evaluare gratuita a imobilului in 24 de ore. Fara angajamente, fara costuri ascunse.
@@ -855,7 +855,7 @@ export default function Home() {
               <div>
                 <p className="footer__col-title">Contact</p>
                 <div className="footer__links">
-                  <a href="mailto:office@decoimob.ro">office@decoimob.ro</a>
+                  <a href="mailto:office@spokadmin.ro">office@spokadmin.ro</a>
                   <a href="tel:+40756362828">0756 362 828</a>
                   <span>Str. C. D. Gherea 89</span>
                   <span>Sector 1, Bucuresti</span>
@@ -863,7 +863,7 @@ export default function Home() {
               </div>
             </div>
             <div className="footer__bottom">
-              <span>© 2026 DecoImob SRL — Firma de administrare imobile Bucuresti</span>
+              <span>© 2026 SpokAdmin SRL — Firma de administrare imobile Bucuresti</span>
               <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
                 {["GDPR","Termeni si conditii","Cookies","Politica de confidentialitate"].map(l => (
                   <a key={l} href="#" style={{ transition: "color 0.2s" }}

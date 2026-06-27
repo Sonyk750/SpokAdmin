@@ -19,7 +19,7 @@ const titles: Record<string, string> = {
 export default function AppHeader({ userName, orgName }: { userName?: string | null; orgName?: string }) {
   const pathname = usePathname();
   const segment  = "/" + (pathname.split("/")[1] ?? "");
-  const title    = titles[segment] ?? "DecoImob";
+  const title    = titles[segment] ?? "SpokAdmin";
 
   const { asociatii, activeId, setActiveId } = useAsociatie();
   const { toggle } = useSidebar();

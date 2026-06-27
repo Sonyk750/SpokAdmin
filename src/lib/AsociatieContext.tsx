@@ -30,7 +30,7 @@ export function AsociatieProvider({
   const [activeId, setActiveIdState] = useState<string>(asociatii[0]?.id ?? "");
 
   useEffect(() => {
-    const stored = localStorage.getItem("decoimob-asoc");
+    const stored = localStorage.getItem("spokadmin-asoc");
     if (stored && asociatii.some(a => a.id === stored)) {
       setActiveIdState(stored);
     }
@@ -38,7 +38,7 @@ export function AsociatieProvider({
 
   function setActiveId(id: string) {
     setActiveIdState(id);
-    try { localStorage.setItem("decoimob-asoc", id); } catch {}
+    try { localStorage.setItem("spokadmin-asoc", id); } catch {}
   }
 
   const active = asociatii.find(a => a.id === activeId);
