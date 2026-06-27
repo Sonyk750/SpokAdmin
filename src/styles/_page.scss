@@ -189,6 +189,62 @@
   }
 }
 
+// === FEATURES GRID (SaaS) ===
+.features-grid {
+  display: grid;
+  gap: 1.25rem;
+  @include sm { grid-template-columns: repeat(2, 1fr); }
+  @include lg { grid-template-columns: repeat(3, 1fr); }
+}
+
+.feature-card {
+  background: $bg-card;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  padding: 1.75rem;
+  transition: border-color 0.25s, transform 0.25s, background 0.25s;
+
+  &:hover {
+    border-color: $violet-border;
+    background: $bg-card-hover;
+    transform: translateY(-3px);
+  }
+
+  &__icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: $radius-md;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: $violet-subtle;
+    border: 1px solid $violet-border;
+    color: $violet-light;
+    margin-bottom: 1.25rem;
+
+    svg { width: 1.375rem; height: 1.375rem; }
+  }
+
+  &--cyan &__icon {
+    background: $cyan-subtle;
+    border-color: $cyan-border;
+    color: $cyan-light;
+  }
+
+  &__title { font-size: 1.0625rem; font-weight: 700; margin-bottom: 0.5rem; }
+  &__desc  { font-size: 0.875rem; color: $text-faint; line-height: 1.65; }
+
+  &__tag {
+    display: inline-block;
+    margin-top: 1rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: $cyan-light;
+  }
+}
+
 // === WHY US ===
 .why-grid {
   display: grid;
