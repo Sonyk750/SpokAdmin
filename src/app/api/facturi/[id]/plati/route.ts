@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     where:  { id, organizationId: orgId },
     select: {
       id: true, valoare: true, status: true, furnizorId: true, asociatieId: true,
-      plati:        { select: { id: true, suma: true, data: true, metoda: true, notes: true }, orderBy: { data: "asc" } },
+      plati:        { select: { id: true, suma: true, data: true, metoda: true, fondName: true, notes: true }, orderBy: { data: "asc" } },
       avansMiscari: { select: { id: true, suma: true, tip: true, data: true, notes: true, plataId: true }, orderBy: { data: "asc" } },
     },
   });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { id } = await params;
-  const body = await req.json() as { suma?: number; metoda?: string; data?: string | null; notes?: string | null };
+  const body = await req.json() as { suma?: number; metoda?: string; fondId?: string | null; data?: string | null; notes?: string | null };
 
   const suma = Number(body.suma);
   if (!suma || isNaN(suma) || suma <= 0)
@@ -66,6 +66,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
 
+  // Fondul din care se plătește (opțional) — trebuie să aparțină asociației.
+  let fondId: string | null = null;
+  let fondName: string | null = null;
+  if (body.fondId) {
+    const fond = await db.fondAsociatie.findFirst({
+      where:  { id: body.fondId, asociatieId: factura.asociatieId },
+      select: { id: true, name: true },
+    });
+    if (!fond) return NextResponse.json({ error: "Fond invalid." }, { status: 400 });
+    fondId = fond.id; fondName = fond.name;
+  }
+
   const acoperit = computeAcoperit(factura.plati, factura.avansMiscari);
   const rest     = r2(factura.valoare - acoperit);
   const surplus  = r2(suma - rest);
@@ -82,6 +94,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         facturaId: factura.id,
         suma:      r2(suma),
         metoda,
+        fondId,
+        fondName,
         data:      body.data ? new Date(body.data) : new Date(),
         notes:     body.notes?.trim() || null,
       },

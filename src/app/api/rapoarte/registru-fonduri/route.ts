@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   const baseSold = baseAgg._sum.sold ?? 0;
 
   const incasariWhere = { asociatieId, organizationId: orgId, ...(apartamentId ? { apartamentId } : {}) };
-  const [incasari, transferuri, fondAp] = await Promise.all([
+  const [incasari, transferuri, fondAp, platiFond] = await Promise.all([
     db.incasare.findMany({
       where:  incasariWhere,
       select: { id: true, apartamentId: true, data: true, serie: true, numarDocument: true, nrApartament: true, proprietarNume: true, pozitiiJson: true, avansJson: true, createdAt: true },
@@ -107,19 +107,40 @@ export async function GET(req: NextRequest) {
       where:  { apartamentId, fondId, asociatieId },
       select: { sold: true, restanta: true },
     }) : Promise.resolve(null),
+    // Plăți de facturi din acest fond (ieșiri) — doar la nivel de asociație
+    apartamentId ? Promise.resolve([]) : db.plata.findMany({
+      where:  { fondId, factura: { asociatieId, organizationId: orgId } },
+      select: { id: true, data: true, suma: true, metoda: true, createdAt: true,
+        factura: { select: { serie: true, numar: true, furnizor: { select: { nume: true } } } } },
+    }),
   ]);
 
   let soldInitial = baseSold;
   for (const i of incasari) if (i.data < start) soldInitial += contribFond(i.pozitiiJson, i.avansJson, fondId);
   for (const t of transferuri) if (t.data < start) soldInitial += (t.inFondId === fondId ? t.suma : 0) - (t.dinFondId === fondId ? t.suma : 0);
+  for (const p of platiFond) if (p.data < start) soldInitial -= p.suma;
 
   type Op = {
-    id: string; data: string; fel: "contributie" | "transfer";
+    id: string; data: string; fel: "contributie" | "transfer" | "plata";
     document: string; detalii: string; intrare: number; iesire: number;
     apartamentId?: string; nrApartament?: string;
     _dataMs: number; _createdMs: number;
   };
   const ops: Op[] = [];
+
+  for (const p of platiFond) {
+    if (p.data < start || p.data > end) continue;
+    const furn  = p.factura?.furnizor?.nume ?? "Furnizor";
+    const facNr = [p.factura?.serie, p.factura?.numar].filter(Boolean).join(" ");
+    const metLabel = p.metoda === "casa" ? "casă" : p.metoda === "banca" ? "bancă" : p.metoda;
+    ops.push({
+      id: p.id, data: p.data.toISOString(), fel: "plata",
+      document: facNr || "Factură",
+      detalii:  `Plată ${furn} (din ${metLabel})`,
+      intrare: 0, iesire: p.suma,
+      _dataMs: p.data.getTime(), _createdMs: p.createdAt.getTime(),
+    });
+  }
 
   for (const i of incasari) {
     if (i.data < start || i.data > end) continue;

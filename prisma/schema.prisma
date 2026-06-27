@@ -313,6 +313,7 @@ model FondAsociatie {
 
   asociatie Asociatie       @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
   solduri   FondApartament[]
+  plati     Plata[]
 
   @@index([asociatieId])
 }
@@ -409,14 +410,18 @@ model Plata {
   facturaId String
   suma      Float
   data      DateTime @default(now())
-  metoda    String   @default("banca") // casa / banca / online
+  metoda    String   @default("banca") // casa / banca / online (sursa banilor)
+  fondId    String? // fondul din care se plătește (reparații / rulment / penalități ...)
+  fondName  String? // snapshot nume fond
   notes     String?
   createdAt DateTime @default(now())
 
   factura      Factura                @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  fond         FondAsociatie?         @relation(fields: [fondId], references: [id], onDelete: SetNull)
   avansMiscari AvansFurnizorMiscare[]
 
   @@index([facturaId])
+  @@index([fondId])
 }
 
 // ─── Avans furnizor (supraplată / prepayment) ─────────────────────────────────

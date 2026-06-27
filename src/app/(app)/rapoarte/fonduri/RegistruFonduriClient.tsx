@@ -6,7 +6,7 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 interface Operatiune {
   id:            string;
   data:          string;
-  fel:           "contributie" | "transfer";
+  fel:           "contributie" | "transfer" | "plata";
   document:      string;
   detalii:       string;
   intrare:       number;
@@ -41,9 +41,9 @@ interface ApartamentItem {
 
 const fmt2 = (v: number) => v.toFixed(2);
 
-const felLabel = (fel: Operatiune["fel"]) => fel === "contributie" ? "Contribuție" : "Transfer";
-const felColor = (fel: Operatiune["fel"]) => fel === "contributie" ? "#4ade80" : "#22d3ee";
-const felColorPdf = (fel: Operatiune["fel"]) => fel === "contributie" ? "#1a7f37" : "#0e7490";
+const felLabel = (fel: Operatiune["fel"]) => fel === "contributie" ? "Contribuție" : fel === "plata" ? "Plată" : "Transfer";
+const felColor = (fel: Operatiune["fel"]) => fel === "contributie" ? "#4ade80" : fel === "plata" ? "#f87171" : "#22d3ee";
+const felColorPdf = (fel: Operatiune["fel"]) => fel === "contributie" ? "#1a7f37" : fel === "plata" ? "#b91c1c" : "#0e7490";
 
 function roDate(iso: string) {
   return new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });

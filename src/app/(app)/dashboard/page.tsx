@@ -47,7 +47,7 @@ export default async function DashboardPage() {
     )
   )).filter((l): l is { id: string } => !!l).map(l => l.id);
 
-  const [listaAgg, listaHeaderAgg, facturiAgg, platiAgg, platiByMetoda, incByTip, fondRestAgg, fondSold, fondNames] = await Promise.all([
+  const [listaAgg, listaHeaderAgg, facturiAgg, platiAgg, platiByMetoda, incByTip, fondRestAgg, fondSold, fondNames, platiFondAgg] = await Promise.all([
     db.listaLunaApartament.aggregate({
       where: { listaId: { in: ultimeleListe } },
       _sum:  { totalDePlata: true, achitat: true, rest: true, restantaVeche: true, totalLuna: true },
@@ -60,6 +60,7 @@ export default async function DashboardPage() {
     db.fondApartament.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { restanta: true } }),
     db.fondApartament.groupBy({ by: ["fondId"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sold: true } }),
     db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds } }, select: { id: true, name: true } }),
+    db.plata.groupBy({ by: ["fondId"], where: { fondId: { not: null }, factura: { asociatieId: { in: asociatiiIds } } }, _sum: { suma: true } }),
   ]);
 
   const totalDePlata       = listaAgg._sum.totalDePlata  ?? 0;
@@ -78,12 +79,14 @@ export default async function DashboardPage() {
   const tip    = (t: string) => incByTip.find(x => x.tipPlata === t)?._sum.sumaIncasata ?? 0;
   const incTotal = incByTip.reduce((s, x) => s + (x._sum.sumaIncasata ?? 0), 0);
 
-  // Solduri fonduri agregate pe nume (între asociații), top 6
+  // Solduri fonduri agregate pe nume (între asociații), top 6 — minus plățile din fond
   const nameById = new Map(fondNames.map(f => [f.id, f.name]));
+  const platiFondById = new Map(platiFondAgg.map(p => [p.fondId, p._sum.suma ?? 0]));
   const byName   = new Map<string, number>();
   for (const r of fondSold) {
     const nm = nameById.get(r.fondId) ?? "Fond";
-    byName.set(nm, (byName.get(nm) ?? 0) + (r._sum.sold ?? 0));
+    const platit = platiFondById.get(r.fondId) ?? 0;
+    byName.set(nm, (byName.get(nm) ?? 0) + (r._sum.sold ?? 0) - platit);
   }
   const fonduriTop = [...byName.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([label, value]) => ({ label, value }));

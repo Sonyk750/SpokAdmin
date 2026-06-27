@@ -21,11 +21,20 @@ async function computeBalances(asociatieId: string, orgId: string) {
     where: { asociatieId, organizationId: orgId },
   });
 
+  // Plăți de facturi efectuate din fonduri (ieșiri)
+  const platiFond = await db.plata.groupBy({
+    by:    ["fondId"],
+    where: { fondId: { not: null }, factura: { asociatieId, organizationId: orgId } },
+    _sum:  { suma: true },
+  });
+  const platiById = new Map(platiFond.map(p => [p.fondId, p._sum.suma ?? 0]));
+
   const balances = fonduri.map(f => {
     const baza  = bazaById.get(f.id) ?? 0;
     const intra = transferuri.filter(t => t.inFondId  === f.id).reduce((s, t) => s + t.suma, 0);
     const iesi  = transferuri.filter(t => t.dinFondId === f.id).reduce((s, t) => s + t.suma, 0);
-    return { id: f.id, name: f.name, balance: baza + intra - iesi };
+    const plati = platiById.get(f.id) ?? 0;
+    return { id: f.id, name: f.name, balance: baza + intra - iesi - plati };
   });
 
   return { fonduri: balances, transferuri };
