@@ -648,9 +648,10 @@ export default function WizardClient({
           if (idx >= 0) {
             next[idx] = {
               ...next[idx],
-              numeComplet: numeComplet || next[idx].numeComplet,
-              telefon:     telefon     || next[idx].telefon,
-              emailuri:    email ? [email, ...next[idx].emailuri.filter(Boolean).filter(em => em !== email)] : next[idx].emailuri,
+              numeComplet: numeComplet !== "" ? numeComplet : next[idx].numeComplet,
+              telefon:     telefon     !== "" ? telefon     : next[idx].telefon,
+              // Suprascrie complet emailurile cu ce vine din XLS (curăță date greșite din importuri anterioare)
+              emailuri:    email !== "" ? [email] : next[idx].emailuri,
             };
           }
         });
