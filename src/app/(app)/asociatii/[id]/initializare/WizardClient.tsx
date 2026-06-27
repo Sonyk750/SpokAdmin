@@ -631,38 +631,36 @@ export default function WizardClient({
       const wb = XLSX.read(data, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      // Skip header row if first cell is not a number
-      const dataRows = rows.filter((r, i) => {
-        if (i === 0) {
-          const first = String(r[0] ?? "").trim();
-          return !isNaN(Number(first)) && first !== "";
-        }
-        return true;
+      // Păstrează doar rândurile cu număr valid în coloana 1 (sare antetul automat)
+      const dataRows = rows.filter(r => {
+        const first = String(r[0] ?? "").trim();
+        return !isNaN(Number(first)) && first !== "";
       });
       if (dataRows.length === 0) return;
+
       setApartamente(prev => {
-        const next = [...prev];
-        dataRows.forEach(row => {
+        // Construiește lista exactă din XLS, păstrând id/scara/etaj dacă ap. exista deja
+        const prevMap = new Map(prev.map(ap => [ap.numar, ap]));
+        const xlsAps: ApartRow[] = dataRows.map(row => {
           const numar     = String(row[0] ?? "").trim();
           const suprafata = String(row[1] ?? "").trim();
           const nrPersone = String(row[2] ?? "").trim();
           const cotaParte = String(row[3] ?? "").trim();
-          if (!numar) return;
-          const idx = next.findIndex(ap => ap.numar === numar);
-          if (idx >= 0) {
-            next[idx] = {
-              ...next[idx],
-              suprafata: suprafata || next[idx].suprafata,
-              nrPersone: nrPersone || next[idx].nrPersone,
-              cotaParte: cotaParte || next[idx].cotaParte,
-            };
-          } else {
-            next.push({ numar, scara: "", etaj: "", suprafata, nrPersone: nrPersone || "2", cotaParte });
-          }
+          const existing  = prevMap.get(numar);
+          return {
+            ...(existing ?? {}),
+            numar,
+            scara:     existing?.scara     ?? "",
+            etaj:      existing?.etaj      ?? "",
+            suprafata: suprafata !== "" ? suprafata : (existing?.suprafata ?? ""),
+            nrPersone: nrPersone !== "" ? nrPersone : (existing?.nrPersone ?? ""),
+            cotaParte: cotaParte !== "" ? cotaParte : (existing?.cotaParte ?? ""),
+          } as ApartRow;
         });
-        return next;
+        return xlsAps;
       });
-      setNrAp(prev => Math.max(prev, dataRows.length));
+      // Actualizează contorul la numărul exact de apartamente din XLS
+      setNrAp(dataRows.length);
     };
     reader.readAsArrayBuffer(file);
     e.target.value = "";
