@@ -618,8 +618,48 @@ export default function WizardClient({
     finally { setSaving(false); }
   }, []);
 
-  // ─── XLS import ref ───────────────────────────────────────────────────────
-  const xlsInputRef = useRef<HTMLInputElement>(null);
+  // ─── XLS import refs ──────────────────────────────────────────────────────
+  const xlsInputRef     = useRef<HTMLInputElement>(null);
+  const xlsPropInputRef = useRef<HTMLInputElement>(null);
+
+  function handleXlsPropImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = ev.target?.result;
+      if (!data) return;
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const dataRows = rows.filter(r => {
+        const first = String(r[0] ?? "").trim();
+        return !isNaN(Number(first)) && first !== "";
+      });
+      if (dataRows.length === 0) return;
+      setProprietari(prev => {
+        const next = [...prev];
+        dataRows.forEach(row => {
+          const numar       = String(row[0] ?? "").trim();
+          const numeComplet = String(row[1] ?? "").trim();
+          const telefon     = String(row[2] ?? "").trim();
+          const email       = String(row[3] ?? "").trim();
+          const idx = next.findIndex(p => p.numar === numar);
+          if (idx >= 0) {
+            next[idx] = {
+              ...next[idx],
+              numeComplet: numeComplet || next[idx].numeComplet,
+              telefon:     telefon     || next[idx].telefon,
+              emailuri:    email ? [email, ...next[idx].emailuri.filter(Boolean).filter(em => em !== email)] : next[idx].emailuri,
+            };
+          }
+        });
+        return next;
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
 
   function handleXlsImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1028,6 +1068,38 @@ export default function WizardClient({
           {propTab === "date" && (
             <div className="contur-tab-body">
               <p className="wizard__step-desc" style={{ marginBottom: "1rem" }}>Asociază un proprietar principal fiecărui apartament.</p>
+
+              {/* Import XLS proprietari */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "0 0 1rem" }}>
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    onClick={() => xlsPropInputRef.current?.click()}
+                    title="Importă date proprietari din fișier Excel"
+                  >
+                    ⬆ Importă XLS
+                  </button>
+                  <input
+                    ref={xlsPropInputRef}
+                    type="file"
+                    accept=".xls,.xlsx,.ods,.csv"
+                    style={{ display: "none" }}
+                    onChange={handleXlsPropImport}
+                  />
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
+                  Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>4 coloane</strong>, în această ordine:<br />
+                  <span style={{ color: "#cbd5e1" }}>
+                    Coloana 1: Nr. apartament &nbsp;·&nbsp;
+                    Coloana 2: Nume și prenume &nbsp;·&nbsp;
+                    Coloana 3: Telefon &nbsp;·&nbsp;
+                    Coloana 4: Email
+                  </span><br />
+                  Primul rând cu text (antet) este ignorat automat.
+                </div>
+              </div>
+
               <div className="table-wrap">
                 <table className="data-table">
                   <thead>
