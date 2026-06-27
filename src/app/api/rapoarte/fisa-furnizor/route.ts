@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { computeAcoperit, getAvansSold } from "@/lib/avans-furnizor";
 
 // Fișă furnizor — extras pe furnizor: facturi, plăți, sold curent.
 export async function GET(req: NextRequest) {
@@ -29,22 +30,24 @@ export async function GET(req: NextRequest) {
   const facturiAll = await db.factura.findMany({
     where:  { furnizorId, asociatieId, organizationId: orgId },
     select: { id: true, serie: true, numar: true, valoare: true, status: true, categorie: true, dataEmiterii: true, createdAt: true,
-      plati: { select: { id: true, suma: true, data: true, metoda: true } } },
+      plati:        { select: { id: true, suma: true, data: true, metoda: true } },
+      avansMiscari: { select: { suma: true } } },
   });
 
   let allFacturat = 0, allPlatit = 0;
   for (const f of facturiAll) {
     allFacturat += f.valoare;
-    for (const p of f.plati) allPlatit += p.suma;
+    for (const p of f.plati) allPlatit += p.suma; // numerar real (avansul se anulează în sold)
   }
   const soldCurent = allFacturat - allPlatit;
+  const avansSold  = await getAvansSold(db, asociatieId, furnizorId);
 
   // Facturi în perioadă (după data emiterii sau, în lipsă, data creării)
   const facturiPerioada = facturiAll
     .map(f => {
       const dataEff = f.dataEmiterii ?? f.createdAt;
-      const platit = f.plati.reduce((s, p) => s + p.suma, 0);
-      return { id: f.id, data: dataEff, document: [f.serie, f.numar].filter(Boolean).join(" ") || "—", categorie: f.categorie, valoare: f.valoare, platit, rest: f.valoare - platit, status: f.status };
+      const platit = computeAcoperit(f.plati, f.avansMiscari);
+      return { id: f.id, data: dataEff, document: [f.serie, f.numar].filter(Boolean).join(" ") || "—", categorie: f.categorie, valoare: f.valoare, platit, rest: Math.round((f.valoare - platit) * 100) / 100, status: f.status };
     })
     .filter(f => f.data >= start && f.data <= end)
     .sort((a, b) => a.data.getTime() - b.data.getTime());
@@ -62,6 +65,7 @@ export async function GET(req: NextRequest) {
     totalFacturat: facturiPerioada.reduce((s, f) => s + f.valoare, 0),
     totalPlatit:   plati.reduce((s, p) => s + p.suma, 0),
     soldCurent,
+    avansSold,
     facturi: facturiPerioada.map(f => ({ ...f, data: f.data.toISOString() })),
     plati:   plati.map(p => ({ ...p, data: p.data.toISOString() })),
   });

@@ -152,6 +152,7 @@ model Asociatie {
   statePlata       StatPlata[]
   asocUsers        AsociatieUser[]
   invitations      UserInvitation[]
+  avansuriFurnizori AvansFurnizor[]
 
   @@index([organizationId])
 }
@@ -351,6 +352,7 @@ model Furnizor {
   organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   asociatii    FurnizorAsociatie[]
   facturi      Factura[]
+  avansuri     AvansFurnizor[]
 
   @@index([organizationId])
 }
@@ -391,9 +393,10 @@ model Factura {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  asociatie Asociatie @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
-  furnizor  Furnizor? @relation(fields: [furnizorId], references: [id])
-  plati     Plata[]
+  asociatie    Asociatie @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  furnizor     Furnizor? @relation(fields: [furnizorId], references: [id])
+  plati        Plata[]
+  avansMiscari AvansFurnizorMiscare[]
 
   @@index([asociatieId])
   @@index([organizationId])
@@ -410,9 +413,53 @@ model Plata {
   notes     String?
   createdAt DateTime @default(now())
 
-  factura Factura @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  factura      Factura                @relation(fields: [facturaId], references: [id], onDelete: Cascade)
+  avansMiscari AvansFurnizorMiscare[]
 
   @@index([facturaId])
+}
+
+// ─── Avans furnizor (supraplată / prepayment) ─────────────────────────────────
+// Sold de avans per (asociație, furnizor). Se alimentează din supraplăți și se
+// consumă automat la facturi noi de la același furnizor.
+
+model AvansFurnizor {
+  id             String   @id @default(cuid())
+  organizationId String
+  asociatieId    String
+  furnizorId     String
+  sold           Float    @default(0) // avans disponibil (neconsumat)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  asociatie Asociatie @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  furnizor  Furnizor  @relation(fields: [furnizorId], references: [id], onDelete: Cascade)
+  miscari   AvansFurnizorMiscare[]
+
+  @@unique([asociatieId, furnizorId])
+  @@index([organizationId])
+  @@index([asociatieId])
+}
+
+model AvansFurnizorMiscare {
+  id        String   @id @default(cuid())
+  avansId   String
+  facturaId String? // factura sursă (depunere) sau pe care s-a aplicat (consum)
+  plataId   String? // plata care a generat depunerea (pentru anulare)
+  data      DateTime @default(now())
+  suma      Float // + depunere (din supraplată) / - consum (aplicat pe factură)
+  tip       String // depunere | consum
+  metoda    String? // casa / banca / online (pentru depuneri; consumul nu mișcă numerar)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  avans   AvansFurnizor @relation(fields: [avansId], references: [id], onDelete: Cascade)
+  factura Factura?      @relation(fields: [facturaId], references: [id], onDelete: SetNull)
+  plata   Plata?        @relation(fields: [plataId], references: [id], onDelete: SetNull)
+
+  @@index([avansId])
+  @@index([facturaId])
+  @@index([plataId])
 }
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ ÃƒÅ½ncasÃ„Æ’ri proprietari Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬

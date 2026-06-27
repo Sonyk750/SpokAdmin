@@ -7,7 +7,7 @@ interface FactRow { id: string; data: string; document: string; categorie: strin
 interface PlataRow { id: string; data: string; suma: number; metoda: string; document: string; }
 interface Fisa {
   furnizor: { nume: string; cui: string | null; telefon: string | null; email: string | null };
-  totalFacturat: number; totalPlatit: number; soldCurent: number;
+  totalFacturat: number; totalPlatit: number; soldCurent: number; avansSold?: number;
   facturi: FactRow[]; plati: PlataRow[];
 }
 interface Furnizor { id: string; nume: string; cui: string | null; }
@@ -181,6 +181,9 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
               <div><div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", color: "#475569" }}>Facturat (perioadă)</div><div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#a78bfa" }}>{fmt2(fisa.totalFacturat)} lei</div></div>
               <div><div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", color: "#475569" }}>Plătit (perioadă)</div><div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#4ade80" }}>{fmt2(fisa.totalPlatit)} lei</div></div>
               <div><div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", color: "#475569" }}>Sold curent (de plată)</div><div style={{ fontSize: "1.25rem", fontWeight: 800, color: fisa.soldCurent > 0 ? "#f87171" : "#64748b" }}>{fmt2(fisa.soldCurent)} lei</div></div>
+              {(fisa.avansSold ?? 0) > 0.01 && (
+                <div><div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", color: "#475569" }}>Avans disponibil</div><div style={{ fontSize: "1.25rem", fontWeight: 800, color: "#38bdf8" }}>{fmt2(fisa.avansSold ?? 0)} lei</div></div>
+              )}
             </div>
           </div>
 

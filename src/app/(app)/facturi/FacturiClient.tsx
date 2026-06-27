@@ -26,6 +26,15 @@ interface FacturaRow {
   distribuireJson:string | null;
   notes:          string | null;
   plati:          { suma: number }[];
+  acoperit?:      number;
+  rest?:          number;
+}
+
+interface PlataRow { id: string; suma: number; data: string; metoda: string; notes: string | null; }
+interface AvansMiscareRow { id: string; suma: number; tip: string; data: string; notes: string | null; plataId: string | null; }
+interface PlataData {
+  valoare: number; acoperit: number; rest: number; status: string; avansSold: number;
+  plati: PlataRow[]; avansMiscari: AvansMiscareRow[];
 }
 
 interface ApRow {
@@ -70,7 +79,7 @@ interface Transa {
   filtru:     FiltruDist;
 }
 
-type ModalMode = "none" | "adauga" | "editeaza" | "distribuie";
+type ModalMode = "none" | "adauga" | "editeaza" | "distribuie" | "plata";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -97,6 +106,18 @@ const CONSUM_TIPURI: { value: string; label: string }[] = [
 
 const STATUS_LABEL: Record<string, string> = { neplatita: "Neachitată", partial: "Parțial", platita: "Achitată" };
 const STATUS_PILL:  Record<string, string> = { neplatita: "pill--red",  partial: "pill--yellow", platita: "pill--green" };
+
+const METODE: { value: string; label: string }[] = [
+  { value: "banca",  label: "Bancă" },
+  { value: "casa",   label: "Casă" },
+  { value: "online", label: "Online" },
+];
+const metodaLabel = (m: string) => METODE.find(x => x.value === m)?.label ?? m;
+
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -226,6 +247,16 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [grupForm, setGrupForm] = useState<{ transaId: string; name: string; selected: string[] } | null>(null);
   const [grupNameErr, setGrupNameErr] = useState(false);
 
+  // ── Plată state ─────────────────────────────────────────────────────────────
+  const [plataData,   setPlataData]   = useState<PlataData | null>(null);
+  const [plataForm,   setPlataForm]   = useState({ suma: "", metoda: "banca", data: todayISO(), notes: "" });
+  const [plataLoading,setPlataLoading]= useState(false);
+  const [plataSaving, setPlataSaving] = useState(false);
+  const [plataErr,    setPlataErr]    = useState<string | null>(null);
+
+  // ── Avans disponibil la furnizorul din formularul de adăugare ───────────────
+  const [avansFurnizor, setAvansFurnizor] = useState(0);
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const availableConsumuri = CONSUM_TIPURI.filter(ct =>
@@ -278,6 +309,19 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   }, [asociatieId, fStatus, fLuna, fAn]);
 
   useEffect(() => { fetchFacturi(); }, [fetchFacturi]);
+
+  // ── Avans disponibil la furnizorul selectat (în formularul de adăugare) ─────
+  useEffect(() => {
+    if (modal !== "adauga" || !asociatieId) { setAvansFurnizor(0); return; }
+    const furn = furnizori.find(f => f.nume.trim().toLowerCase() === form.furnizorNume.trim().toLowerCase());
+    if (!furn) { setAvansFurnizor(0); return; }
+    let cancelled = false;
+    fetch(`/api/avans-furnizor?asociatieId=${asociatieId}&furnizorId=${furn.id}`)
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setAvansFurnizor(Number(d?.sold) || 0); })
+      .catch(() => { if (!cancelled) setAvansFurnizor(0); });
+    return () => { cancelled = true; };
+  }, [modal, form.furnizorNume, asociatieId, furnizori]);
 
   // ── Open modals ───────────────────────────────────────────────────────────
 
@@ -371,10 +415,73 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     }
   }
 
+  // ── Plată facturi ───────────────────────────────────────────────────────────
+
+  async function loadPlataData(facturaId: string) {
+    setPlataLoading(true);
+    try {
+      const res  = await fetch(`/api/facturi/${facturaId}/plati`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      setPlataData(json);
+      return json as PlataData;
+    } catch (e: any) {
+      setPlataErr(e.message);
+      return null;
+    } finally {
+      setPlataLoading(false);
+    }
+  }
+
+  async function openPlata(f: FacturaRow) {
+    setSelected(f); setModal("plata"); setPlataErr(null); setPlataData(null);
+    const data = await loadPlataData(f.id);
+    const rest = data?.rest ?? 0;
+    setPlataForm({ suma: rest > 0 ? String(rest) : "", metoda: "banca", data: todayISO(), notes: "" });
+  }
+
+  async function submitPlata() {
+    if (!selected) return;
+    const suma = parseFloat(plataForm.suma);
+    if (!plataForm.suma || isNaN(suma) || suma <= 0) return setPlataErr("Suma trebuie să fie un număr pozitiv.");
+    setPlataSaving(true); setPlataErr(null);
+    try {
+      const res = await fetch(`/api/facturi/${selected.id}/plati`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ suma, metoda: plataForm.metoda, data: plataForm.data || undefined, notes: plataForm.notes.trim() || undefined }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare server");
+      await loadPlataData(selected.id);
+      setPlataForm(prev => ({ ...prev, suma: "", notes: "" }));
+      fetchFacturi();
+    } catch (e: any) {
+      setPlataErr(e.message);
+    } finally {
+      setPlataSaving(false);
+    }
+  }
+
+  async function deletePlata(plataId: string) {
+    if (!selected) return;
+    if (!confirm("Anulezi această plată?")) return;
+    setPlataErr(null);
+    try {
+      const res = await fetch(`/api/facturi/${selected.id}/plati/${plataId}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      await loadPlataData(selected.id);
+      fetchFacturi();
+    } catch (e: any) {
+      setPlataErr(e.message);
+    }
+  }
+
   function closeModal() {
     setModal("none"); setSelected(null);
     setDistAps([]); setTransse([]); setGrupuri([]);
     setGrupForm(null); setPdfMsg(null);
+    setPlataData(null); setPlataErr(null);
   }
 
   // ── Form update ───────────────────────────────────────────────────────────
@@ -640,6 +747,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               <th>Furnizor</th>
               <th>Serie / Nr.</th>
               <th style={{ textAlign: "right" }}>Valoare (lei)</th>
+              <th style={{ textAlign: "right" }}>Rest (lei)</th>
               <th>Perioadă</th>
               <th>Status</th>
               <th style={{ textAlign: "center" }}>Distribuit</th>
@@ -648,10 +756,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={7} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>Se încarcă...</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>Se încarcă...</td></tr>
             )}
             {!loading && facturi.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>
+              <tr><td colSpan={8} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>
                 Nicio factură{fStatus || fLuna || fAn ? " pentru filtrele selectate" : ""}.
               </td></tr>
             )}
@@ -662,6 +770,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   {[f.serie, f.numar].filter(Boolean).join("/") || "—"}
                 </td>
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
+                <td style={{ textAlign: "right", fontWeight: 700, color: (f.rest ?? f.valoare) > 0.01 ? "#f87171" : "#4ade80" }}>
+                  {fmt2(f.rest ?? f.valoare)}
+                </td>
                 <td>{lunaPeriod(f.luna, f.an)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
@@ -671,6 +782,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: "0.375rem", justifyContent: "flex-end" }}>
+                    <button className="btn-action" onClick={() => openPlata(f)} title="Achită / plăți">💳</button>
                     <button className="btn-action" onClick={() => openDistribuie(f)} title="Distribuire pe apartamente">⊞</button>
                     <button className="btn-action" onClick={() => openEditeaza(f)} title="Editează">✎</button>
                     <button className="btn-action btn-action--danger" onClick={() => deleteFactura(f)} title="Șterge">×</button>
@@ -707,6 +819,11 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   <input type="text" className="input" placeholder="Tastează sau selectează..." list="furnizori-list"
                     value={form.furnizorNume} onChange={e => setF("furnizorNume", e.target.value)} />
                   <datalist id="furnizori-list">{furnizori.map(f => <option key={f.id} value={f.nume} />)}</datalist>
+                  {modal === "adauga" && avansFurnizor > 0.01 && (
+                    <div style={{ fontSize: "0.78rem", color: "#4ade80", marginTop: "0.375rem" }}>
+                      ⓘ Avans disponibil la acest furnizor: <strong>{fmt2(avansFurnizor)} lei</strong> — se aplică automat pe factură la salvare.
+                    </div>
+                  )}
                 </div>
                 <div className="form-field">
                   <label className="form-field__label">Serie</label>
@@ -756,6 +873,125 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
           </div>
         </div>
       )}
+
+      {/* ── Modal Plată ────────────────────────────────────────────────────── */}
+      {modal === "plata" && selected && (() => {
+        const restNow = plataData?.rest ?? 0;
+        const sumaN   = parseFloat(plataForm.suma) || 0;
+        const surplus = Math.round((sumaN - restNow) * 100) / 100;
+        const hasFurnizor = !!selected.furnizor;
+        return (
+        <div className="modal-overlay">
+          <div className="modal">
+            <div className="modal__header">
+              <div>
+                <h2 className="modal__title">Plăți factură</h2>
+                <p style={{ fontSize: "0.8125rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+                  {selected.furnizor?.nume ?? "Furnizor necunoscut"}
+                  {selected.serie || selected.numar ? ` · ${[selected.serie, selected.numar].filter(Boolean).join("/")}` : ""}
+                  {" · "}<strong style={{ color: "#a78bfa" }}>{fmt2(selected.valoare)} lei</strong>
+                </p>
+              </div>
+              <button className="modal__close" onClick={closeModal}>✕</button>
+            </div>
+            <div className="modal__body">
+              {plataLoading && !plataData && <div style={{ textAlign: "center", color: "#475569", padding: "1.5rem" }}>Se încarcă...</div>}
+
+              {plataData && (<>
+                {/* Sumar */}
+                <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Valoare</div><div style={{ fontWeight: 800, color: "#a78bfa" }}>{fmt2(plataData.valoare)}</div></div>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Plătit</div><div style={{ fontWeight: 800, color: "#4ade80" }}>{fmt2(plataData.acoperit)}</div></div>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Rest</div><div style={{ fontWeight: 800, color: plataData.rest > 0.01 ? "#f87171" : "#4ade80" }}>{fmt2(plataData.rest)}</div></div>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Status</div><div><span className={`pill ${STATUS_PILL[plataData.status] ?? "pill--gray"}`}>{STATUS_LABEL[plataData.status] ?? plataData.status}</span></div></div>
+                  {hasFurnizor && (
+                    <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Avans furnizor</div><div style={{ fontWeight: 800, color: plataData.avansSold > 0.01 ? "#38bdf8" : "#64748b" }}>{fmt2(plataData.avansSold)}</div></div>
+                  )}
+                </div>
+
+                {/* Formular plată nouă */}
+                <div className="form-grid form-grid--2">
+                  <div className="form-field">
+                    <label className="form-field__label">Sumă (lei) *</label>
+                    <input type="number" className="input" step="0.01" min="0.01" value={plataForm.suma}
+                      onChange={e => setPlataForm(p => ({ ...p, suma: e.target.value }))} />
+                  </div>
+                  <div className="form-field">
+                    <label className="form-field__label">Metodă</label>
+                    <select className="input" value={plataForm.metoda} onChange={e => setPlataForm(p => ({ ...p, metoda: e.target.value }))}>
+                      {METODE.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label className="form-field__label">Data</label>
+                    <input type="date" className="input" value={plataForm.data} onChange={e => setPlataForm(p => ({ ...p, data: e.target.value }))} />
+                  </div>
+                  <div className="form-field">
+                    <label className="form-field__label">Note</label>
+                    <input type="text" className="input" value={plataForm.notes} onChange={e => setPlataForm(p => ({ ...p, notes: e.target.value }))} />
+                  </div>
+                </div>
+
+                {surplus > 0.01 && hasFurnizor && (
+                  <div style={{ fontSize: "0.8rem", color: "#38bdf8", marginTop: "0.5rem" }}>
+                    ⓘ Surplus de <strong>{fmt2(surplus)} lei</strong> → se adaugă ca avans la {selected.furnizor?.nume}.
+                  </div>
+                )}
+                {surplus > 0.01 && !hasFurnizor && (
+                  <div style={{ fontSize: "0.8rem", color: "#fbbf24", marginTop: "0.5rem" }}>
+                    ⚠ Suma depășește restul, dar factura nu are furnizor — atribuie un furnizor (editează factura) pentru a putea înregistra avansul.
+                  </div>
+                )}
+
+                <div style={{ marginTop: "0.75rem" }}>
+                  <button className="btn btn--primary" onClick={submitPlata} disabled={plataSaving}>
+                    {plataSaving ? "Se înregistrează..." : "Înregistrează plata"}
+                  </button>
+                </div>
+
+                {/* Istoric */}
+                {(plataData.plati.length > 0 || plataData.avansMiscari.length > 0) && (
+                  <div style={{ marginTop: "1.25rem" }}>
+                    <div className="form-field__label" style={{ marginBottom: "0.5rem" }}>Istoric</div>
+                    <div className="table-wrap">
+                      <table className="data-table" style={{ fontSize: "0.8125rem" }}>
+                        <thead><tr><th>Data</th><th>Tip</th><th style={{ textAlign: "right" }}>Sumă</th><th /></tr></thead>
+                        <tbody>
+                          {plataData.plati.map(p => (
+                            <tr key={p.id}>
+                              <td style={{ color: "#94a3b8", whiteSpace: "nowrap" }}>{new Date(p.data).toLocaleDateString("ro-RO")}</td>
+                              <td>Plată · {metodaLabel(p.metoda)}{p.notes ? ` — ${p.notes}` : ""}</td>
+                              <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80" }}>{fmt2(p.suma)}</td>
+                              <td style={{ textAlign: "right" }}>
+                                <button className="btn-action btn-action--danger" title="Anulează plata" onClick={() => deletePlata(p.id)}>×</button>
+                              </td>
+                            </tr>
+                          ))}
+                          {plataData.avansMiscari.map(m => (
+                            <tr key={m.id}>
+                              <td style={{ color: "#94a3b8", whiteSpace: "nowrap" }}>{new Date(m.data).toLocaleDateString("ro-RO")}</td>
+                              <td style={{ color: "#38bdf8" }}>{m.tip === "consum" ? "Aplicat din avans" : "Avans (supraplată)"}{m.notes ? ` — ${m.notes}` : ""}</td>
+                              <td style={{ textAlign: "right", fontWeight: 700, color: "#38bdf8" }}>{m.tip === "consum" ? fmt2(Math.abs(m.suma)) : `+${fmt2(m.suma)}`}</td>
+                              <td />
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>)}
+
+              {plataErr && <div className="wizard__error" style={{ marginTop: "1rem" }}>{plataErr}</div>}
+
+              <div className="modal__footer">
+                <button className="btn btn--secondary" onClick={closeModal}>Închide</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        );
+      })()}
 
       {/* ── Modal Distribuire ──────────────────────────────────────────────── */}
       {modal === "distribuie" && selected && (

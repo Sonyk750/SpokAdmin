@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { recomputeFacturaStatus } from "@/lib/avans-furnizor";
+
+const r2 = (v: number) => Math.round(v * 100) / 100;
+const EPS = 0.01;
 
 async function getFactura(id: string, orgId: string) {
   return db.factura.findFirst({ where: { id, organizationId: orgId } });
@@ -76,6 +80,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     },
   });
 
+  // Dacă valoarea s-a schimbat (și clientul nu a impus un status explicit),
+  // recalculează statusul în funcție de plăți/avans.
+  if (body.valoare !== undefined && body.status === undefined) {
+    await recomputeFacturaStatus(db, id);
+  }
+
   return NextResponse.json(updated);
 }
 
@@ -85,9 +95,41 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { id } = await params;
-  const factura = await getFactura(id, orgId);
+  const factura = await db.factura.findFirst({
+    where:  { id, organizationId: orgId },
+    select: {
+      id: true,
+      avansMiscari: { select: { id: true, suma: true, avansId: true, avans: { select: { sold: true } } } },
+    },
+  });
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
 
-  await db.factura.delete({ where: { id } });
+  // O depunere generată de această factură nu poate fi anulată dacă avansul
+  // respectiv a fost deja consumat pe altă factură.
+  for (const m of factura.avansMiscari) {
+    if (m.suma > 0 && r2(m.avans.sold) < r2(m.suma) - EPS) {
+      return NextResponse.json(
+        { error: "Nu se poate șterge: supraplata acestei facturi a generat un avans deja folosit pe altă factură." },
+        { status: 409 },
+      );
+    }
+  }
+
+  // Net delta per avans (poate avea mai multe mișcări pe același avans).
+  const deltaByAvans = new Map<string, { sold: number; delta: number }>();
+  for (const m of factura.avansMiscari) {
+    const cur = deltaByAvans.get(m.avansId) ?? { sold: m.avans.sold, delta: 0 };
+    cur.delta += m.suma; // depunere (+) și consum (−)
+    deltaByAvans.set(m.avansId, cur);
+  }
+
+  await db.$transaction(async (tx) => {
+    // Reversează efectul asupra soldului: scade depunerile, readaugă consumurile.
+    for (const [avansId, { sold, delta }] of deltaByAvans) {
+      await tx.avansFurnizor.update({ where: { id: avansId }, data: { sold: r2(sold - delta) } });
+    }
+    await tx.factura.delete({ where: { id } }); // plăți + mișcări cascade/SetNull
+  });
+
   return NextResponse.json({ ok: true });
 }
