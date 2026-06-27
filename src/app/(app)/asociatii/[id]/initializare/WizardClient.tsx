@@ -348,9 +348,11 @@ export default function WizardClient({
   const [infoTab,  setInfoTab]  = useState<"info" | "blocuri">("info");
 
   // ── Step 2: Apartamente ──
-  const initAps = existingApartamente.length > 0
-    ? existingApartamente
-    : Array.from({ length: nrApartamente || 1 }, (_, i) => genApartRow(i + 1));
+  const initAps = sortByNumar(
+    existingApartamente.length > 0
+      ? existingApartamente
+      : Array.from({ length: nrApartamente || 1 }, (_, i) => genApartRow(i + 1))
+  );
   const [apartamente, setApartamente] = useState<ApartRow[]>(initAps);
   const [nrAp,        setNrAp]        = useState(nrApartamente || initAps.length);
 
