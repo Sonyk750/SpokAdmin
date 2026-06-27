@@ -13,6 +13,7 @@ const APP_PATHS = [
   "/transferuri",
   "/spv",
   "/utilizatori",
+  "/profil",
 ];
 
 export const authConfig: NextAuthConfig = {
@@ -34,12 +35,16 @@ export const authConfig: NextAuthConfig = {
       }
       return true;
     },
-    jwt({ token, user }) {
+    jwt({ token, user, trigger, session }) {
       if (user) {
         token.id             = user.id as string;
         token.role           = (user as any).role;
         token.organizationId = (user as any).organizationId;
         token.orgRole        = (user as any).orgRole ?? null;
+      }
+      // Reîmprospătare la unstable_update (ex: schimbare nume din profil)
+      if (trigger === "update" && session?.user) {
+        if (typeof session.user.name === "string") token.name = session.user.name;
       }
       return token;
     },

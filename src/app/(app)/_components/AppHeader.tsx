@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAsociatie } from "@/lib/AsociatieContext";
 import { useSidebar } from "@/lib/SidebarContext";
@@ -52,12 +53,12 @@ export default function AppHeader({ userName, orgName }: { userName?: string | n
         )}
       </div>
       <div className="app-header__right">
-        <div className="app-header__user">
+        <Link href="/profil" className="app-header__user" title="Profil" style={{ textDecoration: "none", color: "inherit" }}>
           <div className="app-header__avatar">
             {userName?.[0]?.toUpperCase() ?? "U"}
           </div>
           <span className="app-header__name">{userName ?? "Utilizator"}</span>
-        </div>
+        </Link>
       </div>
     </header>
   );

@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const { handlers, auth, signIn, signOut, unstable_update: updateSession } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(db),
   session: { strategy: "jwt" },
