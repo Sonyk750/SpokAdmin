@@ -75,19 +75,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ contoare: [] });
     }
 
-    // Creăm toate contoarele în batch
+    // Idempotent: nu recrea contoare care există deja (ex: cu serie setată),
+    // ca să nu se dubleze la re-rularea inițializării.
+    const existente = await db.contor.findMany({
+      where:  { asociatieId: id },
+      select: { apartamentId: true, tip: true, locatie: true, denumire: true },
+    });
+    const existKey = new Set(existente.map(c => `${c.apartamentId}|${c.tip}|${c.locatie ?? ""}|${c.denumire ?? ""}`));
+
+    // Creăm doar contoarele lipsă
     const rows = asociatie.apartamente.flatMap(ap =>
-      tmpls.map(t => ({
-        apartamentId:   ap.id,
-        asociatieId:    id,
-        organizationId: orgId,
-        tip:            t.tip,
-        locatie:        t.locatie,
-        denumire:       t.denumire,
-      }))
+      tmpls
+        .filter(t => !existKey.has(`${ap.id}|${t.tip}|${t.locatie}|${t.denumire}`))
+        .map(t => ({
+          apartamentId:   ap.id,
+          asociatieId:    id,
+          organizationId: orgId,
+          tip:            t.tip,
+          locatie:        t.locatie,
+          denumire:       t.denumire,
+        }))
     );
 
-    await db.contor.createMany({ data: rows });
+    if (rows.length > 0) await db.contor.createMany({ data: rows });
 
     // Fetch back cu ID-uri pentru step 7
     const saved = await db.contor.findMany({

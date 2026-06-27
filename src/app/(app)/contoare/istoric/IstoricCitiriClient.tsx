@@ -38,6 +38,14 @@ export default function IstoricCitiriClient() {
   const [data, setData] = useState<ApIstoric[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [asoc, setAsoc] = useState<{ name?: string; address?: string | null; city?: string | null } | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+
+  // info asociație (pentru antet PDF)
+  useEffect(() => {
+    if (!asociatieId) { setAsoc(null); return; }
+    fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(setAsoc).catch(() => setAsoc(null));
+  }, [asociatieId]);
 
   // listă apartamente pentru dropdown
   useEffect(() => {
@@ -78,6 +86,54 @@ export default function IstoricCitiriClient() {
   const totalCitiri = useMemo(() =>
     data.reduce((s, ap) => s + ap.contoare.reduce((t, c) => t + c.citiri.length, 0), 0), [data]);
 
+  async function handlePdf() {
+    if (totalCitiri === 0) return;
+    setPdfLoading(true);
+    try {
+      const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
+      const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
+      (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
+
+      const perioada = `${LUNI[lunaStart - 1]} ${anStart} — ${LUNI[lunaEnd - 1]} ${anEnd}`;
+      const content: any[] = [
+        { columns: [
+          { stack: [{ text: asoc?.name ?? "", bold: true, fontSize: 13 }, { text: [asoc?.address, asoc?.city].filter(Boolean).join(", "), fontSize: 9, color: "#333" }], width: "*" },
+          { stack: [{ text: "Perioada", fontSize: 9, color: "#666" }, { text: perioada, bold: true, fontSize: 10 }], width: "auto", alignment: "right" },
+        ] },
+        { canvas: [{ type: "line", x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 10] },
+        { text: "RAPORT INDEX CONTOARE", fontSize: 15, bold: true, alignment: "center", margin: [0, 2, 0, 12] },
+      ];
+
+      for (const ap of data) {
+        const conts = ap.contoare.filter(c => c.citiri.length > 0);
+        if (conts.length === 0) continue;
+        content.push({ text: `Ap. ${ap.numar}${ap.proprietar ? " — " + ap.proprietar : ""}`, bold: true, fontSize: 11, margin: [0, 8, 0, 4] });
+        for (const c of conts) {
+          content.push({ text: `${TIP_LABEL[c.tip] ?? c.tip}${c.denumire ? " · " + c.denumire : ""}${c.numarSerie ? " · serie " + c.numarSerie : ""}  (total: ${fmt2(c.totalConsum)})`, fontSize: 9, color: "#444", margin: [0, 4, 0, 2] });
+          const body = [
+            [ { text: "Perioadă", style: "th" }, { text: "Index vechi", style: "th", alignment: "right" }, { text: "Index nou", style: "th", alignment: "right" }, { text: "Consum", style: "th", alignment: "right" } ],
+            ...[...c.citiri].reverse().map(r => [
+              { text: `${LUNI_SCURT[r.luna - 1]} ${r.an}`, fontSize: 8 },
+              { text: fmt2(r.indexVechi), alignment: "right", fontSize: 8 },
+              { text: fmt2(r.indexNou), alignment: "right", fontSize: 8 },
+              { text: fmt2(r.consum), alignment: "right", fontSize: 8, bold: true },
+            ]),
+          ];
+          content.push({ table: { headerRows: 1, widths: ["*", 70, 70, 70], body },
+            layout: { fillColor: (r: number) => r === 0 ? "#DDDDDD" : r % 2 === 0 ? "#F5F5F5" : null, hLineWidth: () => 0.5, vLineWidth: () => 0.5, hLineColor: () => "#999", vLineColor: () => "#999", paddingTop: () => 2, paddingBottom: () => 2, paddingLeft: () => 4, paddingRight: () => 4 } });
+        }
+      }
+
+      const doc = { pageSize: "A4", pageMargins: [30, 40, 30, 40], content, styles: { th: { bold: true, fontSize: 9 } }, defaultStyle: { font: "Roboto" } };
+      const pm = pdfMake.default ?? pdfMake;
+      pm.createPdf(doc).download(`raport-index-${anStart}-${anEnd}.pdf`);
+    } catch (e: any) {
+      setError(`Eroare PDF: ${e?.message ?? String(e)}`);
+    } finally {
+      setPdfLoading(false);
+    }
+  }
+
   if (!asociatieId) {
     return <div className="page-shell"><div className="wizard__error">Selectează o asociație din antetul paginii.</div></div>;
   }
@@ -89,6 +145,9 @@ export default function IstoricCitiriClient() {
           <h1 className="page-title">Istoric citiri</h1>
           <p className="page-sub">Citirile contoarelor pe apartament, în perioada selectată</p>
         </div>
+        <button className="btn btn--primary" onClick={handlePdf} disabled={pdfLoading || totalCitiri === 0}>
+          {pdfLoading ? "Se generează..." : "⬇ Descarcă raport PDF"}
+        </button>
       </div>
 
       {/* Filtre */}
