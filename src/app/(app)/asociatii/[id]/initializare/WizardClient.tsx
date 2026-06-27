@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -617,6 +618,56 @@ export default function WizardClient({
     finally { setSaving(false); }
   }, []);
 
+  // ─── XLS import ref ───────────────────────────────────────────────────────
+  const xlsInputRef = useRef<HTMLInputElement>(null);
+
+  function handleXlsImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = ev.target?.result;
+      if (!data) return;
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      // Skip header row if first cell is not a number
+      const dataRows = rows.filter((r, i) => {
+        if (i === 0) {
+          const first = String(r[0] ?? "").trim();
+          return !isNaN(Number(first)) && first !== "";
+        }
+        return true;
+      });
+      if (dataRows.length === 0) return;
+      setApartamente(prev => {
+        const next = [...prev];
+        dataRows.forEach(row => {
+          const numar     = String(row[0] ?? "").trim();
+          const suprafata = String(row[1] ?? "").trim();
+          const nrPersone = String(row[2] ?? "").trim();
+          const cotaParte = String(row[3] ?? "").trim();
+          if (!numar) return;
+          const idx = next.findIndex(ap => ap.numar === numar);
+          if (idx >= 0) {
+            next[idx] = {
+              ...next[idx],
+              suprafata: suprafata || next[idx].suprafata,
+              nrPersone: nrPersone || next[idx].nrPersone,
+              cotaParte: cotaParte || next[idx].cotaParte,
+            };
+          } else {
+            next.push({ numar, scara: "", etaj: "", suprafata, nrPersone: nrPersone || "2", cotaParte });
+          }
+        });
+        return next;
+      });
+      setNrAp(prev => Math.max(prev, dataRows.length));
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
   // ─── Updaters ─────────────────────────────────────────────────────────────
 
   function updateNrAp(n: number) {
@@ -900,6 +951,38 @@ export default function WizardClient({
               <span className="page-sub">{apartamente.length} rânduri</span>
             </div>
           </div>
+
+          {/* Import XLS */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "1rem 0 0.5rem" }}>
+            <div>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => xlsInputRef.current?.click()}
+                title="Importă date apartamente din fișier Excel"
+              >
+                ⬆ Importă XLS
+              </button>
+              <input
+                ref={xlsInputRef}
+                type="file"
+                accept=".xls,.xlsx,.ods,.csv"
+                style={{ display: "none" }}
+                onChange={handleXlsImport}
+              />
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
+              Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>4 coloane</strong>, în această ordine:<br />
+              <span style={{ color: "#cbd5e1" }}>
+                Coloana 1: Nr. apartament &nbsp;·&nbsp;
+                Coloana 2: Suprafață (m²) &nbsp;·&nbsp;
+                Coloana 3: Nr. persoane &nbsp;·&nbsp;
+                Coloana 4: Cotă parte
+              </span><br />
+              Primul rând cu text (antet) este ignorat automat.
+            </div>
+          </div>
+
           <div className="table-wrap" style={{ marginTop: "1rem" }}>
             <table className="data-table">
               <thead>
