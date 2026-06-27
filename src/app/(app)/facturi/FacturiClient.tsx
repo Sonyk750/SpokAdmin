@@ -28,6 +28,8 @@ interface FacturaRow {
   plati:          { suma: number }[];
   acoperit?:      number;
   rest?:          number;
+  dinFond?:       boolean;
+  fonduri?:       string[];
 }
 
 interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; }
@@ -781,9 +783,11 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td>{lunaPeriod(f.luna, f.an)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {f.distribuireJson
-                    ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
-                    : <span style={{ color: "#475569" }}>—</span>}
+                  {f.dinFond
+                    ? <span title={`Acoperită din fond${f.fonduri?.length ? ": " + f.fonduri.join(", ") : ""} — nu se distribuie în lista de întreținere`} style={{ color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond</span>
+                    : f.distribuireJson
+                      ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
+                      : <span style={{ color: "#475569" }}>—</span>}
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: "0.375rem", justifyContent: "flex-end" }}>
@@ -1022,6 +1026,12 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               <button className="modal__close" onClick={closeModal}>✕</button>
             </div>
             <div className="modal__body">
+
+              {selected.dinFond && (
+                <div style={{ background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf8", borderRadius: "0.5rem", padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#7dd3fc" }}>
+                  ⓘ Această factură este acoperită din fond{selected.fonduri?.length ? ` (${selected.fonduri.join(", ")})` : ""}. <strong>Nu se va distribui în lista de întreținere</strong> chiar dacă salvezi o distribuire aici.
+                </div>
+              )}
 
               {distLoading && <div style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>Se încarcă...</div>}
               {!distLoading && distAps.length === 0 && <div className="dash-panel__empty">Niciun apartament inițializat.</div>}

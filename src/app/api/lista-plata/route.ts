@@ -127,8 +127,14 @@ export async function GET(req: NextRequest) {
 
   // ── Aggregate facturi distributions ──────────────────────────────────────
 
+  // Facturile acoperite (parțial sau total) dintr-un fond NU se mai distribuie
+  // în lista de întreținere — proprietarii au contribuit deja la fondul respectiv.
   const facturiLuna = await db.factura.findMany({
-    where:  { asociatieId, luna, an, distribuireJson: { not: null } },
+    where:  {
+      asociatieId, luna, an,
+      distribuireJson: { not: null },
+      plati: { none: { fondId: { not: null } } },
+    },
     select: { distribuireJson: true },
   });
 

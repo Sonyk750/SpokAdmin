@@ -27,16 +27,17 @@ export async function GET(req: NextRequest) {
     include: {
       furnizor:     { select: { id: true, nume: true } },
       asociatie:    { select: { id: true, name: true } },
-      plati:        { select: { suma: true } },
+      plati:        { select: { suma: true, fondId: true, fondName: true } },
       avansMiscari: { select: { suma: true } },
     },
     orderBy: [{ an: "desc" }, { luna: "desc" }, { createdAt: "desc" }],
   });
 
-  // Atașează acoperit/rest calculat (plăți numerar − mișcări avans).
+  // Atașează acoperit/rest calculat (plăți numerar − mișcări avans) + info fond.
   const withRest = facturi.map(f => {
-    const acoperit = computeAcoperit(f.plati, f.avansMiscari);
-    return { ...f, acoperit, rest: r2(f.valoare - acoperit) };
+    const acoperit  = computeAcoperit(f.plati, f.avansMiscari);
+    const fonduri   = [...new Set(f.plati.filter(p => p.fondId).map(p => p.fondName ?? "Fond"))];
+    return { ...f, acoperit, rest: r2(f.valoare - acoperit), dinFond: fonduri.length > 0, fonduri };
   });
 
   return NextResponse.json(withRest);
