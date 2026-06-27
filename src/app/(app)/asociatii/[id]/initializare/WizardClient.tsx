@@ -630,8 +630,46 @@ export default function WizardClient({
   }, []);
 
   // ─── XLS import refs ──────────────────────────────────────────────────────
-  const xlsInputRef     = useRef<HTMLInputElement>(null);
-  const xlsPropInputRef = useRef<HTMLInputElement>(null);
+  const xlsInputRef      = useRef<HTMLInputElement>(null);
+  const xlsPropInputRef  = useRef<HTMLInputElement>(null);
+  const xlsSoldInputRef  = useRef<HTMLInputElement>(null);
+
+  function handleXlsSoldImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = ev.target?.result;
+      if (!data) return;
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const dataRows = rows.filter(r => {
+        const first = String(r[0] ?? "").trim();
+        return !isNaN(Number(first)) && first !== "";
+      });
+      if (dataRows.length === 0) return;
+      setSolduri(prev => {
+        const next = [...prev];
+        dataRows.forEach(row => {
+          const numar    = String(row[0] ?? "").trim();
+          const rest1    = String(row[1] ?? "").trim();
+          const rest2    = String(row[2] ?? "").trim();
+          const idx = next.findIndex(s => s.numar === numar);
+          if (idx >= 0) {
+            next[idx] = {
+              ...next[idx],
+              restantaIntretinere: rest1 !== "" && !isNaN(Number(rest1)) ? rest1 : next[idx].restantaIntretinere,
+              restantaCurenta:     rest2 !== "" && !isNaN(Number(rest2)) ? rest2 : next[idx].restantaCurenta,
+            };
+          }
+        });
+        return next;
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
 
   function handleXlsPropImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1188,6 +1226,37 @@ export default function WizardClient({
         <div className="wizard__body">
           <h2 className="wizard__step-title">Solduri inițiale — Întreținere</h2>
           <p className="wizard__step-desc">Restanțele la întreținere la data preluării. Lasă gol dacă nu există.</p>
+
+          {/* Import XLS solduri */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "1rem 0 0.5rem" }}>
+            <div>
+              <button
+                type="button"
+                className="btn btn--secondary"
+                onClick={() => xlsSoldInputRef.current?.click()}
+                title="Importă restanțe din fișier Excel"
+              >
+                ⬆ Importă XLS
+              </button>
+              <input
+                ref={xlsSoldInputRef}
+                type="file"
+                accept=".xls,.xlsx,.ods,.csv"
+                style={{ display: "none" }}
+                onChange={handleXlsSoldImport}
+              />
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
+              Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>3 coloane</strong>, în această ordine:<br />
+              <span style={{ color: "#cbd5e1" }}>
+                Coloana 1: Nr. apartament &nbsp;·&nbsp;
+                Coloana 2: Restanță întreținere (lei) &nbsp;·&nbsp;
+                Coloana 3: Restanță curentă (lei)
+              </span><br />
+              Potrivirea se face după numărul apartamentului. Primul rând cu text este ignorat automat.
+            </div>
+          </div>
+
           <div className="table-wrap" style={{ marginTop: "1rem" }}>
             <table className="data-table">
               <thead>
