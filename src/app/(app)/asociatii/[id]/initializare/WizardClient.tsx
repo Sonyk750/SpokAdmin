@@ -171,7 +171,7 @@ interface Props {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function genApartRow(nr: number): ApartRow {
-  return { numar: nr.toString(), scara: "", etaj: "", suprafata: "", nrPersone: "2", cotaParte: "" };
+  return { numar: nr.toString(), scara: "", etaj: "", suprafata: "", nrPersone: "", cotaParte: "" };
 }
 
 function buildPropRows(aps: ApartRow[]): PropRow[] {
