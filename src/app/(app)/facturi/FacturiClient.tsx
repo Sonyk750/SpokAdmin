@@ -29,6 +29,7 @@ interface FacturaRow {
   acoperit?:      number;
   rest?:          number;
   dinFond?:       boolean;
+  fondPaid?:      number;
   fonduri?:       string[];
 }
 
@@ -783,11 +784,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td>{lunaPeriod(f.luna, f.an)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {f.dinFond
-                    ? <span title={`Acoperită din fond${f.fonduri?.length ? ": " + f.fonduri.join(", ") : ""} — nu se distribuie în lista de întreținere`} style={{ color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond</span>
-                    : f.distribuireJson
-                      ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
-                      : <span style={{ color: "#475569" }}>—</span>}
+                  {f.distribuireJson
+                    ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
+                    : <span style={{ color: "#475569" }}>—</span>}
+                  {f.dinFond && (
+                    <span title={`${fmt2(f.fondPaid ?? 0)} lei din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — partea aceasta nu se distribuie în lista de întreținere`}
+                      style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 2 }}>
+                      −{fmt2(f.fondPaid ?? 0)} fond
+                    </span>
+                  )}
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: "0.375rem", justifyContent: "flex-end" }}>
@@ -1029,7 +1034,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
               {selected.dinFond && (
                 <div style={{ background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf8", borderRadius: "0.5rem", padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#7dd3fc" }}>
-                  ⓘ Această factură este acoperită din fond{selected.fonduri?.length ? ` (${selected.fonduri.join(", ")})` : ""}. <strong>Nu se va distribui în lista de întreținere</strong> chiar dacă salvezi o distribuire aici.
+                  ⓘ Din această factură, <strong>{fmt2(selected.fondPaid ?? 0)} lei</strong> sunt acoperiți din fond{selected.fonduri?.length ? ` (${selected.fonduri.join(", ")})` : ""}.
+                  {" "}În lista de întreținere se distribuie doar restul de <strong>{fmt2(Math.max(0, selected.valoare - (selected.fondPaid ?? 0)))} lei</strong> (proporțional). Poți distribui valoarea totală aici — sistemul scade automat partea din fond.
                 </div>
               )}
 

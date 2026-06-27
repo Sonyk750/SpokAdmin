@@ -37,7 +37,8 @@ export async function GET(req: NextRequest) {
   const withRest = facturi.map(f => {
     const acoperit  = computeAcoperit(f.plati, f.avansMiscari);
     const fonduri   = [...new Set(f.plati.filter(p => p.fondId).map(p => p.fondName ?? "Fond"))];
-    return { ...f, acoperit, rest: r2(f.valoare - acoperit), dinFond: fonduri.length > 0, fonduri };
+    const fondPaid  = r2(f.plati.filter(p => p.fondId).reduce((s, p) => s + p.suma, 0));
+    return { ...f, acoperit, rest: r2(f.valoare - acoperit), dinFond: fondPaid > 0, fondPaid, fonduri };
   });
 
   return NextResponse.json(withRest);

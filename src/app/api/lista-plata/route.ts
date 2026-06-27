@@ -127,15 +127,13 @@ export async function GET(req: NextRequest) {
 
   // ── Aggregate facturi distributions ──────────────────────────────────────
 
-  // Facturile acoperite (parțial sau total) dintr-un fond NU se mai distribuie
-  // în lista de întreținere — proprietarii au contribuit deja la fondul respectiv.
+  // Partea unei facturi acoperită dintr-un fond NU se distribuie în lista de
+  // întreținere (proprietarii au contribuit deja la fond). Restul (valoare −
+  // partea din fond) se distribuie proporțional. Dacă e integral din fond,
+  // factorul devine 0 și factura nu apare deloc în listă.
   const facturiLuna = await db.factura.findMany({
-    where:  {
-      asociatieId, luna, an,
-      distribuireJson: { not: null },
-      plati: { none: { fondId: { not: null } } },
-    },
-    select: { distribuireJson: true },
+    where:  { asociatieId, luna, an, distribuireJson: { not: null } },
+    select: { valoare: true, distribuireJson: true, plati: { select: { suma: true, fondId: true } } },
   });
 
   const cheltuialaKeys: string[] = [];
@@ -153,6 +151,16 @@ export async function GET(req: NextRequest) {
       const criteriuByCol:  Record<string, string> = Array.isArray(raw) ? {} : (raw.criteriuByCol  ?? {});
       const consumTipByCol: Record<string, string> = Array.isArray(raw) ? {} : (raw.consumTipByCol ?? {});
 
+      // Factor de distribuire = cât din factură se distribuie (restul e din fond).
+      const fondPaid = f.plati.filter(p => p.fondId).reduce((s, p) => s + p.suma, 0);
+      const distTotal = dist.reduce((s, item) => {
+        const cols = (item.coloane && Object.keys(item.coloane).length > 0) ? item.coloane : { Cheltuieli: item.suma };
+        return s + Object.values(cols).reduce((a, v) => a + v, 0);
+      }, 0);
+      const distribuibil = Math.max(0, f.valoare - fondPaid);
+      const factor = distTotal > 0 ? Math.min(1, distribuibil / distTotal) : 0;
+      if (factor <= 0) continue; // integral din fond → nu se distribuie
+
       for (const [k, v] of Object.entries(criteriuByCol))  { if (!criteriuByColAgg[k])  criteriuByColAgg[k]  = v; }
       for (const [k, v] of Object.entries(consumTipByCol)) { if (!consumTipByColAgg[k]) consumTipByColAgg[k] = v; }
 
@@ -163,7 +171,8 @@ export async function GET(req: NextRequest) {
           : { "Cheltuieli": item.suma };
         for (const [key, val] of Object.entries(cols)) {
           if (!cheltuialaKeysSet.has(key)) { cheltuialaKeysSet.add(key); cheltuialaKeys.push(key); }
-          colPerAp[item.apartamentId][key] = (colPerAp[item.apartamentId][key] ?? 0) + val;
+          const adj = Math.round(val * factor * 100) / 100;
+          colPerAp[item.apartamentId][key] = (colPerAp[item.apartamentId][key] ?? 0) + adj;
         }
       }
     } catch {}
