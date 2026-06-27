@@ -170,6 +170,15 @@ interface Props {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function parseNumar(numar: string): number {
+  const n = parseFloat(numar.replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+
+function sortByNumar<T extends { numar: string }>(list: T[]): T[] {
+  return [...list].sort((a, b) => parseNumar(a.numar) - parseNumar(b.numar));
+}
+
 function genApartRow(nr: number): ApartRow {
   return { numar: nr.toString(), scara: "", etaj: "", suprafata: "", nrPersone: "", cotaParte: "" };
 }
@@ -656,7 +665,7 @@ export default function WizardClient({
             };
           }
         });
-        return next;
+        return sortByNumar(next);
       });
     };
     reader.readAsArrayBuffer(file);
@@ -699,7 +708,7 @@ export default function WizardClient({
             cotaParte: cotaParte !== "" ? cotaParte : (existing?.cotaParte ?? ""),
           } as ApartRow;
         });
-        return xlsAps;
+        return sortByNumar(xlsAps);
       });
       // Actualizează contorul la numărul exact de apartamente din XLS
       setNrAp(dataRows.length);
