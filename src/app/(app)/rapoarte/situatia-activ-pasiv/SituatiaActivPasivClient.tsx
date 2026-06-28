@@ -74,14 +74,14 @@ async function downloadPdf(rap: Raport, detaliat: boolean) {
   ]);
 
   const doc: any = {
-    pageSize: "A4", pageOrientation: "portrait", pageMargins: [28, 32, 28, 40],
+    pageSize: "A4", pageOrientation: "landscape", pageMargins: [28, 30, 28, 36],
     content: [
       { text: a.name, bold: true, fontSize: 12, alignment: "center" },
       { text: adresaLinie(a), fontSize: 9, alignment: "center", color: "#333" },
       { text: a.cui ? `Cod fiscal: ${a.cui}` : "", fontSize: 9, alignment: "center", color: "#333" },
       { text: bancaLinie(a), fontSize: 9, alignment: "center", color: "#333", margin: [0, 0, 0, 8] },
       { text: `Situaţia soldurilor elementelor de activ şi pasiv  ${dataLunga(rap.data)}`, bold: true, fontSize: 11, alignment: "center", margin: [0, 0, 0, 10] },
-      { table: { headerRows: 1, widths: [16, "*", 58, 16, "*", 58], body }, layout: {
+      { table: { headerRows: 1, widths: [18, "*", 72, 18, "*", 72], body }, layout: {
         fillColor: (r: number) => r === 0 ? "#e8e8e8" : null,
         hLineWidth: () => 0.4, vLineWidth: () => 0.4, hLineColor: () => "#888", vLineColor: () => "#888",
         paddingTop: () => 2, paddingBottom: () => 2, paddingLeft: () => 3, paddingRight: () => 3,
@@ -197,7 +197,7 @@ export default function SituatiaActivPasivClient({ defaultDate }: { defaultDate:
   return (
     <>
       <style>{`
-        @media print { @page { size: A4 portrait; margin: 12mm; } body * { visibility: hidden; } #print-zone, #print-zone * { visibility: visible; } #print-zone { position: fixed; inset: 0; background: #fff; color: #000; font-family: "Times New Roman", serif; } }
+        @media print { @page { size: A4 landscape; margin: 10mm; } body * { visibility: hidden; } #print-zone, #print-zone * { visibility: visible; } #print-zone { position: fixed; inset: 0; background: #fff; color: #000; font-family: "Times New Roman", serif; } }
         @media screen { #print-zone { display: none !important; } }
       `}</style>
 

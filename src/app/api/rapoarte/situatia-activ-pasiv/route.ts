@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
     }),
     db.fondApartament.findMany({
       where:  { asociatieId },
-      select: { fondId: true, sold: true },
+      select: { fondId: true, apartamentId: true, sold: true },
     }),
     db.transferFond.findMany({
       where:  { asociatieId, organizationId: orgId },
@@ -196,7 +196,25 @@ export async function GET(req: NextRequest) {
 
   // P1–P4 — Solduri fonduri (la data), încadrate automat după nume
   const baseByFond = new Map<string, number>();
-  for (const fa of fondApart) baseByFond.set(fa.fondId, r2((baseByFond.get(fa.fondId) ?? 0) + fa.sold));
+  const faByFond = new Map<string, Map<string, number>>(); // fondId → apId → sold
+  for (const fa of fondApart) {
+    baseByFond.set(fa.fondId, r2((baseByFond.get(fa.fondId) ?? 0) + fa.sold));
+    let m = faByFond.get(fa.fondId);
+    if (!m) { m = new Map(); faByFond.set(fa.fondId, m); }
+    m.set(fa.apartamentId, r2((m.get(fa.apartamentId) ?? 0) + fa.sold));
+  }
+  // Desfăşurarea per apartament a unui fond (apartamentele cu sold, în ordinea numărului).
+  const fondSub = (fondId: string): Sub[] => {
+    const m = faByFond.get(fondId);
+    if (!m) return [];
+    const out: Sub[] = [];
+    for (const ap of apartamente) {
+      const s = m.get(ap.id);
+      if (s === undefined || Math.abs(s) <= EPS) continue;
+      out.push({ label: `${ap.numar}. ${propLabel(ap)}`, valoare: s });
+    }
+    return out;
+  };
   const soldAsocByFond = new Map<string, number>();
   try {
     const wd = asoc.wizardData ? JSON.parse(asoc.wizardData) : {};
@@ -226,7 +244,7 @@ export async function GET(req: NextRequest) {
   const fondCat = { rulment: [] as Detaliu[], reparatii: [] as Detaliu[], speciale: [] as Detaliu[], alte: [] as Detaliu[] };
   for (const f of fonduri) {
     const val = fondSold.get(f.id) ?? 0;
-    fondCat[categorieFond(f.name)].push({ label: f.name, valoare: val });
+    fondCat[categorieFond(f.name)].push({ label: f.name, valoare: val, sub: fondSub(f.id) });
   }
   const sumDet = (d: Detaliu[]) => r2(d.reduce((s, x) => s + x.valoare, 0));
 
