@@ -87,7 +87,8 @@ async function downloadPdf(rap: Raport, detaliat: boolean) {
         paddingTop: () => 2, paddingBottom: () => 2, paddingLeft: () => 3, paddingRight: () => 3,
       } },
       { columns: [
-        { stack: [{ text: `Preşedinte: ${a.presedinteName ?? ""}`, fontSize: 9, margin: [0, 0, 0, 3] }, { text: `Cenzor: ${a.cenzorName ?? ""}`, fontSize: 9 }] },
+        { text: `Preşedinte: ${a.presedinteName ?? ""}`, fontSize: 9, alignment: "left" },
+        { text: `Cenzor: ${a.cenzorName ?? ""}`, fontSize: 9, alignment: "center" },
         { text: `Administrator: ${a.adminName ?? ""}`, fontSize: 9, alignment: "right" },
       ], margin: [0, 16, 0, 0] },
     ],
@@ -251,11 +252,9 @@ export default function SituatiaActivPasivClient({ defaultDate }: { defaultDate:
           </div>
           <TabelDoc rap={rap} detaliat={detaliat} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem", color: "#cbd5e1", fontSize: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <div>
-              <div>Preşedinte: {a.presedinteName ?? "—"}</div>
-              <div>Cenzor: {a.cenzorName ?? "—"}</div>
-            </div>
-            <div style={{ textAlign: "right" }}>Administrator: {a.adminName ?? "—"}</div>
+            <div style={{ flex: 1, textAlign: "left" }}>Preşedinte: {a.presedinteName ?? "—"}</div>
+            <div style={{ flex: 1, textAlign: "center" }}>Cenzor: {a.cenzorName ?? "—"}</div>
+            <div style={{ flex: 1, textAlign: "right" }}>Administrator: {a.adminName ?? "—"}</div>
           </div>
         </div>
       )}
@@ -274,11 +273,9 @@ export default function SituatiaActivPasivClient({ defaultDate }: { defaultDate:
           </div>
           <TabelDoc rap={rap} detaliat={detaliat} print />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: "18pt", fontSize: "9pt" }}>
-            <div>
-              <div style={{ marginBottom: "4pt" }}>Preşedinte: {a.presedinteName ?? ""}</div>
-              <div>Cenzor: {a.cenzorName ?? ""}</div>
-            </div>
-            <div>Administrator: {a.adminName ?? ""}</div>
+            <div style={{ flex: 1, textAlign: "left" }}>Preşedinte: {a.presedinteName ?? ""}</div>
+            <div style={{ flex: 1, textAlign: "center" }}>Cenzor: {a.cenzorName ?? ""}</div>
+            <div style={{ flex: 1, textAlign: "right" }}>Administrator: {a.adminName ?? ""}</div>
           </div>
         </div>
       )}
