@@ -83,6 +83,7 @@ model Organization {
   stripeSubscriptionId String?   @unique
   subscriptionStatus   String?
   currentPeriodEnd     DateTime?
+  rolePermissions      String?              // JSON: { proprietar: {lista_plata:true,...}, presedinte:{...}, ... }
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
