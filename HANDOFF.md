@@ -11,8 +11,8 @@
 ## Migrare — ce s-a făcut și ce a rămas
 - [x] Clonat în `C:\Projects`: spokadmin, spokapp, spokinvoice, vosmart, spokloto49 (+ `.env` + `npm install`).
 - [x] spokloto49 a primit repo GitHub nou (nu avea) + push (branch `master`).
-- [ ] **De făcut pe PC:** clone toate 5 din GitHub în `C:\Projects` + copiat `.env` din copia OneDrive + `npm install`.
-- [ ] **După ce ambele mașini merg din `C:\Projects`:** șters folderele din `OneDrive\Projects`.
+- [x] **PC:** clonate toate 5 din GitHub în `C:\Projects` + copiat `.env` + `npm install`.
+- [x] **Șters folderele din `OneDrive\Projects`** (28 iun 2026) — verificat înainte: toate repo-urile din `C:\Projects` sincronizate cu origin, fără commit-uri nepush-uite, toate `.env`-urile prezente. Folderul `OneDrive\Projects` e acum gol. Migrarea OneDrive → `C:\Projects` e completă.
 
 ## Context spokadmin (aplicația la care lucrăm)
 SaaS administrare asociații (Next.js 16 + Prisma + Neon prod unic; deploy Vercel pe push `main`).
