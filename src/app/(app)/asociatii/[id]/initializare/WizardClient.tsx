@@ -672,6 +672,7 @@ export default function WizardClient({
       const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
 
       let numarCurent = "";
+      let tipCurent   = "";  // moștenit pentru rândurile de continuare (col1=null)
       const updates: { numar: string; tip: string; locRaw: string; serie: string; indexVechi: string; indexNou: string }[] = [];
 
       rows.forEach(row => {
@@ -688,7 +689,10 @@ export default function WizardClient({
           if (m) numarCurent = m[1].replace(",", ".");
         }
 
-        const tip = TIP_MAP[col1];
+        // Actualizează tipul dacă e explicit; altfel moștenește din rândul anterior
+        if (TIP_MAP[col1]) tipCurent = TIP_MAP[col1];
+
+        const tip = tipCurent;
         if (!tip || !numarCurent || !col2) return;
 
         const serie      = col3;
