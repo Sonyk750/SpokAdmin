@@ -34,6 +34,7 @@ const nav: Item[] = [
       { type: "link",  href: "/rapoarte/registru-jurnal",     label: "Jurnal" },
       { type: "link",  href: "/rapoarte/fonduri",             label: "Fonduri" },
       { type: "label", label: "SITUAȚII" },
+      { type: "link",  href: "/rapoarte/situatia-activ-pasiv", label: "Situația activ / pasiv" },
       { type: "link",  href: "/rapoarte/restantieri",         label: "Restanțieri" },
       { type: "link",  href: "/rapoarte/fisa-proprietar",     label: "Fișă proprietar" },
       { type: "link",  href: "/rapoarte/fisa-furnizor",       label: "Fișă furnizor" },
