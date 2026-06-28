@@ -370,13 +370,27 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
         <div className="form-field">
           <label className="form-field__label">Luna</label>
           <select className="input" value={luna} onChange={e => setLuna(parseInt(e.target.value))}>
-            {LUNI.map((l, i) => <option key={i + 1} value={i + 1}>{l}</option>)}
+            {LUNI.map((l, i) => {
+              const m = i + 1;
+              // Nu permite liste pentru perioade viitoare (după perioada curentă)
+              const viitoare = perioadaCurentaLuna != null && perioadaCurentaAn != null &&
+                (an > perioadaCurentaAn || (an === perioadaCurentaAn && m > perioadaCurentaLuna));
+              if (viitoare) return null;
+              return <option key={m} value={m}>{l}</option>;
+            })}
           </select>
         </div>
         <div className="form-field">
           <label className="form-field__label">Anul</label>
-          <input type="number" className="input" value={an} min={2000} max={2100}
-            style={{ width: "90px" }} onChange={e => setAn(parseInt(e.target.value) || an)} />
+          <input type="number" className="input" value={an} min={2000} max={perioadaCurentaAn ?? 2100}
+            style={{ width: "90px" }}
+            onChange={e => {
+              const v = parseInt(e.target.value) || an;
+              const capAn = perioadaCurentaAn ? Math.min(v, perioadaCurentaAn) : v;
+              setAn(capAn);
+              // dacă luna selectată devine viitoare în noul an, o aducem la perioada curentă
+              if (perioadaCurentaLuna && capAn === perioadaCurentaAn && luna > perioadaCurentaLuna) setLuna(perioadaCurentaLuna);
+            }} />
         </div>
         <button className="btn btn--primary" onClick={genereaza}
           disabled={loading || !asociatieId} style={{ alignSelf: "flex-end" }}>
