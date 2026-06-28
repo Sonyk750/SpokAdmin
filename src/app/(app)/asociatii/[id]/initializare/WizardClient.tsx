@@ -1561,18 +1561,30 @@ export default function WizardClient({
                       </tr>
                     </thead>
                     <tbody>
-                      {soldFondAsoc.map((row, i) => (
-                        <tr key={row.fondId || row.fondName}>
-                          <td style={{ fontWeight: 600, color: "#a78bfa" }}>{row.fondName}</td>
-                          <td style={{ textAlign: "right" }}>
-                            <input
-                              type="number" className="input input--sm"
-                              value={row.sold}
-                              onChange={e => setSoldFondAsoc(prev => prev.map((r, j) => j === i ? { ...r, sold: e.target.value } : r))}
-                              style={{ width: "150px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
-                          </td>
-                        </tr>
-                      ))}
+                      {soldFondAsoc.map((row, i) => {
+                        const blocat = soldContribFonduri.some(sf => sf.fondName === row.fondName && parseFloat(sf.sold) > 0);
+                        return (
+                          <tr key={row.fondId || row.fondName}>
+                            <td style={{ fontWeight: 600, color: "#a78bfa" }}>
+                              {row.fondName}
+                              {blocat && (
+                                <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", color: "#f59e0b", fontWeight: 400 }}>
+                                  — completat detaliat
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ textAlign: "right" }}>
+                              <input
+                                type="number" className="input input--sm"
+                                value={blocat ? "" : row.sold}
+                                onChange={e => !blocat && setSoldFondAsoc(prev => prev.map((r, j) => j === i ? { ...r, sold: e.target.value } : r))}
+                                disabled={blocat}
+                                style={{ width: "150px", textAlign: "right", opacity: blocat ? 0.4 : 1, cursor: blocat ? "not-allowed" : "auto" }}
+                                step="0.01" min={0} placeholder={blocat ? "blocat" : ""} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     {soldFondAsoc.some(r => r.sold !== "") && (
                       <tfoot>
