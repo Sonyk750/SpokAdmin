@@ -127,6 +127,16 @@ function todayISO(): string {
 
 function fmt2(v: number) { return v.toFixed(2); }
 
+// Suma efectiv distribuită pe apartamente dintr-o factură (din distribuireJson)
+function distribuitFactura(distribuireJson: string | null): number {
+  if (!distribuireJson) return 0;
+  try {
+    const raw = JSON.parse(distribuireJson);
+    const rows = Array.isArray(raw) ? raw : raw.rows;
+    return (rows ?? []).reduce((s: number, r: any) => s + (Number(r?.suma) || 0), 0);
+  } catch { return 0; }
+}
+
 function lunaPeriod(luna: number | null, an: number | null): string {
   if (!luna || !an) return "—";
   return `${LUNI[luna - 1]} ${an}`;
@@ -863,7 +873,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               <th>Furnizor</th>
               <th>Serie / Nr.</th>
               <th style={{ textAlign: "right" }}>Valoare (lei)</th>
-              <th style={{ textAlign: "right" }}>Rest (lei)</th>
+              <th style={{ textAlign: "right" }}>Rest de distribuit</th>
               <th>Perioadă</th>
               <th>Status</th>
               <th style={{ textAlign: "center" }}>Distribuit</th>
@@ -886,9 +896,16 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   {[f.serie, f.numar].filter(Boolean).join("/") || "—"}
                 </td>
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
-                <td style={{ textAlign: "right", fontWeight: 700, color: (f.rest ?? f.valoare) > 0.01 ? "#f87171" : "#4ade80" }}>
-                  {fmt2(f.rest ?? f.valoare)}
-                </td>
+                {(() => {
+                  const restDist = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
+                  const ok = restDist <= 0.01;
+                  return (
+                    <td style={{ textAlign: "right", fontWeight: 700, color: ok ? "#475569" : "#f87171" }}
+                      title={ok ? "Factură distribuită integral" : `${fmt2(restDist)} lei nedistribuiți pe apartamente`}>
+                      {ok ? "—" : fmt2(restDist)}
+                    </td>
+                  );
+                })()}
                 <td>{lunaPeriod(f.luna, f.an)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
