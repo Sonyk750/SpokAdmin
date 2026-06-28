@@ -642,11 +642,90 @@ export default function WizardClient({
   }, []);
 
   // ─── XLS import refs ──────────────────────────────────────────────────────
+  // Mapare tip furnizor → tip intern
+  const TIP_MAP: Record<string, string> = {
+    AR: "apa_rece", AC: "apa_calda", EL: "electric", GZ: "gaz", GN: "gaz",
+  };
+  // Mapare locație furnizor → locație internă
+  const LOC_MAP: Record<string, string> = {
+    "baie 1": "baie", "baie": "baie",
+    "baie 2": "baie_mica", "baie_mica": "baie_mica", "baie mica": "baie_mica",
+    "bucatarie": "bucatarie", "bucătărie": "bucatarie",
+    "general": "general", "gradina": "gradina", "grădină": "gradina",
+  };
   const xlsInputRef      = useRef<HTMLInputElement>(null);
   const xlsPropInputRef  = useRef<HTMLInputElement>(null);
   const xlsSoldInputRef  = useRef<HTMLInputElement>(null);
   const xlsFondInputRef        = useRef<HTMLInputElement>(null);
   const xlsSoldFondInputRef    = useRef<HTMLInputElement>(null);
+  const xlsContoareInputRef   = useRef<HTMLInputElement>(null);
+
+  function handleXlsContoareImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = ev.target?.result;
+      if (!data) return;
+      const wb   = XLSX.read(data, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      let numarCurent = "";
+      const updates: { numar: string; tip: string; locRaw: string; serie: string; indexVechi: string; indexNou: string }[] = [];
+
+      rows.forEach(row => {
+        const col0 = String(row[0] ?? "").trim();
+        const col1 = String(row[1] ?? "").trim();
+        const col2 = String(row[2] ?? "").trim().toLowerCase();
+        const col3 = String(row[3] ?? "").trim();
+        const col4 = row[4];
+        const col5 = row[5];
+
+        // Rând apartament nou: "1. Apartament 1" sau "23. Apartament 23"
+        if (col0 && /^\d/.test(col0)) {
+          const m = col0.match(/^(\d+(?:[.,]\d+)?)\./);
+          if (m) numarCurent = m[1].replace(",", ".");
+        }
+
+        const tip = TIP_MAP[col1];
+        if (!tip || !numarCurent || !col2) return;
+
+        const serie      = col3;
+        const indexVechi = col4 !== null && col4 !== undefined && col4 !== "" ? String(col4) : "";
+        const indexNou   = col5 !== null && col5 !== undefined && col5 !== "" ? String(col5) : "";
+
+        if (!serie && indexVechi === "" && indexNou === "") return;
+
+        updates.push({ numar: numarCurent, tip, locRaw: col2, serie, indexVechi, indexNou });
+      });
+
+      if (updates.length === 0) return;
+
+      setIndexRows(prev => {
+        const next = [...prev];
+        updates.forEach(u => {
+          const locMapped = LOC_MAP[u.locRaw] ?? u.locRaw;
+          const gi = next.findIndex(r =>
+            r.numar === u.numar &&
+            r.tip   === u.tip   &&
+            (r.locatie === locMapped || r.locatie === u.locRaw || r.denumire.toLowerCase() === u.locRaw)
+          );
+          if (gi >= 0) {
+            next[gi] = {
+              ...next[gi],
+              numarSerie: u.serie      !== "" ? u.serie      : next[gi].numarSerie,
+              indexVechi: u.indexVechi !== "" ? u.indexVechi : next[gi].indexVechi,
+              indexNou:   u.indexNou   !== "" ? u.indexNou   : next[gi].indexNou,
+            };
+          }
+        });
+        return next;
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
 
   function handleXlsSoldFondImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1874,6 +1953,39 @@ export default function WizardClient({
         <div className="wizard__body">
           <h2 className="wizard__step-title">Indecși contoare</h2>
           <p className="wizard__step-desc">Introdu indexul vechi și indexul nou pentru fiecare contor. Lasă gol dacă nu ai valori.</p>
+
+          {apsWithIndex.length > 0 && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "0 0 1.25rem" }}>
+              <div>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => xlsContoareInputRef.current?.click()}
+                  title="Importă indecși contoare din fișier furnizor (Cagero, Ista, Techem etc.)"
+                >
+                  ⬆ Importă XLS
+                </button>
+                <input
+                  ref={xlsContoareInputRef}
+                  type="file"
+                  accept=".xls,.xlsx,.ods,.csv"
+                  style={{ display: "none" }}
+                  onChange={handleXlsContoareImport}
+                />
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.6, paddingTop: "0.25rem" }}>
+                Fișier centralizator furnizor (Cagero, Ista, Techem, Decor Press etc.)<br />
+                <span style={{ color: "#cbd5e1" }}>
+                  Coloane așteptate: <strong style={{ color: "#a78bfa" }}>Abonat · Tip · Amplasare · Serie · Index vechi · Index nou</strong>
+                </span><br />
+                Potrivire după: <span style={{ color: "#cbd5e1" }}>nr. apartament + tip contor + locație</span><br />
+                <span style={{ fontSize: "0.72rem" }}>
+                  Tip: AR=apă rece, AC=apă caldă &nbsp;·&nbsp;
+                  Locație: „baie 1"=baie, „baie 2"=baie mică, „bucatarie"=bucătărie
+                </span>
+              </div>
+            </div>
+          )}
 
           {apsWithIndex.length === 0 ? (
             <div className="dash-panel__empty">Niciun contor configurat — apasă Continuă.</div>
