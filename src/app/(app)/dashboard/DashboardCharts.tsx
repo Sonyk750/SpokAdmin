@@ -27,8 +27,6 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
     ? v.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : v.toLocaleString("ro-RO");
 
-  const scrollable = bars.length > 6;
-
   return (
     <div className="dash-panel" style={{ marginBottom: "1.5rem", padding: "1.25rem 1.5rem" }}>
       {/* Taburi */}
@@ -45,10 +43,10 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
         <div className="dash-panel__empty">Nicio dată disponibilă pentru această secțiune.</div>
       ) : hasNeg ? (
         /* ── Grafic bidirecțional (pozitive sus, negative jos) ────────────── */
-        <div style={{ overflowX: scrollable ? "auto" : "visible", paddingBottom: "0.5rem" }}>
+        <div style={{ overflowX: "auto", paddingBottom: "0.5rem" }}>
           <div style={{
             display: "flex", alignItems: "stretch", gap: "0.4rem",
-            minWidth: scrollable ? bars.length * 76 : undefined,
+            minWidth: "100%",
           }}>
             {bars.map((b, i) => {
               const isNeg  = b.value < 0;
@@ -58,8 +56,8 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
 
               return (
                 <div key={b.label + i} style={{
-                  flex: scrollable ? "0 0 72px" : 1,
-                  minWidth: 0,
+                  flex: 1,
+                  minWidth: 55,
                   display: "flex", flexDirection: "column", alignItems: "center",
                 }}>
                   {/* Label valoare deasupra (bara pozitivă) */}
@@ -121,17 +119,17 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
       ) : (
         /* ── Grafic normal (doar pozitive) ───────────────────────────────── */
         <div style={{
-          display: "flex", alignItems: "flex-end", justifyContent: "space-around",
+          display: "flex", alignItems: "flex-end",
           gap: "0.5rem", minHeight: POS_H + 64,
-          overflowX: scrollable ? "auto" : "visible",
+          overflowX: "auto",
         }}>
           {bars.map((b, i) => {
             const color = COLORS[i % COLORS.length];
             const barPx = Math.max(Math.round((b.value / posMax) * POS_H), 4);
             return (
               <div key={b.label + i} style={{
-                flex: scrollable ? "0 0 72px" : 1,
-                minWidth: 0, display: "flex", flexDirection: "column",
+                flex: 1,
+                minWidth: 55, display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "flex-end",
               }}>
                 <span style={{ fontSize: "0.72rem", fontWeight: 800, color, marginBottom: "0.4rem", whiteSpace: "nowrap" }}>
