@@ -114,8 +114,7 @@ export default async function DashboardPage() {
     } catch {}
   }
   const fonduriTop = [...byName.entries()]
-    .filter(([, v]) => v > 0)
-    .sort((a, b) => b[1] - a[1]).slice(0, 6)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .map(([label, value]) => ({ label, value }));
 
   // Ultimele asociații / facturi pentru panourile de jos

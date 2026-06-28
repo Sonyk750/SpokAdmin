@@ -13,8 +13,9 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
   const tab = tabs.find(t => t.key === active) ?? tabs[0];
   if (!tab) return null;
 
-  const bars = tab.bars.slice(0, 6);
-  const max  = Math.max(1, ...bars.map(b => b.value));
+  // Tab fonduri poate avea mai multe bare; restul limitat la 6
+  const bars = tab.key === "fonduri" ? tab.bars : tab.bars.slice(0, 6);
+  const absMax = Math.max(1, ...bars.map(b => Math.abs(b.value)));
   const fmt  = (v: number) => tab.unit === "lei"
     ? v.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : v.toLocaleString("ro-RO");
@@ -39,21 +40,25 @@ export default function DashboardCharts({ tabs }: { tabs: Tab[] }) {
       {bars.length === 0 ? (
         <div className="dash-panel__empty">Nicio dată disponibilă pentru această secțiune.</div>
       ) : (
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", gap: "0.75rem", minHeight: MAXBAR + 64 }}>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", gap: "0.5rem", minHeight: MAXBAR + 64, overflowX: bars.length > 6 ? "auto" : "visible" }}>
           {bars.map((b, i) => {
-            const color = COLORS[i % COLORS.length];
-            const barPx = b.value > 0 ? Math.round((b.value / max) * MAXBAR) : 0;
+            const neg   = b.value < 0;
+            const color = neg ? "#f87171" : COLORS[i % COLORS.length];
+            const barPx = Math.max(Math.round((Math.abs(b.value) / absMax) * MAXBAR), 4);
             return (
-              <div key={b.label + i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
-                <span style={{ fontSize: "0.78rem", fontWeight: 800, color, marginBottom: "0.4rem", whiteSpace: "nowrap" }}>
-                  {fmt(b.value)}
+              <div key={b.label + i} style={{ flex: "0 0 auto", minWidth: bars.length > 6 ? 64 : 0, width: bars.length > 6 ? 72 : undefined, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
+                <span style={{ fontSize: "0.72rem", fontWeight: 800, color, marginBottom: "0.4rem", whiteSpace: "nowrap" }}>
+                  {neg ? "−" : ""}{fmt(Math.abs(b.value))}
                 </span>
                 <div style={{
-                  width: "100%", maxWidth: 70, height: Math.max(barPx, 3),
-                  background: `linear-gradient(180deg, ${color}, ${color}88)`,
+                  width: "100%", maxWidth: 70, height: barPx,
+                  background: neg
+                    ? `linear-gradient(180deg, #f87171, #f8717188)`
+                    : `linear-gradient(180deg, ${color}, ${color}88)`,
                   borderRadius: "7px 7px 0 0",
+                  opacity: neg ? 0.85 : 1,
                 }} />
-                <span style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: "0.55rem", textAlign: "center", lineHeight: 1.2 }}>
+                <span style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "0.55rem", textAlign: "center", lineHeight: 1.2, maxWidth: 72, wordBreak: "break-word" }}>
                   {b.label}
                 </span>
               </div>
