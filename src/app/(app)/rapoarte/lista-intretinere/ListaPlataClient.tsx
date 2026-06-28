@@ -103,18 +103,57 @@ const fmt4 = (v: number) => v.toFixed(4);
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLuna: number; defaultAn: number }) {
-  const { activeId: asociatieId, primaListaLuna, primaListaAn } = useAsociatie();
+  const { activeId: asociatieId, perioadaCurentaLuna, perioadaCurentaAn, refreshPerioada } = useAsociatie();
 
   const [luna, setLuna] = useState(defaultLuna);
   const [an,   setAn]   = useState(defaultAn);
 
-  // Când se încarcă primaListaLuna din context, setează implicit
+  // Când se încarcă perioada curentă din context, setează implicit
   useEffect(() => {
-    if (primaListaLuna && primaListaAn) {
-      setLuna(primaListaLuna);
-      setAn(primaListaAn);
+    if (perioadaCurentaLuna && perioadaCurentaAn) {
+      setLuna(perioadaCurentaLuna);
+      setAn(perioadaCurentaAn);
     }
-  }, [primaListaLuna, primaListaAn]);
+  }, [perioadaCurentaLuna, perioadaCurentaAn]);
+
+  // Închidere / redeschidere listă
+  const [closing, setClosing] = useState(false);
+  const isCurenta = luna === perioadaCurentaLuna && an === perioadaCurentaAn;
+
+  async function inchideLista() {
+    if (!asociatieId) return;
+    const urm = luna >= 12 ? `${LUNI[0]} ${an + 1}` : `${LUNI[luna]} ${an}`;
+    if (!confirm(`Închizi lista pe ${LUNI[luna - 1]} ${an}?\n\nRestanțele neachitate + întreținerea lunii se reportează în ${urm}, iar perioada curentă devine ${urm}.`)) return;
+    setClosing(true); setError(null);
+    try {
+      const r = await fetch(`/api/asociatii/${asociatieId}/inchide-lista`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ luna, an }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Eroare");
+      refreshPerioada();
+      if (j.perioadaCurenta) { setLuna(j.perioadaCurenta.luna); setAn(j.perioadaCurenta.an); }
+    } catch (e: any) { setError(e.message); }
+    finally { setClosing(false); }
+  }
+
+  async function redeschideLista() {
+    if (!asociatieId) return;
+    // Ultima lună închisă = luna dinaintea perioadei curente
+    const cl = perioadaCurentaLuna === 1 ? 12 : (perioadaCurentaLuna ?? 1) - 1;
+    const ca = perioadaCurentaLuna === 1 ? (perioadaCurentaAn ?? 0) - 1 : (perioadaCurentaAn ?? 0);
+    if (!confirm(`Redeschizi lista pe ${LUNI[cl - 1]} ${ca}? Reportarea în restanță se anulează, iar perioada curentă revine la ${LUNI[cl - 1]} ${ca}.`)) return;
+    setClosing(true); setError(null);
+    try {
+      const r = await fetch(`/api/asociatii/${asociatieId}/inchide-lista?luna=${cl}&an=${ca}`, { method: "DELETE" });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Eroare");
+      refreshPerioada();
+      setLuna(cl); setAn(ca);
+    } catch (e: any) { setError(e.message); }
+    finally { setClosing(false); }
+  }
 
   const [fondMode,     setFondMode]     = useState<FondMode>("detaliat");
   const [data,         setData]         = useState<ListaData | null>(null);
@@ -291,16 +330,34 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
       <div className="page-header">
         <div>
           <h1 className="page-title">Lista întreținere</h1>
-          <p className="page-sub">Situația lunară pe apartamente — cheltuieli și restanțe</p>
+          <p className="page-sub">
+            Situația lunară pe apartamente — cheltuieli și restanțe
+            {perioadaCurentaLuna && perioadaCurentaAn && (
+              <> · <strong style={{ color: "#a78bfa" }}>Perioadă curentă: {LUNI[perioadaCurentaLuna - 1]} {perioadaCurentaAn}</strong></>
+            )}
+          </p>
         </div>
-        {data && (
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button className="btn btn--secondary" onClick={() => window.print()}>⎙ Tipărire</button>
-            <button className="btn btn--primary" onClick={() => setShowPdfModal(true)}>
-              ⬇ Descarcă PDF
-            </button>
-          </div>
-        )}
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {perioadaCurentaLuna && perioadaCurentaAn && (
+            isCurenta ? (
+              <button className="btn btn--primary" onClick={inchideLista} disabled={closing || !data}
+                title="Reportează restanțele + întreținerea lunii și avansează perioada">
+                {closing ? "Se procesează…" : `🔒 Închide lista ${LUNI[luna - 1]}`}
+              </button>
+            ) : (
+              <button className="btn btn--secondary" onClick={redeschideLista} disabled={closing}
+                title="Redeschide ultima lună închisă (anulează reportarea)">
+                {closing ? "Se procesează…" : "↩ Redeschide ultima lună"}
+              </button>
+            )
+          )}
+          {data && (
+            <>
+              <button className="btn btn--secondary" onClick={() => window.print()}>⎙ Tipărire</button>
+              <button className="btn btn--primary" onClick={() => setShowPdfModal(true)}>⬇ Descarcă PDF</button>
+            </>
+          )}
+        </div>
       </div>
 
       {!asociatieId && (

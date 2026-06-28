@@ -33,17 +33,17 @@ function consumOf(c: ContorRow): { val: number; text: string; neg: boolean } {
 }
 
 export default function CitiriClient({ defaultLuna, defaultAn }: { defaultLuna: number; defaultAn: number }) {
-  const { activeId: asociatieId, primaListaLuna, primaListaAn } = useAsociatie();
+  const { activeId: asociatieId, perioadaCurentaLuna, perioadaCurentaAn } = useAsociatie();
 
   const [luna, setLuna] = useState(defaultLuna);
   const [an,   setAn]   = useState(defaultAn);
 
   useEffect(() => {
-    if (primaListaLuna && primaListaAn) {
-      setLuna(primaListaLuna);
-      setAn(primaListaAn);
+    if (perioadaCurentaLuna && perioadaCurentaAn) {
+      setLuna(perioadaCurentaLuna);
+      setAn(perioadaCurentaAn);
     }
-  }, [primaListaLuna, primaListaAn]);
+  }, [perioadaCurentaLuna, perioadaCurentaAn]);
   const [data, setData] = useState<ApBlock[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);

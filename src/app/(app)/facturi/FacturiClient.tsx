@@ -213,7 +213,11 @@ interface Props { furnizori: Furnizor[]; defaultLuna: number; defaultAn: number;
 
 export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna, defaultAn }: Props) {
 
-  const { activeId: asociatieId } = useAsociatie();
+  const { activeId: asociatieId, perioadaCurentaLuna, perioadaCurentaAn } = useAsociatie();
+
+  // Luna/anul propuse implicit = perioada curentă a asociației (altfel data calendaristică)
+  const effLuna = perioadaCurentaLuna ?? defaultLuna;
+  const effAn   = perioadaCurentaAn   ?? defaultAn;
 
   // ── Filters ──────────────────────────────────────────────────────────────
   const [fStatus, setFStatus] = useState("");
@@ -351,7 +355,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   // ── Open modals ───────────────────────────────────────────────────────────
 
   function openAdauga() {
-    setSelected(null); setForm(emptyForm(defaultLuna, defaultAn));
+    setSelected(null); setForm(emptyForm(effLuna, effAn));
     setFormErr(null); setPdfMsg(null); setPdfFile(null); setPdfDeleted(false); setModal("adauga");
   }
 
@@ -362,8 +366,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       valoare: String(f.valoare),
       dataEmiterii: f.dataEmiterii ? f.dataEmiterii.slice(0, 10) : "",
       dataScadenta: f.dataScadenta ? f.dataScadenta.slice(0, 10) : "",
-      luna: f.luna ? String(f.luna) : String(defaultLuna),
-      an:   f.an   ? String(f.an)   : String(defaultAn),
+      luna: f.luna ? String(f.luna) : String(effLuna),
+      an:   f.an   ? String(f.an)   : String(effAn),
       notes: f.notes ?? "",
     });
     setFormErr(null); setPdfMsg(null); setModal("editeaza");

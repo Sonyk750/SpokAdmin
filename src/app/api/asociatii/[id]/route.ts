@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getPerioadaCurenta } from "@/lib/perioada";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -36,6 +37,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     banci = [{ name: a.bank, iban: a.iban || undefined }];
   }
 
+  const perioadaCurenta = await getPerioadaCurenta(id);
+
   return NextResponse.json({
     name:           a.name,
     address:        a.address ?? null,
@@ -51,6 +54,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     fonduri:        a.fonduri ?? [],
     primaListaLuna,
     primaListaAn,
+    perioadaCurentaLuna: perioadaCurenta.luna,
+    perioadaCurentaAn:   perioadaCurenta.an,
   });
 }
 
