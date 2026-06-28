@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { parseXlsx } from "@/lib/xlsx";
 
+// ── Detectare și aplatizare formate cunoscute ────────────────────────────────
+
+type ImportFormat = "generic" | "cagero";
+
+function detectFormat(rows: string[][]): ImportFormat {
+  // Cagero: undeva în primele 6 rânduri există un rând cu "Serie" la col 3
+  // și ceva de tip "Index" la col 4 și 5
+  for (let i = 0; i < Math.min(6, rows.length); i++) {
+    if (/serie/i.test(rows[i]?.[3] ?? "") && /index/i.test(rows[i]?.[4] ?? "")) {
+      return "cagero";
+    }
+  }
+  return "generic";
+}
+
+// Aplatizează formatul Cagero (rânduri grupate pe apartament + continuări null)
+// în rânduri individuale [serie, indexVechi, indexNou]
+function flattenCagero(rows: string[][]): string[][] {
+  const headerIdx = rows.findIndex(r => /serie/i.test(r[3] ?? "") && /index/i.test(r[4] ?? ""));
+  if (headerIdx < 0) return rows;
+
+  const result: string[][] = [["Serie", "Index vechi", "Index nou"]];
+  for (const row of rows.slice(headerIdx + 1)) {
+    const serie    = (row[3] ?? "").trim();
+    const ivechi   = (row[4] ?? "").trim();
+    const inou     = (row[5] ?? "").trim();
+    if (!serie || isNaN(parseFloat(inou))) continue;
+    result.push([serie, ivechi, inou]);
+  }
+  return result;
+}
+
 // POST (multipart) — parsează un fișier .xlsx și întoarce tabelul brut.
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -26,13 +58,20 @@ export async function POST(req: NextRequest) {
         const sep = line.includes(";") && !line.includes(",") ? ";" : (line.split(";").length > line.split(",").length ? ";" : ",");
         return line.split(sep).map(c => c.trim().replace(/^"|"$/g, ""));
       });
-      return NextResponse.json({ rows });
+      return NextResponse.json({ rows, format: "generic" });
     }
 
     const { rows } = parseXlsx(buf);
     if (rows.length === 0) return NextResponse.json({ error: "Fișierul pare gol." }, { status: 400 });
-    // Limităm la max 50 coloane pentru afișare
-    return NextResponse.json({ rows: rows.map(r => r.slice(0, 50)) });
+
+    const format = detectFormat(rows);
+
+    if (format === "cagero") {
+      const flat = flattenCagero(rows);
+      return NextResponse.json({ rows: flat, format });
+    }
+
+    return NextResponse.json({ rows: rows.map(r => r.slice(0, 50)), format });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Eroare la citirea fișierului." }, { status: 400 });
   }

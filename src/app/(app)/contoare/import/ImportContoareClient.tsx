@@ -50,6 +50,7 @@ export default function ImportContoareClient() {
   const [indexVechiCol, setIndexVechiCol] = useState<number>(-1); // -1 = automat (din ultima citire)
   const [headerRow, setHeaderRow]         = useState(true);
 
+  const [format, setFormat]       = useState<string>("");
   const [contoare, setContoare] = useState<ContorInfo[]>([]);
   const [saving, setSaving]     = useState(false);
   const [done, setDone]         = useState<string | null>(null);
@@ -90,22 +91,23 @@ export default function ImportContoareClient() {
 
   // ── Upload + parse ──────────────────────────────────────────────────────────
   async function handleFile(file: File) {
-    setParsing(true); setError(null); setDone(null); setRows([]);
+    setParsing(true); setError(null); setDone(null); setRows([]); setFormat("");
     try {
       const fd = new FormData(); fd.append("file", file);
       const res = await fetch("/api/contoare/import", { method: "POST", body: fd });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare la import");
       const r: string[][] = json.rows ?? [];
-      setRows(r); setFileName(file.name);
-      // auto-detect coloane din antet
+      setRows(r); setFileName(file.name); setFormat(json.format ?? "generic");
+      // auto-detect coloane din antet (funcționează și pentru formate pre-procesate)
       const hdr = (r[0] ?? []).map(x => (x ?? "").toLowerCase());
       const findCol = (re: RegExp) => hdr.findIndex(h => re.test(h));
       const sCol = findCol(/serie|seria|nr\.?\s*contor|nr\.?\s*apometru|series/);
-      const iCol = findCol(/index.*(nou|actual|curent|nou)|citire|valoare|index|reading|current|actual/);
+      const iCol = findCol(/index\s*(nou|actual|curent)|citire|reading|current|actual/);
+      const ivCol = findCol(/index\s*(vechi|anterior|prev)|vechi|anterior|previous/);
       setSerieCol(sCol);
       setIndexCol(iCol >= 0 ? iCol : -1);
-      setIndexVechiCol(findCol(/index.*(vechi|anterior|prev)|vechi|anterior|previous/));
+      setIndexVechiCol(ivCol);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -168,7 +170,7 @@ export default function ImportContoareClient() {
 
   function reset() {
     setRows([]); setFileName(""); setSerieCol(-1); setIndexCol(-1); setIndexVechiCol(-1);
-    setError(null); setDone(null);
+    setError(null); setDone(null); setFormat("");
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -217,6 +219,14 @@ export default function ImportContoareClient() {
 
       {error && <div className="wizard__error" style={{ marginBottom: "1rem" }}>{error}</div>}
       {done  && <div style={{ color: "#4ade80", fontWeight: 700, marginBottom: "1rem" }}>✓ {done}</div>}
+
+      {format && format !== "generic" && (
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem", background: "#1a2e1a", border: "1px solid #166534", borderRadius: "0.5rem", padding: "0.35rem 0.75rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#4ade80" }}>
+          <span style={{ fontWeight: 700 }}>Format detectat:</span>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>{format}</span>
+          <span style={{ color: "#86efac" }}>— coloane mapate automat</span>
+        </div>
+      )}
 
       {rows.length > 0 && (
         <>
