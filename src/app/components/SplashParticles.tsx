@@ -115,178 +115,217 @@ export default function SplashParticles({ onSkip }: { onSkip: () => void }) {
     if (!ctx) return;
     const c = ctx;
 
-    const W = window.innerWidth;
-    const H = window.innerHeight;
-    cv.width = W; cv.height = H;
+    // Cap DPR la 2 pentru claritate fara a supraincarca GPU-ul pe telefoane
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0, small = false;
 
-    // Ambient particles
-    const COLS = ["#a78bfa","#67e8f9","#c4b5fd","#38bdf8","#818cf8"];
-    for (let i = 0; i < 110; i++) {
-      ambients.current.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: -(Math.random() * 0.6 + 0.15),
-        r: Math.random() * 1.8 + 0.4,
-        alpha: Math.random() * 0.35 + 0.08,
-        color: COLS[Math.floor(Math.random() * COLS.length)],
-        pulse: Math.random() * Math.PI * 2,
-        pulseSpeed: 0.02 + Math.random() * 0.03,
-      });
+    function sizeCanvas() {
+      W = cv!.clientWidth  || window.innerWidth;
+      H = cv!.clientHeight || window.innerHeight;
+      small = W < 640;
+      cv!.width  = Math.max(1, Math.round(W * dpr));
+      cv!.height = Math.max(1, Math.round(H * dpr));
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    const logoW   = Math.min(580, W * 0.82);
-    const logoH   = Math.round(logoW * 52 / 260);
-    const step    = Math.max(3, Math.round(logoW / 155));
-    const cubeS   = Math.max(2, step - 1);
-    const offX    = (W - logoW) / 2;
-    const offY    = (H - logoH) / 2;
-    const diag    = Math.hypot(W, H);
-    const logoCX  = offX + logoW / 2;
-    const logoCY  = offY + logoH / 2;
+    const COLS = ["#a78bfa","#67e8f9","#c4b5fd","#38bdf8","#818cf8"];
 
-    document.fonts.load(`800 ${Math.round(34 * (logoH / 52))}px "DM Sans"`).finally(() => {
-      const raw = buildTargets(logoW, logoH, step);
-      const MAX = 2400;
-      const src = raw.length > MAX
-        ? raw.filter((_, i) => i % Math.ceil(raw.length / MAX) === 0)
-        : raw;
+    function build() {
+      if (dissolvedRef.current) return;
+      cancelAnimationFrame(rafRef.current);
+      sizeCanvas();
+      ambients.current  = [];
+      particles.current = [];
+      phaseRef.current  = 0;
+      tick.current      = 0;
 
-      particles.current = src.map(t => {
-        const angle = Math.random() * Math.PI * 2;
-        const dist  = diag * (0.45 + Math.random() * 0.75);
-        const sx    = W / 2 + Math.cos(angle) * dist;
-        const sy    = H / 2 + Math.sin(angle) * dist;
-        const ptx   = offX + t.x;
-        const pty   = offY + t.y;
-        const dvx   = ptx - logoCX;
-        const dvy   = pty - logoCY;
-        const dvm   = Math.hypot(dvx, dvy) || 1;
-        return {
-          x: sx, y: sy,
-          tx: ptx, ty: pty,
-          sx, sy,
-          nx: dvx / dvm, ny: dvy / dvm,
-          color: t.color,
-          size: cubeS + (Math.random() > 0.88 ? 1 : 0),
-          delay: Math.random() * 0.5,
-        };
-      });
-
-      phaseStartRef.current = performance.now();
-
-      function bg() {
-        // Background fill
-        c.fillStyle = "#050814";
-        c.fillRect(0, 0, W, H);
-
-        // Pulsing violet glow — left-center
-        const p1 = (Math.sin(tick.current * 0.018) * 0.12 + 0.22);
-        const g1 = c.createRadialGradient(W * 0.28, H * 0.42, 0, W * 0.28, H * 0.42, W * 0.42);
-        g1.addColorStop(0, `rgba(124,58,237,${p1})`);
-        g1.addColorStop(1, "rgba(0,0,0,0)");
-        c.fillStyle = g1; c.fillRect(0, 0, W, H);
-
-        // Pulsing cyan glow — right-center
-        const p2 = (Math.sin(tick.current * 0.022 + 1.5) * 0.1 + 0.18);
-        const g2 = c.createRadialGradient(W * 0.72, H * 0.58, 0, W * 0.72, H * 0.58, W * 0.38);
-        g2.addColorStop(0, `rgba(6,182,212,${p2})`);
-        g2.addColorStop(1, "rgba(0,0,0,0)");
-        c.fillStyle = g2; c.fillRect(0, 0, W, H);
-
-        // Subtle grid
-        c.globalAlpha = 0.03;
-        c.strokeStyle = "#a78bfa";
-        c.lineWidth = 0.5;
-        const gs = 60;
-        for (let x = 0; x < W; x += gs) { c.beginPath(); c.moveTo(x,0); c.lineTo(x,H); c.stroke(); }
-        for (let y = 0; y < H; y += gs) { c.beginPath(); c.moveTo(0,y); c.lineTo(W,y); c.stroke(); }
-        c.globalAlpha = 1;
+      // Mai putine particule pe ecrane mici (performanta pe telefon)
+      const ambientCount = small ? 42 : 110;
+      for (let i = 0; i < ambientCount; i++) {
+        ambients.current.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.25,
+          vy: -(Math.random() * 0.6 + 0.15),
+          r: Math.random() * 1.8 + 0.4,
+          alpha: Math.random() * 0.35 + 0.08,
+          color: COLS[Math.floor(Math.random() * COLS.length)],
+          pulse: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.02 + Math.random() * 0.03,
+        });
       }
 
-      function drawAmbients() {
-        for (const a of ambients.current) {
-          a.x += a.vx; a.y += a.vy; a.pulse += a.pulseSpeed;
-          if (a.y < -4) { a.y = H + 4; a.x = Math.random() * W; }
-          const alpha = a.alpha * (0.7 + Math.sin(a.pulse) * 0.3);
-          c.globalAlpha = alpha;
-          c.fillStyle = a.color;
-          c.beginPath(); c.arc(a.x, a.y, a.r, 0, Math.PI * 2); c.fill();
+      const logoW   = Math.min(580, W * (small ? 0.92 : 0.82));
+      const logoH   = Math.round(logoW * 52 / 260);
+      const step    = Math.max(3, Math.round(logoW / 155));
+      const cubeS   = Math.max(2, step - 1);
+      const offX    = (W - logoW) / 2;
+      const offY    = (H - logoH) / 2;
+      const diag    = Math.hypot(W, H);
+      const logoCX  = offX + logoW / 2;
+      const logoCY  = offY + logoH / 2;
+
+      document.fonts.load(`800 ${Math.round(34 * (logoH / 52))}px "DM Sans"`).finally(() => {
+        if (dissolvedRef.current) return;
+        const raw = buildTargets(logoW, logoH, step);
+        const MAX = small ? 1100 : 2400;
+        const src = raw.length > MAX
+          ? raw.filter((_, i) => i % Math.ceil(raw.length / MAX) === 0)
+          : raw;
+
+        particles.current = src.map(t => {
+          const angle = Math.random() * Math.PI * 2;
+          const dist  = diag * (0.45 + Math.random() * 0.75);
+          const sx    = W / 2 + Math.cos(angle) * dist;
+          const sy    = H / 2 + Math.sin(angle) * dist;
+          const ptx   = offX + t.x;
+          const pty   = offY + t.y;
+          const dvx   = ptx - logoCX;
+          const dvy   = pty - logoCY;
+          const dvm   = Math.hypot(dvx, dvy) || 1;
+          return {
+            x: sx, y: sy,
+            tx: ptx, ty: pty,
+            sx, sy,
+            nx: dvx / dvm, ny: dvy / dvm,
+            color: t.color,
+            size: cubeS + (Math.random() > 0.88 ? 1 : 0),
+            delay: Math.random() * 0.5,
+          };
+        });
+
+        phaseStartRef.current = performance.now();
+
+        function bg() {
+          c.fillStyle = "#050814";
+          c.fillRect(0, 0, W, H);
+
+          const p1 = (Math.sin(tick.current * 0.018) * 0.12 + 0.22);
+          const g1 = c.createRadialGradient(W * 0.28, H * 0.42, 0, W * 0.28, H * 0.42, W * 0.42);
+          g1.addColorStop(0, `rgba(124,58,237,${p1})`);
+          g1.addColorStop(1, "rgba(0,0,0,0)");
+          c.fillStyle = g1; c.fillRect(0, 0, W, H);
+
+          const p2 = (Math.sin(tick.current * 0.022 + 1.5) * 0.1 + 0.18);
+          const g2 = c.createRadialGradient(W * 0.72, H * 0.58, 0, W * 0.72, H * 0.58, W * 0.38);
+          g2.addColorStop(0, `rgba(6,182,212,${p2})`);
+          g2.addColorStop(1, "rgba(0,0,0,0)");
+          c.fillStyle = g2; c.fillRect(0, 0, W, H);
+
+          // Grila subtila — doar pe ecrane mari (cost mare pe telefon)
+          if (!small) {
+            c.globalAlpha = 0.03;
+            c.strokeStyle = "#a78bfa";
+            c.lineWidth = 0.5;
+            const gs = 60;
+            for (let x = 0; x < W; x += gs) { c.beginPath(); c.moveTo(x,0); c.lineTo(x,H); c.stroke(); }
+            for (let y = 0; y < H; y += gs) { c.beginPath(); c.moveTo(0,y); c.lineTo(W,y); c.stroke(); }
+            c.globalAlpha = 1;
+          }
         }
-        c.globalAlpha = 1;
-      }
 
-      function frame(now: number) {
-        tick.current++;
-        const el = now - phaseStartRef.current;
-        c.clearRect(0, 0, W, H);
-        bg();
-        drawAmbients();
-
-        // ── Phase 0: fly-in ──────────────────────────────────────────
-        if (phaseRef.current === 0) {
-          for (const p of particles.current) {
-            const raw = (el / FLY_IN_MS - p.delay) / (1 - p.delay * 0.4);
-            const t   = Math.min(1, Math.max(0, raw));
-            const e   = easeOut(t);
-            p.x = p.sx + (p.tx - p.sx) * e;
-            p.y = p.sy + (p.ty - p.sy) * e;
-            c.globalAlpha = Math.min(1, t * 2.2);
-            c.fillStyle = p.color;
-            c.fillRect(p.x, p.y, p.size, p.size);
+        function drawAmbients() {
+          for (const a of ambients.current) {
+            a.x += a.vx; a.y += a.vy; a.pulse += a.pulseSpeed;
+            if (a.y < -4) { a.y = H + 4; a.x = Math.random() * W; }
+            const alpha = a.alpha * (0.7 + Math.sin(a.pulse) * 0.3);
+            c.globalAlpha = alpha;
+            c.fillStyle = a.color;
+            c.beginPath(); c.arc(a.x, a.y, a.r, 0, Math.PI * 2); c.fill();
           }
           c.globalAlpha = 1;
-          if (el >= FLY_IN_MS * 1.2) {
-            phaseRef.current = 1;
-            phaseStartRef.current = now;
-            setShowSkip(true);
-            setTimeout(() => setSubtitleVisible(true), 300);
+        }
+
+        function frame(now: number) {
+          tick.current++;
+          const el = now - phaseStartRef.current;
+          c.clearRect(0, 0, W, H);
+          bg();
+          drawAmbients();
+
+          if (phaseRef.current === 0) {
+            for (const p of particles.current) {
+              const rawP = (el / FLY_IN_MS - p.delay) / (1 - p.delay * 0.4);
+              const t   = Math.min(1, Math.max(0, rawP));
+              const e   = easeOut(t);
+              p.x = p.sx + (p.tx - p.sx) * e;
+              p.y = p.sy + (p.ty - p.sy) * e;
+              c.globalAlpha = Math.min(1, t * 2.2);
+              c.fillStyle = p.color;
+              c.fillRect(p.x, p.y, p.size, p.size);
+            }
+            c.globalAlpha = 1;
+            if (el >= FLY_IN_MS * 1.2) {
+              phaseRef.current = 1;
+              phaseStartRef.current = now;
+              setShowSkip(true);
+              setTimeout(() => setSubtitleVisible(true), 300);
+            }
+
+          } else if (phaseRef.current === 1) {
+            const glowA = 0.10 + Math.sin(tick.current * 0.04) * 0.04;
+            const lg = c.createRadialGradient(logoCX, logoCY, 0, logoCX, logoCY, logoW * 0.55);
+            lg.addColorStop(0, `rgba(167,139,250,${glowA})`);
+            lg.addColorStop(0.5, `rgba(103,232,249,${glowA * 0.4})`);
+            lg.addColorStop(1, "rgba(0,0,0,0)");
+            c.fillStyle = lg; c.fillRect(0, 0, W, H);
+
+            const breathe = 0.92 + Math.sin(tick.current * 0.05) * 0.08;
+            for (const p of particles.current) {
+              c.globalAlpha = breathe;
+              c.fillStyle = p.color;
+              c.fillRect(p.tx, p.ty, p.size, p.size);
+            }
+            c.globalAlpha = 1;
+            if (el >= HOLD_MS) startDissolve();
+
+          } else {
+            const t   = Math.min(1, el / DISSOLVE_MS);
+            const e   = easeIn(t);
+            const spd = diag * 0.38 * e;
+            c.globalAlpha = 1 - t;
+            for (const p of particles.current) {
+              c.fillStyle = p.color;
+              c.fillRect(p.tx + p.nx * spd, p.ty + p.ny * spd, p.size, p.size);
+            }
+            c.globalAlpha = 1;
           }
 
-        // ── Phase 1: hold ─────────────────────────────────────────────
-        } else if (phaseRef.current === 1) {
-          // Logo center glow
-          const glowA = 0.10 + Math.sin(tick.current * 0.04) * 0.04;
-          const lg = c.createRadialGradient(logoCX, logoCY, 0, logoCX, logoCY, logoW * 0.55);
-          lg.addColorStop(0, `rgba(167,139,250,${glowA})`);
-          lg.addColorStop(0.5, `rgba(103,232,249,${glowA * 0.4})`);
-          lg.addColorStop(1, "rgba(0,0,0,0)");
-          c.fillStyle = lg; c.fillRect(0, 0, W, H);
-
-          const breathe = 0.92 + Math.sin(tick.current * 0.05) * 0.08;
-          for (const p of particles.current) {
-            c.globalAlpha = breathe;
-            c.fillStyle = p.color;
-            c.fillRect(p.tx, p.ty, p.size, p.size);
-          }
-          c.globalAlpha = 1;
-          if (el >= HOLD_MS) startDissolve();
-
-        // ── Phase 2: dissolve ─────────────────────────────────────────
-        } else {
-          const t   = Math.min(1, el / DISSOLVE_MS);
-          const e   = easeIn(t);
-          const spd = diag * 0.38 * e;
-          c.globalAlpha = 1 - t;
-          for (const p of particles.current) {
-            c.fillStyle = p.color;
-            c.fillRect(p.tx + p.nx * spd, p.ty + p.ny * spd, p.size, p.size);
-          }
-          c.globalAlpha = 1;
+          rafRef.current = requestAnimationFrame(frame);
         }
 
         rafRef.current = requestAnimationFrame(frame);
-      }
+      });
+    }
 
-      rafRef.current = requestAnimationFrame(frame);
-    });
+    build();
 
-    return () => cancelAnimationFrame(rafRef.current);
+    // Rebuild la rotire / schimbare majora de viewport (ignora micro-resize de la bara de adrese)
+    let rt = 0;
+    let lastW = W, lastH = H;
+    function onResize() {
+      if (dissolvedRef.current) return;
+      const nw = cv!.clientWidth || window.innerWidth;
+      const nh = cv!.clientHeight || window.innerHeight;
+      if (Math.abs(nw - lastW) < 64 && Math.abs(nh - lastH) < 120) return;
+      lastW = nw; lastH = nh;
+      clearTimeout(rt);
+      rt = window.setTimeout(build, 180);
+    }
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      clearTimeout(rt);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
   }, [startDissolve]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#050814" }}>
-      <canvas ref={canvasRef} style={{ display: "block" }} />
+    <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "#050814", overflow: "hidden", touchAction: "none" }}>
+      <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
 
       {/* Subtitle */}
       {subtitleVisible && (
