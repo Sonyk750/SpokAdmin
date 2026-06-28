@@ -237,9 +237,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfMsg,     setPdfMsg]     = useState<string | null>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
-  const attachInputRef = useRef<HTMLInputElement>(null);
 
-  // PDF de atașat la salvare (importat sau atașat manual)
+  // PDF de atașat la salvare (importat din PDF)
   const [pdfFile,    setPdfFile]    = useState<File | null>(null);
   const [pdfDeleted, setPdfDeleted] = useState(false);
   const [pdfBusy,    setPdfBusy]    = useState(false);
@@ -577,14 +576,6 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     } finally {
       setPdfLoading(false);
     }
-  }
-
-  // Atașează un PDF fără a-l trimite la AI (doar îl reține pentru salvare).
-  function attachPdfFile(file: File) {
-    if (file.type && file.type !== "application/pdf") { setPdfMsg("Eroare: fișierul trebuie să fie PDF."); return; }
-    if (file.size > 10 * 1024 * 1024) { setPdfMsg("Eroare: PDF prea mare (max. 10 MB)."); return; }
-    setPdfFile(file); setPdfDeleted(false);
-    setPdfMsg(`PDF „${file.name}" va fi atașat la salvare.`);
   }
 
   // Upload/șterge PDF pentru o factură existentă (din modalul de editare).
@@ -927,15 +918,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               <div className="pdf-import">
                 <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); e.target.value = ""; }} />
-                <input ref={attachInputRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
-                  onChange={e => { const f = e.target.files?.[0]; if (f) attachPdfFile(f); e.target.value = ""; }} />
                 <button type="button" className="btn btn--secondary pdf-import__btn"
                   disabled={pdfLoading} onClick={() => fileInputRef.current?.click()}>
-                  {pdfLoading ? "Se citește..." : "📄 Importă din PDF"}
-                </button>
-                <button type="button" className="btn btn--secondary pdf-import__btn"
-                  disabled={pdfLoading} onClick={() => attachInputRef.current?.click()}>
-                  📎 Atașează PDF
+                  {pdfLoading ? "Se citește..." : "📄 Importă din PDF (se atașează automat)"}
                 </button>
                 {pdfMsg && <span className={pdfIsErr ? "pdf-import__msg--err" : "pdf-import__msg--ok"}>{pdfMsg}</span>}
               </div>
