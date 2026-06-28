@@ -914,10 +914,26 @@ export default function WizardClient({
     ap, prop: proprietari[idx],
     rows: soldFonduri.filter(sf => sf.numar === ap.numar),
   }));
+  const TIP_ORDER   = ["apa_rece", "apa_calda", "electric", "gaz"];
+  const LOC_ORDER   = ["bucatarie", "baie", "baie_mica", "general", "gradina"];
+  function sortIndexRows(rows: IndexRow[]): IndexRow[] {
+    return [...rows].sort((a, b) => {
+      const tipDiff = (TIP_ORDER.indexOf(a.tip) ?? 99) - (TIP_ORDER.indexOf(b.tip) ?? 99);
+      if (tipDiff !== 0) return tipDiff;
+      const locA = a.locatie || a.denumire;
+      const locB = b.locatie || b.denumire;
+      const iA = LOC_ORDER.indexOf(locA);
+      const iB = LOC_ORDER.indexOf(locB);
+      if (iA !== -1 && iB !== -1) return iA - iB;
+      if (iA !== -1) return -1;
+      if (iB !== -1) return 1;
+      return locA.localeCompare(locB);
+    });
+  }
   const apsWithIndex = apartamente.map(ap => ({
     ap,
     prop: proprietari.find(p => p.numar === ap.numar),
-    rows: indexRows.filter(r => r.numar === ap.numar),
+    rows: sortIndexRows(indexRows.filter(r => r.numar === ap.numar)),
   })).filter(x => x.rows.length > 0);
 
   const conturTabsVisible = [
