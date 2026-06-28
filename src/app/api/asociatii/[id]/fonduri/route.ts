@@ -84,12 +84,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   });
   const platiByFond = new Map(platiAgg.map(r => [r.fondId!, r._sum.suma ?? 0]));
 
-  // 5. Sold curent = inițial + contribuții - plăți
+  // 4b. Facturi ALOCATE pe fond (acoperite din fond, nedistribuite) — reduc soldul fondului
+  const facturiAgg = await db.factura.groupBy({
+    by:    ["fondId"],
+    where: { fondId: { in: fondIds }, asociatieId: id, organizationId: orgId },
+    _sum:  { valoare: true },
+  });
+  const facturiByFond = new Map(facturiAgg.map(r => [r.fondId!, r._sum.valoare ?? 0]));
+
+  // 5. Sold curent = inițial + contribuții - plăți din fond - facturi alocate pe fond
   const result = fonduri.map(f => {
     const initial = (soldByFond.get(f.id) ?? 0) || (soldAsocByFond.get(f.id) ?? 0);
     const contrib = contribByFond.get(f.id) ?? 0;
     const plati   = platiByFond.get(f.id) ?? 0;
-    return { id: f.id, name: f.name, sold: initial + contrib - plati };
+    const facturi = facturiByFond.get(f.id) ?? 0;
+    return { id: f.id, name: f.name, sold: initial + contrib - plati - facturi };
   });
 
   return NextResponse.json(result);

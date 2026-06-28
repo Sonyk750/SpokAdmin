@@ -31,6 +31,8 @@ interface FacturaRow {
   dinFond?:       boolean;
   fondPaid?:      number;
   fonduri?:       string[];
+  fondId?:        string | null;   // alocare pe fond (acoperită din fond, nedistribuită)
+  fondName?:      string | null;
   hasPdf?:        boolean;
 }
 
@@ -691,6 +693,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
         luna:         form.luna ? parseInt(form.luna) : undefined,
         an:           form.an   ? parseInt(form.an)   : undefined,
         notes:        form.notes.trim()  || undefined,
+        fondId:       (modal === "adauga" && platesteDinFond && fondPlataId) ? fondPlataId : undefined,
       };
       let res: Response;
       if (modal === "adauga") {
@@ -704,18 +707,6 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       const facturaId = modal === "adauga" ? json.id : selected!.id;
       try { if (facturaId) await uploadPdf(facturaId); }
       catch (e: any) { setFormErr(e.message); setSaving(false); fetchFacturi(); return; }
-      // Plata din fond (la creare): achită integral factura din fondul ales
-      if (modal === "adauga" && platesteDinFond && fondPlataId && facturaId) {
-        const pr = await fetch(`/api/facturi/${facturaId}/plati`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ suma: valoare, metoda: "banca", fondId: fondPlataId }),
-        });
-        if (!pr.ok) {
-          const j = await pr.json().catch(() => ({}));
-          setFormErr(j.error ?? "Factura s-a creat, dar plata din fond a eșuat.");
-          setSaving(false); fetchFacturi(); return;
-        }
-      }
       const freshFurn = await fetch("/api/furnizori").then(r => r.json());
       setFurnizori(freshFurn);
       closeModal(); fetchFacturi();
@@ -949,7 +940,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               const restDist      = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
               const areDist       = !!f.distribuireJson;
               const distComplet   = restDist <= 0.01;
-              const platitDinFond = (f.fondPaid ?? 0) >= f.valoare - 0.01; // achitată integral din fond
+              const alocatFond = !!f.fondId; // acoperită din fond — nu se distribuie pe apartamente
               return (
               <tr key={f.id}>
                 <td style={{ fontWeight: 600 }}>{f.furnizor?.nume ?? <span style={{ color: "#475569" }}>—</span>}</td>
@@ -962,15 +953,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {platitDinFond
-                    ? <span title={`Plătită din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — nu se distribuie pe apartamente`}
-                        style={{ display: "inline-block", padding: "2px 9px", borderRadius: 99, background: "rgba(56,189,248,0.14)", color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond</span>
+                  {alocatFond
+                    ? <span title={`Acoperită din fond${f.fondName ? " (" + f.fondName + ")" : ""} — nu se distribuie pe apartamente. Plata se face separat din casă/bancă.`}
+                        style={{ display: "inline-block", padding: "2px 9px", borderRadius: 99, background: "rgba(56,189,248,0.14)", color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond{f.fondName ? ` · ${f.fondName}` : ""}</span>
                     : !areDist
                       ? <span className="pill pill--red" title="Factura nu a fost distribuită pe apartamente">nedistribuit</span>
                       : distComplet
                         ? <span className="pill pill--green" title="Distribuită integral pe apartamente">{f.luna ? `${LUNI[f.luna - 1]}${f.an ? " " + f.an : ""}` : "Distribuită"}</span>
                         : <span className="pill pill--red" title={`Mai sunt ${fmt2(restDist)} lei de distribuit — deschide Distribuire`}>⚠ {fmt2(restDist)} lei</span>}
-                  {f.dinFond && !platitDinFond && (
+                  {f.dinFond && !alocatFond && (
                     <span title={`${fmt2(f.fondPaid ?? 0)} lei din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — partea aceasta nu se distribuie în lista de întreținere`}
                       style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 4 }}>
                       −{fmt2(f.fondPaid ?? 0)} fond
@@ -985,9 +976,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                       <button className="btn-action" onClick={() => openEditeaza(f)} title="Fără PDF — atașează din editare" style={{ opacity: 0.4 }}>👁</button>
                     )}
                     <button className="btn-action" onClick={() => openPlata(f)} title="Achită / plăți">💳</button>
-                    <button className="btn-action" onClick={() => openDistribuie(f)} disabled={platitDinFond}
-                      title={platitDinFond ? "Plătită din fond — nu se distribuie pe apartamente" : "Distribuire pe apartamente"}
-                      style={platitDinFond ? { opacity: 0.35, cursor: "not-allowed" } : undefined}>⊞</button>
+                    <button className="btn-action" onClick={() => openDistribuie(f)} disabled={alocatFond}
+                      title={alocatFond ? "Acoperită din fond — nu se distribuie pe apartamente" : "Distribuire pe apartamente"}
+                      style={alocatFond ? { opacity: 0.35, cursor: "not-allowed" } : undefined}>⊞</button>
                     <button className="btn-action" onClick={() => openEditeaza(f)} title="Editează">✎</button>
                     <button className="btn-action btn-action--danger" onClick={() => deleteFactura(f)} title="Șterge">×</button>
                   </div>
@@ -1085,7 +1076,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                         onChange={e => setPlatesteDinFond(e.target.checked)}
                         style={{ accentColor: "#7c3aed", width: 16, height: 16 }} />
                       <span style={{ color: "#cbd5e1", fontSize: "0.88rem" }}>
-                        Plătesc factura dintr-un fond <span style={{ color: "#64748b", fontSize: "0.78rem" }}>(nu se distribuie pe apartamente)</span>
+                        Acopăr factura dintr-un fond <span style={{ color: "#64748b", fontSize: "0.78rem" }}>(scade din fond, nu se distribuie pe apartamente; plata se face separat din casă/bancă)</span>
                       </span>
                     </label>
                     {platesteDinFond && (

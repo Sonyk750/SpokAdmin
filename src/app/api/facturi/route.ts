@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
     an?:           number;
     categorie?:    string;
     notes?:        string;
+    fondId?:       string;
   };
 
   if (!body.asociatieId) return NextResponse.json({ error: "Asociația este obligatorie." }, { status: 400 });
@@ -76,6 +77,18 @@ export async function POST(req: NextRequest) {
     select: { id: true },
   });
   if (!asociatie) return NextResponse.json({ error: "Asociație invalidă." }, { status: 400 });
+
+  // Alocare pe fond (opțional): factura e acoperită din acest fond (reduce soldul fondului,
+  // nu se distribuie pe apartamente). NU e plată — statusul rămâne „neplatită".
+  let fondId: string | null = null, fondName: string | null = null;
+  if (body.fondId) {
+    const fond = await db.fondAsociatie.findFirst({
+      where:  { id: body.fondId, asociatieId: body.asociatieId },
+      select: { id: true, name: true },
+    });
+    if (!fond) return NextResponse.json({ error: "Fond invalid." }, { status: 400 });
+    fondId = fond.id; fondName = fond.name;
+  }
 
   // Resolve furnizor: use existing id, or create by name
   let furnizorId = body.furnizorId ?? null;
@@ -111,6 +124,8 @@ export async function POST(req: NextRequest) {
         an:             body.an   ?? null,
         categorie:      body.categorie || null,
         notes:          body.notes?.trim() || null,
+        fondId,
+        fondName,
       },
       select: { id: true, organizationId: true, asociatieId: true, furnizorId: true },
     });

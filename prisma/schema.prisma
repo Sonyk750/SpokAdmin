@@ -415,6 +415,10 @@ model Factura {
   aiProcessed     Boolean   @default(false)
   aiData          String?
   notes           String?
+  // Alocare pe fond: factura e acoperită din acest fond (reduce soldul fondului,
+  // NU se distribuie pe apartamente). Distinctă de plată — statusul rămâne pe plăți (casă/bancă).
+  fondId          String?
+  fondName        String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
