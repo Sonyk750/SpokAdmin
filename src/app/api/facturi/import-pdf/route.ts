@@ -49,7 +49,7 @@ Reguli:
 - serie: seria documentului (ex: "FACT", "RO", "FCV") — null dacă nu există
 - numar: numărul documentului (cifre/cod, fără serie)
 - valoare: valoarea facturii CURENTE (contravaloarea serviciilor facturate ÎN ACEASTĂ LUNĂ, cu TVA inclus). Caută "Total factură", "Total factură curentă", "Valoare factură", "Total de plată factură curentă". NU lua "Sold precedent / Rest de plată / Total de plată" dacă acela include restanțe sau sold din facturi anterioare — ai nevoie DOAR de factura curentă.
-- dataEmiterii: data emiterii în format YYYY-MM-DD — null dacă nu găsești`,
+- dataEmiterii: data emiterii. Pe facturile românești data e scrisă zi.lună.an (ex: "05.06.2026" sau "5 iunie 2026" = 5 iunie). Returneaz-o în format ISO YYYY-MM-DD corect (ex: 2026-06-05). NU inversa ziua cu luna.`,
           },
         ],
       }],
