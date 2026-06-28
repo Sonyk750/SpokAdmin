@@ -8,7 +8,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const asociatie = await db.asociatie.findFirst({
-    where: { id, organizationId: session.user.organizationId },
+    where:  { id, organizationId: session.user.organizationId },
+    select: { id: true, wizardData: true },
   });
   if (!asociatie) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -16,9 +17,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     indecsi: { contorId: string; numarSerie?: string; indexVechi: string; indexNou: string }[];
   };
 
-  const now  = new Date();
-  const luna = now.getMonth() + 1;
-  const an   = now.getFullYear();
+  // Citirile de la inițializare aparțin primei liste de plată (ex: mai), nu lunii curente.
+  const now = new Date();
+  let wd: Record<string, unknown> = {};
+  try { if (asociatie.wizardData) wd = JSON.parse(asociatie.wizardData); } catch {}
+  const luna = Number(wd.primaListaLuna) || (now.getMonth() + 1);
+  const an   = Number(wd.primaListaAn)   || now.getFullYear();
 
   for (const r of indecsi) {
     const vechi = parseFloat(r.indexVechi) || 0;
