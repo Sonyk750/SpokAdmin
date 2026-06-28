@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
               telefon:      true,
               emailuriJson: true,
               calitati:     true,
+              drepturi:     true,
             },
           },
         },
@@ -50,6 +51,8 @@ export async function GET(req: NextRequest) {
       let calitati: string[] = [];
       try { calitati = JSON.parse(lnk.proprietar.calitati || "[]"); } catch {}
       if (!calitati.includes("proprietar")) calitati = ["proprietar", ...calitati];
+      let drepturi: Record<string, boolean> = {};
+      try { drepturi = JSON.parse(lnk.proprietar.drepturi || "{}"); } catch {}
       return {
         proprietarId:  lnk.proprietar.id,
         prenume:       lnk.proprietar.prenume,
@@ -57,6 +60,7 @@ export async function GET(req: NextRequest) {
         telefon:       lnk.proprietar.telefon,
         emailuri,
         calitati,
+        drepturi,
         apartamentNr:  `Ap. ${ap.numar}`,
         apartamentId:  ap.id,
         isMain:        lnk.isMain,

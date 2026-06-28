@@ -14,12 +14,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
   });
   if (!proprietar) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { prenume, nume, telefon, emailuri, calitati } = await req.json() as {
+  const { prenume, nume, telefon, emailuri, calitati, drepturi } = await req.json() as {
     prenume:  string;
     nume:     string;
     telefon:  string;
     emailuri: string[];
     calitati?: string[];
+    drepturi?: Record<string, boolean>;
   };
 
   const emailuriCurate = (emailuri ?? []).map(e => e.trim()).filter(Boolean);
@@ -41,8 +42,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
       email:        emailuriCurate[0] ?? null,
       emailuriJson: emailuriCurate.length ? JSON.stringify(emailuriCurate) : null,
       calitati:     JSON.stringify(calitatiSave),
+      drepturi:     drepturi ? JSON.stringify(drepturi) : undefined,
     },
-    select: { id: true, prenume: true, nume: true, telefon: true, email: true, emailuriJson: true, calitati: true },
+    select: { id: true, prenume: true, nume: true, telefon: true, email: true, emailuriJson: true, calitati: true, drepturi: true },
   });
 
   return NextResponse.json(updated);

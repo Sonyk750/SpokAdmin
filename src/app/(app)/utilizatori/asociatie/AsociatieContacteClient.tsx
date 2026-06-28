@@ -5,6 +5,13 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 
 // ─── Tipuri ───────────────────────────────────────────────────────────────────
 
+interface Drepturi {
+  rapoarte:     boolean;
+  istoricIndex: boolean;
+  citiri:       boolean;
+  mesaje:       boolean;
+}
+
 interface ProprietarRow {
   proprietarId: string;
   prenume:      string | null;
@@ -12,6 +19,7 @@ interface ProprietarRow {
   telefon:      string | null;
   emailuri:     string[];
   calitati:     string[];
+  drepturi:     Partial<Drepturi>;
   apartamentNr: string;
   apartamentId: string;
   isMain:       boolean;
@@ -19,7 +27,7 @@ interface ProprietarRow {
 
 type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex";
 
-// ─── Constante roluri ─────────────────────────────────────────────────────────
+// ─── Configurare roluri ───────────────────────────────────────────────────────
 
 const CALITATI_CONFIG: { key: ExtraCalitate; label: string; color: string; bg: string }[] = [
   { key: "presedinte",  label: "Președinte",  color: "#fbbf24", bg: "rgba(251,191,36,0.12)"  },
@@ -27,13 +35,20 @@ const CALITATI_CONFIG: { key: ExtraCalitate; label: string; color: string; bg: s
   { key: "membru_cex",  label: "Membru CEX",  color: "#4ade80", bg: "rgba(74,222,128,0.12)"  },
 ];
 
-// ce acces are fiecare calitate (informativ, contul nu există încă)
-const ACCES_MAP: Record<string, { rapoarte: boolean; istoric: boolean; citiri: boolean; mesaje: boolean }> = {
-  proprietar:  { rapoarte: false, istoric: false, citiri: true,  mesaje: true  },
-  presedinte:  { rapoarte: true,  istoric: true,  citiri: true,  mesaje: true  },
-  cenzor:      { rapoarte: true,  istoric: true,  citiri: false, mesaje: true  },
-  membru_cex:  { rapoarte: true,  istoric: false, citiri: false, mesaje: true  },
+// Drepturi implicite per calitate (se pot suprascrie individual)
+const DEFAULT_DREPTURI: Record<string, Drepturi> = {
+  proprietar:  { rapoarte: true,  istoricIndex: false, citiri: true,  mesaje: true  },
+  presedinte:  { rapoarte: true,  istoricIndex: true,  citiri: true,  mesaje: true  },
+  cenzor:      { rapoarte: true,  istoricIndex: true,  citiri: false, mesaje: true  },
+  membru_cex:  { rapoarte: true,  istoricIndex: false, citiri: false, mesaje: true  },
 };
+
+const DREPTURI_LABELS: { key: keyof Drepturi; label: string; desc: string }[] = [
+  { key: "rapoarte",     label: "Rapoarte & liste de plată",  desc: "Vizualizare liste lunare, rapoarte financiare" },
+  { key: "istoricIndex", label: "Istoric index contoare",     desc: "Consultare citiri și consum istoric" },
+  { key: "citiri",       label: "Citiri contoare (manual)",   desc: "Introducere index lunar pentru propriile contoare" },
+  { key: "mesaje",       label: "Mesaje în aplicație",        desc: "Comunicare cu administratorul asociației" },
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +68,19 @@ function getExtra(calitati: string[]): ExtraCalitate | null {
   return null;
 }
 
+function defaultDrepturiForCalitate(extra: ExtraCalitate | null): Drepturi {
+  if (!extra) return { ...DEFAULT_DREPTURI.proprietar };
+  // merge: proprietar defaults + extra role overrides (take max access)
+  const base  = DEFAULT_DREPTURI.proprietar;
+  const bonus = DEFAULT_DREPTURI[extra];
+  return {
+    rapoarte:     base.rapoarte     || bonus.rapoarte,
+    istoricIndex: base.istoricIndex || bonus.istoricIndex,
+    citiri:       base.citiri       || bonus.citiri,
+    mesaje:       base.mesaje       || bonus.mesaje,
+  };
+}
+
 function CalitateChip({ calitati }: { calitati: string[] }) {
   const extra = getExtra(calitati);
   if (!extra) {
@@ -70,12 +98,6 @@ function CalitateChip({ calitati }: { calitati: string[] }) {
 // ─── Modal drepturi referință ─────────────────────────────────────────────────
 
 function DreptRefModal({ onClose }: { onClose: () => void }) {
-  const rows = [
-    { label: "Rapoarte & liste",         prop: false, pres: true,  cenz: true,  cex: true  },
-    { label: "Istoric contabil",          prop: false, pres: true,  cenz: true,  cex: false },
-    { label: "Citiri contoare (manual)",  prop: true,  pres: true,  cenz: false, cex: false },
-    { label: "Mesaje în aplicație",       prop: true,  pres: true,  cenz: true,  cex: true  },
-  ];
   const Tick = ({ ok }: { ok: boolean }) => (
     <td style={{ textAlign: "center", color: ok ? "#4ade80" : "#334155", fontWeight: ok ? 700 : 400 }}>
       {ok ? "✓" : "—"}
@@ -83,14 +105,15 @@ function DreptRefModal({ onClose }: { onClose: () => void }) {
   );
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={e => e.stopPropagation()}>
         <div className="modal__header">
-          <h2 className="modal__title">Drepturi pe calitate</h2>
+          <h2 className="modal__title">Drepturi implicite pe calitate</h2>
           <button className="modal__close" onClick={onClose}>✕</button>
         </div>
         <div className="modal__body">
           <p style={{ color: "#94a3b8", fontSize: "0.82rem", marginBottom: "1.25rem" }}>
-            Accesul de mai jos devine activ când proprietarul va fi invitat să creeze cont în SpokAdmin.
+            Valorile de mai jos sunt <strong style={{ color: "#e2e8f0" }}>implicite</strong> la atribuirea calității.
+            Pot fi ajustate individual per proprietar din cardul acestuia.
           </p>
           <table className="data-table" style={{ fontSize: "0.83rem" }}>
             <thead>
@@ -103,13 +126,13 @@ function DreptRefModal({ onClose }: { onClose: () => void }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.label}>
-                  <td>{r.label}</td>
-                  <Tick ok={r.prop} />
-                  <Tick ok={r.pres} />
-                  <Tick ok={r.cenz} />
-                  <Tick ok={r.cex}  />
+              {DREPTURI_LABELS.map(d => (
+                <tr key={d.key}>
+                  <td>{d.label}</td>
+                  <Tick ok={DEFAULT_DREPTURI.proprietar[d.key]} />
+                  <Tick ok={DEFAULT_DREPTURI.presedinte[d.key] || DEFAULT_DREPTURI.proprietar[d.key]} />
+                  <Tick ok={DEFAULT_DREPTURI.cenzor[d.key]     || DEFAULT_DREPTURI.proprietar[d.key]} />
+                  <Tick ok={DEFAULT_DREPTURI.membru_cex[d.key] || DEFAULT_DREPTURI.proprietar[d.key]} />
                 </tr>
               ))}
             </tbody>
@@ -123,7 +146,7 @@ function DreptRefModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ─── Modal proprietar (calitate + contact edit) ───────────────────────────────
+// ─── Modal proprietar ─────────────────────────────────────────────────────────
 
 function ProprietarModal({
   row, onClose, onSaved,
@@ -134,10 +157,28 @@ function ProprietarModal({
 }) {
   const [tab, setTab] = useState<"calitate" | "contact">("calitate");
 
-  // calitate state
+  // calitate
   const [extra, setExtra] = useState<ExtraCalitate | null>(getExtra(row.calitati));
 
-  // contact state
+  // drepturi custom — inițializat din DB, fallback la default rol
+  const [drepturi, setDrepturi] = useState<Drepturi>(() => {
+    const saved = row.drepturi as Partial<Drepturi>;
+    const def   = defaultDrepturiForCalitate(getExtra(row.calitati));
+    return {
+      rapoarte:     saved.rapoarte     ?? def.rapoarte,
+      istoricIndex: saved.istoricIndex ?? def.istoricIndex,
+      citiri:       saved.citiri       ?? def.citiri,
+      mesaje:       saved.mesaje       ?? def.mesaje,
+    };
+  });
+
+  // când schimbă calitatea, pre-completează drepturile cu defaulturile noii calități
+  function handleChangeExtra(newExtra: ExtraCalitate | null) {
+    setExtra(newExtra);
+    setDrepturi(defaultDrepturiForCalitate(newExtra));
+  }
+
+  // contact
   const [prenume,  setPrenume]  = useState(row.prenume  ?? "");
   const [nume,     setNume]     = useState(row.nume);
   const [telefon,  setTelefon]  = useState(row.telefon  ?? "");
@@ -145,15 +186,6 @@ function ProprietarModal({
 
   const [saving,  setSaving]  = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
-
-  // acces rezumat bazat pe calitati curente
-  const calitatiCurente = extra ? ["proprietar", extra] : ["proprietar"];
-  const accesTotal = {
-    rapoarte: calitatiCurente.some(c => ACCES_MAP[c]?.rapoarte),
-    istoric:  calitatiCurente.some(c => ACCES_MAP[c]?.istoric),
-    citiri:   calitatiCurente.some(c => ACCES_MAP[c]?.citiri),
-    mesaje:   calitatiCurente.some(c => ACCES_MAP[c]?.mesaje),
-  };
 
   async function handleSave() {
     setSaving(true); setSaveErr(null);
@@ -164,6 +196,7 @@ function ProprietarModal({
           prenume, nume, telefon,
           emailuri: emailuri.filter(e => e.trim()),
           calitati: extra ? ["proprietar", extra] : ["proprietar"],
+          drepturi,
         }),
       });
       const json = await res.json();
@@ -174,19 +207,16 @@ function ProprietarModal({
     finally { setSaving(false); }
   }
 
-  const AccesRow = ({ label, ok }: { label: string; ok: boolean }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.45rem 0", borderBottom: "1px solid #1e293b" }}>
-      <span style={{ fontSize: "0.83rem", color: "#cbd5e1" }}>{label}</span>
-      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: ok ? "#4ade80" : "#475569" }}>
-        {ok ? "✓ Acces" : "✗ Fără acces"}
-      </span>
-    </div>
-  );
+  const toggleDrept = (key: keyof Drepturi) =>
+    setDrepturi(prev => ({ ...prev, [key]: !prev[key] }));
+
+  const defaultCurent = defaultDrepturiForCalitate(extra);
+  const hasCustom = (Object.keys(drepturi) as (keyof Drepturi)[]).some(k => drepturi[k] !== defaultCurent[k]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
-        {/* Header cu avatar */}
+        {/* Header */}
         <div style={{ padding: "1.5rem 1.5rem 0", display: "flex", gap: "1rem", alignItems: "center" }}>
           <div style={{
             width: 48, height: 48, borderRadius: "50%", flexShrink: 0,
@@ -215,53 +245,87 @@ function ProprietarModal({
         </div>
 
         <div className="modal__body" style={{ paddingTop: "1.25rem" }}>
+
           {/* ── Tab Calitate ── */}
           {tab === "calitate" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              {/* Checkboxes calitate */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+
+              {/* Calitate */}
               <div>
                 <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
                   Calitate în asociație
                 </div>
-                {/* Proprietar — mereu activ */}
                 <label style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.5rem 0.75rem", borderRadius: 8, background: "rgba(124,58,237,0.08)", marginBottom: "0.4rem", cursor: "default" }}>
                   <input type="checkbox" checked disabled style={{ accentColor: "#7c3aed", width: 16, height: 16 }} />
                   <span style={{ color: "#a78bfa", fontWeight: 600, fontSize: "0.88rem" }}>Proprietar</span>
                   <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#64748b" }}>implicit</span>
                 </label>
-                {/* Calitati extra — mutual exclusive */}
                 {CALITATI_CONFIG.map(c => (
                   <label key={c.key} style={{
                     display: "flex", alignItems: "center", gap: "0.6rem",
                     padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
                     background: extra === c.key ? c.bg : "transparent",
                     border: `1px solid ${extra === c.key ? c.color + "44" : "transparent"}`,
-                    cursor: "pointer", transition: "background 0.15s",
+                    cursor: "pointer",
                   }}>
                     <input type="checkbox"
                       checked={extra === c.key}
-                      onChange={e => setExtra(e.target.checked ? c.key : null)}
+                      onChange={e => handleChangeExtra(e.target.checked ? c.key : null)}
                       style={{ accentColor: c.color, width: 16, height: 16 }}
                     />
                     <span style={{ color: extra === c.key ? c.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
                       {c.label}
                     </span>
                     {extra !== null && extra !== c.key && (
-                      <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: "#475569" }}>exclusiv cu {CALITATI_CONFIG.find(x => x.key === extra)?.label}</span>
+                      <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: "#475569" }}>
+                        exclusiv cu {CALITATI_CONFIG.find(x => x.key === extra)?.label}
+                      </span>
                     )}
                   </label>
                 ))}
               </div>
 
-              {/* Acces aplicație */}
+              {/* Drepturi custom */}
               <div>
-                <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
-                  Acces în aplicație <span style={{ color: "#475569", fontWeight: 400, textTransform: "none" }}>(cont viitor)</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                  <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Acces în aplicație
+                  </div>
+                  {hasCustom && (
+                    <span style={{ fontSize: "0.68rem", color: "#fbbf24", background: "rgba(251,191,36,0.1)", padding: "1px 7px", borderRadius: 99 }}>
+                      personalizat
+                    </span>
+                  )}
+                  {hasCustom && (
+                    <button type="button"
+                      style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#64748b", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                      onClick={() => setDrepturi(defaultDrepturiForCalitate(extra))}>
+                      resetează implicit
+                    </button>
+                  )}
                 </div>
-                <AccesRow label="Rapoarte & liste de plată" ok={accesTotal.rapoarte} />
-                <AccesRow label="Istoric contabil"          ok={accesTotal.istoric}  />
-                <AccesRow label="Citiri contoare (manual)"  ok={accesTotal.citiri}   />
-                <AccesRow label="Mesaje în aplicație"       ok={accesTotal.mesaje}   />
+                <p style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "0.75rem" }}>
+                  Activ când va fi creat contul. Bifele de mai jos pot fi ajustate individual.
+                </p>
+                {DREPTURI_LABELS.map(d => (
+                  <label key={d.key} style={{
+                    display: "flex", alignItems: "flex-start", gap: "0.6rem",
+                    padding: "0.55rem 0.75rem", borderRadius: 8, marginBottom: "0.3rem", cursor: "pointer",
+                    background: drepturi[d.key] ? "rgba(74,222,128,0.05)" : "transparent",
+                    border: `1px solid ${drepturi[d.key] ? "rgba(74,222,128,0.15)" : "transparent"}`,
+                  }}>
+                    <input type="checkbox" checked={drepturi[d.key]}
+                      onChange={() => toggleDrept(d.key)}
+                      style={{ accentColor: "#4ade80", width: 16, height: 16, marginTop: 2, flexShrink: 0 }}
+                    />
+                    <div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 600, color: drepturi[d.key] ? "#e2e8f0" : "#64748b" }}>
+                        {d.label}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "#475569", marginTop: 1 }}>{d.desc}</div>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
           )}
@@ -326,12 +390,12 @@ function ProprietarModal({
 export default function AsociatieContacteClient() {
   const { activeId: asociatieId } = useAsociatie();
 
-  const [rows,       setRows]       = useState<ProprietarRow[]>([]);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [search,     setSearch]     = useState("");
-  const [selected,   setSelected]   = useState<ProprietarRow | null>(null);
-  const [showDrept,  setShowDrept]  = useState(false);
+  const [rows,      setRows]      = useState<ProprietarRow[]>([]);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [search,    setSearch]    = useState("");
+  const [selected,  setSelected]  = useState<ProprietarRow | null>(null);
+  const [showDrept, setShowDrept] = useState(false);
 
   const load = useCallback(async () => {
     if (!asociatieId) { setRows([]); return; }
@@ -360,6 +424,7 @@ export default function AsociatieContacteClient() {
   const nrPresedinte = rows.filter(r => r.calitati.includes("presedinte")).length;
   const nrCenzor     = rows.filter(r => r.calitati.includes("cenzor")).length;
   const nrCex        = rows.filter(r => r.calitati.includes("membru_cex")).length;
+  const nrDoarProp   = rows.filter(r => !r.calitati.some(c => c !== "proprietar")).length;
 
   if (!asociatieId) {
     return (
@@ -371,32 +436,28 @@ export default function AsociatieContacteClient() {
 
   return (
     <div className="page-shell">
-      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title">Contacte proprietari</h1>
-          <p className="page-sub">
-            {rows.length} proprietari · {nrPresedinte > 0 && `1 Președinte · `}{nrCenzor > 0 && `1 Cenzor · `}{nrCex > 0 && `${nrCex} Mem. CEX · `}
-            Click pe nume pentru calitate și drepturi
-          </p>
+          <p className="page-sub">Click pe orice rând pentru calitate, drepturi și date de contact</p>
         </div>
         <button className="btn btn--secondary" onClick={() => setShowDrept(true)}>
           📋 Drepturi pe rol
         </button>
       </div>
 
-      {/* Căutare + statistici rapide */}
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+      {/* Căutare + statistici */}
+      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
         <input type="text" className="input" style={{ maxWidth: 300 }}
           placeholder="Caută după nume, apartament, email..."
           value={search} onChange={e => setSearch(e.target.value)} />
-        <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto" }}>
+        <div style={{ display: "flex", gap: "0.5rem", marginLeft: "auto", flexWrap: "wrap" }}>
           {[
-            { label: "Proprietari", count: rows.filter(r => !r.calitati.some(c => c !== "proprietar")).length, color: "#7c3aed" },
+            { label: "Proprietari", count: nrDoarProp,   color: "#7c3aed" },
             { label: "Președinte",  count: nrPresedinte, color: "#fbbf24" },
             { label: "Cenzor",      count: nrCenzor,     color: "#38bdf8" },
             { label: "Mem. CEX",    count: nrCex,        color: "#4ade80" },
-          ].map(s => (
+          ].map(s => s.count > 0 && (
             <div key={s.label} style={{ fontSize: "0.75rem", padding: "4px 10px", borderRadius: 99, background: `${s.color}18`, color: s.color, fontWeight: 600 }}>
               {s.count} {s.label}
             </div>
@@ -421,22 +482,20 @@ export default function AsociatieContacteClient() {
               <tr>
                 <th style={{ width: 80 }}>Ap.</th>
                 <th>Proprietar</th>
-                <th style={{ width: 180 }}>Calitate</th>
+                <th style={{ width: 200 }}>Calitate</th>
                 <th style={{ width: 140 }}>Telefon</th>
                 <th>Email</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(r => (
-                <tr key={r.proprietarId} style={{ cursor: "pointer" }}
-                  onClick={() => setSelected(r)}
-                  className="tr--hover">
+                <tr key={r.proprietarId} style={{ cursor: "pointer" }} onClick={() => setSelected(r)}>
                   <td style={{ fontWeight: 700, color: "#a78bfa" }}>
                     {r.apartamentNr}
                     {!r.isMain && <span style={{ fontSize: "0.65rem", color: "#64748b", marginLeft: 4 }}>co-prop</span>}
                   </td>
                   <td>
-                    <span style={{ color: "#a78bfa", textDecoration: "underline", textDecorationStyle: "dotted", cursor: "pointer" }}>
+                    <span style={{ color: "#a78bfa", textDecoration: "underline", textDecorationStyle: "dotted" }}>
                       {displayName(r)}
                     </span>
                   </td>
@@ -444,7 +503,7 @@ export default function AsociatieContacteClient() {
                   <td style={{ color: r.telefon ? "#e2e8f0" : "#475569", fontSize: "0.83rem" }}>{r.telefon || "—"}</td>
                   <td style={{ fontSize: "0.8rem" }}>
                     {r.emailuri.length
-                      ? <span style={{ color: "#38bdf8" }}>{r.emailuri[0]}{r.emailuri.length > 1 && <span style={{ color: "#64748b" }}> +{r.emailuri.length - 1}</span>}</span>
+                      ? <><span style={{ color: "#38bdf8" }}>{r.emailuri[0]}</span>{r.emailuri.length > 1 && <span style={{ color: "#64748b" }}> +{r.emailuri.length - 1}</span>}</>
                       : <span style={{ color: "#475569" }}>—</span>
                     }
                   </td>
@@ -459,7 +518,7 @@ export default function AsociatieContacteClient() {
         <ProprietarModal
           row={selected}
           onClose={() => setSelected(null)}
-          onSaved={() => { load(); }}
+          onSaved={load}
         />
       )}
 

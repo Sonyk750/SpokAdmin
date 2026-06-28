@@ -263,6 +263,7 @@ model Proprietar {
   adresa         String?
   tip            String   @default("proprietar") // proprietar / chirias
   calitati       String   @default("[]")         // JSON array: ["proprietar","presedinte"|"cenzor"|"membru_cex"]
+  drepturi       String   @default("{}")         // JSON: {rapoarte,istoricIndex,citiri,mesaje} override per proprietar
   emailuriJson   String?  // JSON array de email-uri
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
