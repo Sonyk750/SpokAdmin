@@ -31,6 +31,7 @@ interface FacturaRow {
   dinFond?:       boolean;
   fondPaid?:      number;
   fonduri?:       string[];
+  hasPdf?:        boolean;
 }
 
 interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; }
@@ -235,7 +236,13 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   // ── PDF import ────────────────────────────────────────────────────────────
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfMsg,     setPdfMsg]     = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const attachInputRef = useRef<HTMLInputElement>(null);
+
+  // PDF de atașat la salvare (importat sau atașat manual)
+  const [pdfFile,    setPdfFile]    = useState<File | null>(null);
+  const [pdfDeleted, setPdfDeleted] = useState(false);
+  const [pdfBusy,    setPdfBusy]    = useState(false);
 
   // ── Distribuire state ─────────────────────────────────────────────────────
   const [distAps,     setDistAps]     = useState<ApRow[]>([]);
@@ -331,11 +338,11 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
   function openAdauga() {
     setSelected(null); setForm(emptyForm(defaultLuna, defaultAn));
-    setFormErr(null); setPdfMsg(null); setModal("adauga");
+    setFormErr(null); setPdfMsg(null); setPdfFile(null); setPdfDeleted(false); setModal("adauga");
   }
 
   function openEditeaza(f: FacturaRow) {
-    setSelected(f);
+    setSelected(f); setPdfFile(null); setPdfDeleted(false);
     setForm({
       furnizorNume: f.furnizor?.nume ?? "", serie: f.serie ?? "", numar: f.numar ?? "",
       valoare: String(f.valoare),
@@ -491,6 +498,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     setModal("none"); setSelected(null);
     setDistAps([]); setTransse([]); setGrupuri([]);
     setGrupForm(null); setPdfMsg(null);
+    setPdfFile(null); setPdfDeleted(false);
     setPlataData(null); setPlataErr(null);
   }
 
@@ -515,12 +523,47 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
         valoare:      data.valoare != null ? String(data.valoare) : prev.valoare,
         dataEmiterii: data.dataEmiterii ?? prev.dataEmiterii,
       }));
-      setPdfMsg("Factură citită cu succes. Verificați datele înainte de salvare.");
+      // Reține fișierul ca să-l atașăm la factură la salvare.
+      setPdfFile(file); setPdfDeleted(false);
+      setPdfMsg("Factură citită cu succes. PDF-ul va fi atașat la salvare.");
     } catch (e: any) {
       setPdfMsg(`Eroare: ${e.message}`);
     } finally {
       setPdfLoading(false);
     }
+  }
+
+  // Atașează un PDF fără a-l trimite la AI (doar îl reține pentru salvare).
+  function attachPdfFile(file: File) {
+    if (file.type && file.type !== "application/pdf") { setPdfMsg("Eroare: fișierul trebuie să fie PDF."); return; }
+    if (file.size > 10 * 1024 * 1024) { setPdfMsg("Eroare: PDF prea mare (max. 10 MB)."); return; }
+    setPdfFile(file); setPdfDeleted(false);
+    setPdfMsg(`PDF „${file.name}" va fi atașat la salvare.`);
+  }
+
+  // Upload/șterge PDF pentru o factură existentă (din modalul de editare).
+  async function uploadPdf(facturaId: string) {
+    if (pdfFile) {
+      const fd = new FormData(); fd.append("pdf", pdfFile);
+      const res = await fetch(`/api/facturi/${facturaId}/pdf`, { method: "POST", body: fd });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error ?? "Eroare la atașarea PDF");
+    } else if (pdfDeleted) {
+      await fetch(`/api/facturi/${facturaId}/pdf`, { method: "DELETE" });
+    }
+  }
+
+  async function deleteExistingPdf() {
+    if (!selected) return;
+    if (!confirm("Ștergi PDF-ul atașat acestei facturi?")) return;
+    setPdfBusy(true);
+    try {
+      await fetch(`/api/facturi/${selected.id}/pdf`, { method: "DELETE" });
+      setSelected({ ...selected, hasPdf: false });
+      setPdfFile(null); setPdfDeleted(false);
+      setPdfMsg("PDF șters.");
+      fetchFacturi();
+    } catch { /* noop */ }
+    finally { setPdfBusy(false); }
   }
 
   // ── Save factură ──────────────────────────────────────────────────────────
@@ -550,6 +593,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
+      // Atașează / actualizează PDF-ul pe factura salvată.
+      const facturaId = modal === "adauga" ? json.id : selected!.id;
+      try { if (facturaId) await uploadPdf(facturaId); }
+      catch (e: any) { setFormErr(e.message); setSaving(false); fetchFacturi(); return; }
       const freshFurn = await fetch("/api/furnizori").then(r => r.json());
       setFurnizori(freshFurn);
       closeModal(); fetchFacturi();
@@ -798,6 +845,11 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 </td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: "0.375rem", justifyContent: "flex-end" }}>
+                    {f.hasPdf ? (
+                      <a className="btn-action" href={`/api/facturi/${f.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Vezi factura (PDF)">👁</a>
+                    ) : (
+                      <button className="btn-action" onClick={() => openEditeaza(f)} title="Fără PDF — atașează din editare" style={{ opacity: 0.4 }}>👁</button>
+                    )}
                     <button className="btn-action" onClick={() => openPlata(f)} title="Achită / plăți">💳</button>
                     <button className="btn-action" onClick={() => openDistribuie(f)} title="Distribuire pe apartamente">⊞</button>
                     <button className="btn-action" onClick={() => openEditeaza(f)} title="Editează">✎</button>
@@ -822,12 +874,31 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               <div className="pdf-import">
                 <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
                   onChange={e => { const f = e.target.files?.[0]; if (f) handlePdfFile(f); e.target.value = ""; }} />
+                <input ref={attachInputRef} type="file" accept=".pdf,application/pdf" style={{ display: "none" }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) attachPdfFile(f); e.target.value = ""; }} />
                 <button type="button" className="btn btn--secondary pdf-import__btn"
                   disabled={pdfLoading} onClick={() => fileInputRef.current?.click()}>
                   {pdfLoading ? "Se citește..." : "📄 Importă din PDF"}
                 </button>
+                <button type="button" className="btn btn--secondary pdf-import__btn"
+                  disabled={pdfLoading} onClick={() => attachInputRef.current?.click()}>
+                  📎 Atașează PDF
+                </button>
                 {pdfMsg && <span className={pdfIsErr ? "pdf-import__msg--err" : "pdf-import__msg--ok"}>{pdfMsg}</span>}
               </div>
+
+              {/* Stare PDF atașat */}
+              {(pdfFile || (selected?.hasPdf && !pdfDeleted)) && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", margin: "0.25rem 0 0.5rem", fontSize: "0.82rem", color: "#7dd3fc" }}>
+                  <span>📎 {pdfFile ? pdfFile.name : "PDF atașat"}{pdfFile ? " (se salvează)" : ""}</span>
+                  {!pdfFile && selected?.hasPdf && (
+                    <a href={`/api/facturi/${selected.id}/pdf`} target="_blank" rel="noopener noreferrer" style={{ color: "#a78bfa" }}>Vezi</a>
+                  )}
+                  {pdfFile
+                    ? <button type="button" onClick={() => { setPdfFile(null); setPdfMsg(null); }} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: "0.82rem" }}>anulează</button>
+                    : <button type="button" disabled={pdfBusy} onClick={deleteExistingPdf} style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: "0.82rem" }}>șterge</button>}
+                </div>
+              )}
 
               <div className="form-grid form-grid--2">
                 <div className="form-field form-field--full">

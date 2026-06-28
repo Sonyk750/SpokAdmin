@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
       asociatie:    { select: { id: true, name: true } },
       plati:        { select: { suma: true, fondId: true, fondName: true } },
       avansMiscari: { select: { suma: true } },
+      pdf:          { select: { id: true } },
     },
     orderBy: [{ an: "desc" }, { luna: "desc" }, { createdAt: "desc" }],
   });
@@ -38,7 +39,8 @@ export async function GET(req: NextRequest) {
     const acoperit  = computeAcoperit(f.plati, f.avansMiscari);
     const fonduri   = [...new Set(f.plati.filter(p => p.fondId).map(p => p.fondName ?? "Fond"))];
     const fondPaid  = r2(f.plati.filter(p => p.fondId).reduce((s, p) => s + p.suma, 0));
-    return { ...f, acoperit, rest: r2(f.valoare - acoperit), dinFond: fondPaid > 0, fondPaid, fonduri };
+    const { pdf, ...rest } = f;
+    return { ...rest, acoperit, rest: r2(f.valoare - acoperit), dinFond: fondPaid > 0, fondPaid, fonduri, hasPdf: !!pdf };
   });
 
   return NextResponse.json(withRest);
