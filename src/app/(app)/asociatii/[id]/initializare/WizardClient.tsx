@@ -372,8 +372,17 @@ export default function WizardClient({
 
   // ── Step 7: Solduri fonduri (contribuții acumulate) ──
   const [soldContribFonduri, setSoldContribFonduri] = useState<SoldContribFondRow[]>(buildSoldContribFondRows(initAps, existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI, existingSoldFonduri));
+  const [soldFondTab, setSoldFondTab] = useState<"asociatie" | "detaliat">("asociatie");
+  const initFonduriActive = (existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI).filter(f => f.isEnabled);
+  const [soldFondAsoc, setSoldFondAsoc] = useState<{ fondId: string; fondName: string; sold: string }[]>(() => {
+    const raw = wizardInitData.soldFondAsoc as Array<{ fondId?: unknown; fondName?: unknown; sold?: unknown }> | null | undefined;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map(r => ({ fondId: String(r.fondId ?? ""), fondName: String(r.fondName ?? ""), sold: String(r.sold ?? "") }));
+    }
+    return initFonduriActive.map(f => ({ fondId: f.id ?? "", fondName: f.name, sold: "" }));
+  });
 
-  // ── Step 7: Sold casă / bancă + prima listă de plată ──
+  // ── Step 8: Sold casă / bancă + prima listă de plată ──
   const _today = new Date().toISOString().slice(0, 10);
   const _now   = new Date();
   const [soldCasa,       setSoldCasa]       = useState<string>(String(wizardInitData.soldCasa ?? ""));
@@ -542,11 +551,14 @@ export default function WizardClient({
   const saveSolduriContribFonduri = useCallback(async () => {
     setSaving(true); setError(null);
     try {
-      await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s => ({ apartamentId: s.apartamentId, fondId: s.fondId, sold: s.sold || "0" })) });
+      await api("solduri-fonduri", {
+        solduriFonduri: soldContribFonduri.map(s => ({ apartamentId: s.apartamentId, fondId: s.fondId, sold: s.sold || "0" })),
+        soldFondAsoc,
+      });
       setMaxStep(p => Math.max(p, 8)); setStep(8);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
-  }, [soldContribFonduri]);
+  }, [soldContribFonduri, soldFondAsoc]);
 
   const saveSoldInitial = useCallback(async () => {
     setSaving(true); setError(null);
@@ -614,10 +626,10 @@ export default function WizardClient({
       }
       else if (s === 4) await api("solduri", { solduri: solduri.map(s2 => ({ ...s2, restantaIntretinere: s2.restantaIntretinere || "0", restantaCurenta: s2.restantaCurenta || "0" })) });
       else if (s === 6) await api("sold-fonduri", { soldFonduri });
-      else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })) });
+      else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })), soldFondAsoc });
       else if (s === 8) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
     } catch { /* silent — nu blocăm navigarea */ }
-  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
+  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
 
   const finalizeaza = useCallback(async () => {
     setSaving(true); setError(null);
@@ -1517,71 +1529,135 @@ export default function WizardClient({
       {step === 7 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Solduri — Fonduri</h2>
-          <p className="wizard__step-desc">Contribuțiile acumulate de proprietari la fiecare fond de-a lungul timpului. Lasă gol dacă nu există sold acumulat.</p>
+          <p className="wizard__step-desc">Contribuțiile acumulate la fiecare fond. Lasă gol dacă nu există sold acumulat.</p>
 
-          {fondActive.length > 0 && (
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "1rem 0 0.5rem" }}>
-              <div>
-                <button
-                  type="button"
-                  className="btn btn--secondary"
-                  onClick={() => xlsSoldFondInputRef.current?.click()}
-                  title="Importă solduri fonduri din fișier Excel"
-                >
-                  ⬆ Importă XLS
-                </button>
-                <input
-                  ref={xlsSoldFondInputRef}
-                  type="file"
-                  accept=".xls,.xlsx,.ods,.csv"
-                  style={{ display: "none" }}
-                  onChange={handleXlsSoldFondImport}
-                />
-              </div>
-              <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
-                Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>{fondActive.length + 1} coloane</strong>, în această ordine:<br />
-                <span style={{ color: "#cbd5e1" }}>
-                  Coloana 1: Nr. apartament &nbsp;·&nbsp;
-                  {fondActive.map((f, i) => `Coloana ${i + 2}: ${f.name}`).join(" · ")}
-                </span><br />
-                Potrivire după numărul apartamentului. Primul rând cu text este ignorat automat.
-              </div>
-            </div>
-          )}
+          {/* Tab-uri */}
+          <div className="contur-tabs" style={{ marginBottom: "1.5rem" }}>
+            {(["asociatie", "detaliat"] as const).map(t => (
+              <button key={t} type="button"
+                className={`contur-tab${soldFondTab === t ? " contur-tab--active" : ""}`}
+                onClick={() => setSoldFondTab(t)}
+              >
+                {t === "asociatie" ? "Fonduri asociație" : "Fonduri detaliat"}
+              </button>
+            ))}
+          </div>
 
-          {fondActive.length === 0 ? (
-            <div className="dash-panel__empty">Niciun fond activ.</div>
-          ) : (
-            <div className="table-wrap" style={{ marginTop: "1rem" }}>
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "60px" }}>Ap.</th>
-                    <th>Proprietar</th>
-                    {fondActive.map(f => <th key={f.id ?? f.name} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{f.name} (lei)</th>)}
-                  </tr>
-                </thead>
-                <tbody>
-                  {apsWithFonduri.map(({ ap, prop }) => (
-                    <tr key={ap.numar}>
-                      <td style={{ color: "#a78bfa", fontWeight: 700 }}>{ap.numar}</td>
-                      <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{prop?.numeComplet || "—"}</td>
-                      {fondActive.map(f => {
-                        const gi = soldContribFonduri.findIndex(sf => sf.numar === ap.numar && sf.fondName === f.name);
-                        return (
-                          <td key={f.id ?? f.name} style={{ textAlign: "right" }}>
-                            <input type="number" className="input input--sm" value={soldContribFonduri[gi]?.sold ?? ""}
-                              onChange={e => gi >= 0 && setSoldContribFonduri(prev => prev.map((s, j) => j === gi ? { ...s, sold: e.target.value } : s))}
-                              style={{ width: "110px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
+          {/* Tab: Fonduri asociație — sold total per fond */}
+          {soldFondTab === "asociatie" && (
+            <div className="contur-tab-body">
+              <p className="wizard__step-desc" style={{ marginBottom: "1rem" }}>
+                Soldul total al fiecărui fond la nivelul întregii asociații la data preluării.
+              </p>
+              {fondActive.length === 0 ? (
+                <div className="dash-panel__empty">Niciun fond activ.</div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Fond</th>
+                        <th style={{ textAlign: "right", width: "180px" }}>Sold (lei)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {soldFondAsoc.map((row, i) => (
+                        <tr key={row.fondId || row.fondName}>
+                          <td style={{ fontWeight: 600, color: "#a78bfa" }}>{row.fondName}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <input
+                              type="number" className="input input--sm"
+                              value={row.sold}
+                              onChange={e => setSoldFondAsoc(prev => prev.map((r, j) => j === i ? { ...r, sold: e.target.value } : r))}
+                              style={{ width: "150px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
                           </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {soldFondAsoc.some(r => r.sold !== "") && (
+                      <tfoot>
+                        <tr>
+                          <td style={{ paddingTop: "0.75rem", fontWeight: 700, fontSize: "0.8125rem", color: "#94a3b8" }}>Total:</td>
+                          <td style={{ textAlign: "right", fontWeight: 800, color: "#a78bfa", paddingTop: "0.75rem" }}>
+                            {soldFondAsoc.reduce((s, r) => s + (parseFloat(r.sold) || 0), 0).toFixed(2)} lei
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )}
             </div>
           )}
+
+          {/* Tab: Fonduri detaliat — per apartament */}
+          {soldFondTab === "detaliat" && (
+            <div className="contur-tab-body">
+              {fondActive.length > 0 && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "0 0 1rem" }}>
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn--secondary"
+                      onClick={() => xlsSoldFondInputRef.current?.click()}
+                      title="Importă solduri fonduri din fișier Excel"
+                    >
+                      ⬆ Importă XLS
+                    </button>
+                    <input
+                      ref={xlsSoldFondInputRef}
+                      type="file"
+                      accept=".xls,.xlsx,.ods,.csv"
+                      style={{ display: "none" }}
+                      onChange={handleXlsSoldFondImport}
+                    />
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
+                    Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>{fondActive.length + 1} coloane</strong>, în această ordine:<br />
+                    <span style={{ color: "#cbd5e1" }}>
+                      Coloana 1: Nr. apartament &nbsp;·&nbsp;
+                      {fondActive.map((f, i) => `Coloana ${i + 2}: ${f.name}`).join(" · ")}
+                    </span><br />
+                    Potrivire după numărul apartamentului. Primul rând cu text este ignorat automat.
+                  </div>
+                </div>
+              )}
+              {fondActive.length === 0 ? (
+                <div className="dash-panel__empty">Niciun fond activ.</div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: "60px" }}>Ap.</th>
+                        <th>Proprietar</th>
+                        {fondActive.map(f => <th key={f.id ?? f.name} style={{ textAlign: "right", whiteSpace: "nowrap" }}>{f.name} (lei)</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {apsWithFonduri.map(({ ap, prop }) => (
+                        <tr key={ap.numar}>
+                          <td style={{ color: "#a78bfa", fontWeight: 700 }}>{ap.numar}</td>
+                          <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{prop?.numeComplet || "—"}</td>
+                          {fondActive.map(f => {
+                            const gi = soldContribFonduri.findIndex(sf => sf.numar === ap.numar && sf.fondName === f.name);
+                            return (
+                              <td key={f.id ?? f.name} style={{ textAlign: "right" }}>
+                                <input type="number" className="input input--sm" value={soldContribFonduri[gi]?.sold ?? ""}
+                                  onChange={e => gi >= 0 && setSoldContribFonduri(prev => prev.map((s, j) => j === gi ? { ...s, sold: e.target.value } : s))}
+                                  style={{ width: "110px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="wizard__footer">
             <button className="btn btn--secondary" onClick={() => { silentSaveStep(7).then(() => setStep(6)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSolduriContribFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>

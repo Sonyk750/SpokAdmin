@@ -8,12 +8,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const asociatie = await db.asociatie.findFirst({
-    where: { id, organizationId: session.user.organizationId },
+    where:  { id, organizationId: session.user.organizationId },
+    select: { id: true, wizardData: true },
   });
   if (!asociatie) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { solduriFonduri } = await req.json() as {
+  const { solduriFonduri, soldFondAsoc } = await req.json() as {
     solduriFonduri: { apartamentId: string; fondId: string; sold: string }[];
+    soldFondAsoc?:  { fondId: string; fondName: string; sold: string }[];
   };
 
   for (const s of solduriFonduri) {
@@ -33,7 +35,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   }
 
-  await db.asociatie.update({ where: { id }, data: { wizardStep: 7 } });
+  let existingData: Record<string, unknown> = {};
+  try { if ((asociatie as any).wizardData) existingData = JSON.parse((asociatie as any).wizardData); } catch {}
+
+  await db.asociatie.update({
+    where: { id },
+    data:  {
+      wizardStep: 7,
+      wizardData: JSON.stringify({ ...existingData, soldFondAsoc: soldFondAsoc ?? [] }),
+    },
+  });
 
   return NextResponse.json({ ok: true });
 }
