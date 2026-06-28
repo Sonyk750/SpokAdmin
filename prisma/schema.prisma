@@ -154,6 +154,7 @@ model Asociatie {
   asocUsers        AsociatieUser[]
   invitations      UserInvitation[]
   avansuriFurnizori AvansFurnizor[]
+  chatThreads      ChatThread[]
 
   @@index([organizationId])
 }
@@ -821,4 +822,72 @@ model StatPlataRand {
 
   @@unique([statPlataId, angajatId])
   @@index([statPlataId])
+}
+
+// ─── Chat intern asociație ────────────────────────────────────────────────────
+// Două suprafețe: "announcement" (mesaje de interes / broadcast, o direcție) și
+// "direct" (conversații private 1:1, guvernate de matricea de comunicare).
+
+model ChatThread {
+  id             String   @id @default(cuid())
+  organizationId String
+  asociatieId    String
+  kind           String   // "announcement" | "direct"
+  title          String?
+  lastMessageAt  DateTime @default(now())
+  createdById    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  asociatie    Asociatie         @relation(fields: [asociatieId], references: [id], onDelete: Cascade)
+  participants ChatParticipant[]
+  messages     ChatMessage[]
+  reads        ChatRead[]
+
+  @@index([asociatieId])
+  @@index([organizationId])
+}
+
+// Sloturile conversației (pentru "direct": 2 rânduri). "announcement" nu are sloturi —
+// audiența e implicită (toți membrii asociației + staff).
+model ChatParticipant {
+  id       String  @id @default(cuid())
+  threadId String
+  userId   String? // null când slotul e un rol (ADMINISTRATOR)
+  role     String? // "ADMINISTRATOR" pentru slotul firmei; altfel null
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+  @@index([userId])
+}
+
+// Marker de citire per (utilizator, thread) — funcționează uniform pentru anunțuri
+// și pentru firele direct (inclusiv fiecare membru de staff pe firul cu administratorul).
+model ChatRead {
+  id         String   @id @default(cuid())
+  threadId   String
+  userId     String
+  lastReadAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id          String    @id @default(cuid())
+  threadId    String
+  senderId    String
+  senderRole  String    // snapshot: ADMINISTRATOR | PRESEDINTE | CENZOR | PROPRIETAR
+  body        String
+  isPinned    Boolean   @default(false)
+  deletedAt   DateTime?
+  deletedById String?
+  createdAt   DateTime  @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
 }

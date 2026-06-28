@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 
@@ -18,101 +19,6 @@ interface ProprietarRow {
 }
 
 type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex";
-type RoleKey = "proprietar" | ExtraCalitate;
-type PermMap  = Record<string, boolean>;
-type RolePerms = Record<RoleKey, PermMap>;
-
-// ─── Definiție rapoarte ───────────────────────────────────────────────────────
-
-interface ReportDef { key: string; label: string; locked?: RoleKey[] }
-
-const REPORT_GROUPS: { group: string; items: ReportDef[] }[] = [
-  {
-    group: "Liste & rapoarte lunare",
-    items: [
-      { key: "lista_plata",   label: "Lista de plată" },
-      { key: "explicatii",    label: "Explicații listă" },
-    ],
-  },
-  {
-    group: "Registre",
-    items: [
-      { key: "reg_incasari",  label: "Registru Încasări" },
-      { key: "reg_plati",     label: "Registru Plăți" },
-      { key: "reg_casa",      label: "Registru Casă" },
-      { key: "reg_banca",     label: "Registru Bancă" },
-      { key: "jurnal",        label: "Jurnal" },
-      { key: "reg_fonduri",   label: "Registru Fonduri" },
-    ],
-  },
-  {
-    group: "Situații",
-    items: [
-      { key: "restantieri",   label: "Restanțieri" },
-      { key: "fisa_proprie",  label: "Fișă proprietar (proprie)", locked: ["proprietar"] },
-      { key: "fisa_furnizor", label: "Fișă furnizor" },
-      { key: "venituri",      label: "Venituri și cheltuieli" },
-    ],
-  },
-  {
-    group: "Alte funcții",
-    items: [
-      { key: "citiri",        label: "Citiri contoare (ap. propriu)", locked: ["proprietar", "presedinte"] },
-      { key: "istoric_index", label: "Istoric index contoare (ap. propriu)", locked: ["proprietar"] },
-      { key: "mesaje",        label: "Mesaje în aplicație",            locked: ["proprietar", "presedinte", "cenzor", "membru_cex"] },
-    ],
-  },
-];
-
-const ALL_KEYS = REPORT_GROUPS.flatMap(g => g.items.map(i => i.key));
-
-// ─── Defaulturi implicite per rol ─────────────────────────────────────────────
-
-const DEFAULT_PERMS: RolePerms = {
-  proprietar: {
-    lista_plata: true, explicatii: false,
-    reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false,
-    jurnal: false, reg_fonduri: false,
-    restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false,
-    citiri: true, istoric_index: true, mesaje: true,
-  },
-  presedinte: {
-    lista_plata: true, explicatii: true,
-    reg_incasari: true, reg_plati: true, reg_casa: true, reg_banca: true,
-    jurnal: true, reg_fonduri: true,
-    restantieri: true, fisa_proprie: true, fisa_furnizor: true, venituri: true,
-    citiri: true, istoric_index: true, mesaje: true,
-  },
-  cenzor: {
-    lista_plata: true, explicatii: true,
-    reg_incasari: true, reg_plati: true, reg_casa: true, reg_banca: true,
-    jurnal: true, reg_fonduri: true,
-    restantieri: true, fisa_proprie: true, fisa_furnizor: true, venituri: true,
-    citiri: false, istoric_index: true, mesaje: true,
-  },
-  membru_cex: {
-    lista_plata: true, explicatii: false,
-    reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false,
-    jurnal: false, reg_fonduri: false,
-    restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false,
-    citiri: false, istoric_index: false, mesaje: true,
-  },
-};
-
-function mergeWithDefaults(saved: Partial<RolePerms>): RolePerms {
-  const roles: RoleKey[] = ["proprietar", "presedinte", "cenzor", "membru_cex"];
-  const result = {} as RolePerms;
-  for (const r of roles) {
-    result[r] = { ...DEFAULT_PERMS[r], ...(saved[r] ?? {}) };
-    // locked items rămân mereu true
-    for (const grp of REPORT_GROUPS) {
-      for (const item of grp.items) {
-        if (item.locked?.includes(r)) result[r][item.key] = true;
-      }
-    }
-  }
-  return result;
-}
 
 // ─── Config calitati UI ───────────────────────────────────────────────────────
 
@@ -121,13 +27,6 @@ const CALITATI_CONFIG: { key: ExtraCalitate; label: string; color: string; bg: s
   { key: "cenzor",      label: "Cenzor",      color: "#38bdf8", bg: "rgba(56,189,248,0.12)" },
   { key: "membru_cex",  label: "Membru CEX",  color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
 ];
-
-const ROLE_LABELS: Record<RoleKey, string> = {
-  proprietar: "Proprietar", presedinte: "Președinte", cenzor: "Cenzor", membru_cex: "Mem. CEX",
-};
-const ROLE_COLORS: Record<RoleKey, string> = {
-  proprietar: "#7c3aed", presedinte: "#fbbf24", cenzor: "#38bdf8", membru_cex: "#4ade80",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -152,126 +51,6 @@ function CalitateChip({ calitati }: { calitati: string[] }) {
       <span style={{ fontSize: "0.7rem", color: "#7c3aed", background: "rgba(124,58,237,0.12)", padding: "2px 8px", borderRadius: 99, fontWeight: 600 }}>Prop</span>
       <span style={{ fontSize: "0.7rem", color: cfg.color, background: cfg.bg, padding: "2px 8px", borderRadius: 99, fontWeight: 600 }}>{cfg.label}</span>
     </span>
-  );
-}
-
-// ─── Modal matrice drepturi roluri ────────────────────────────────────────────
-
-function DreptMatriceModal({ onClose }: { onClose: () => void }) {
-  const [perms,   setPerms]   = useState<RolePerms | null>(null);
-  const [saving,  setSaving]  = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [err,     setErr]     = useState<string | null>(null);
-  const [saved,   setSaved]   = useState(false);
-
-  useEffect(() => {
-    fetch("/api/utilizatori/role-permissions")
-      .then(r => r.json())
-      .then(d => { setPerms(mergeWithDefaults(d)); setLoading(false); })
-      .catch(() => { setPerms(mergeWithDefaults({})); setLoading(false); });
-  }, []);
-
-  function toggle(role: RoleKey, key: string) {
-    if (!perms) return;
-    // nu permite debifarea locked items
-    const item = REPORT_GROUPS.flatMap(g => g.items).find(i => i.key === key);
-    if (item?.locked?.includes(role)) return;
-    setPerms(prev => prev ? {
-      ...prev,
-      [role]: { ...prev[role], [key]: !prev[role][key] },
-    } : prev);
-    setSaved(false);
-  }
-
-  async function handleSave() {
-    if (!perms) return;
-    setSaving(true); setErr(null);
-    try {
-      const res = await fetch("/api/utilizatori/role-permissions", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(perms),
-      });
-      if (!res.ok) throw new Error("Eroare salvare");
-      setSaved(true);
-    } catch (e: any) { setErr(e.message); }
-    finally { setSaving(false); }
-  }
-
-  const roles: RoleKey[] = ["proprietar", "presedinte", "cenzor", "membru_cex"];
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 700, width: "95vw" }} onClick={e => e.stopPropagation()}>
-        <div className="modal__header">
-          <h2 className="modal__title">Configurare drepturi per rol</h2>
-          <button className="modal__close" onClick={onClose}>✕</button>
-        </div>
-        <div className="modal__body" style={{ padding: "1rem 1.5rem" }}>
-          {loading && <p style={{ color: "#94a3b8" }}>Se încarcă...</p>}
-          {!loading && perms && (
-            <>
-              <p style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: "1rem" }}>
-                🔒 = activ permanent (nu poate fi dezactivat) · Modificările se aplică tuturor proprietarilor cu acel rol.
-              </p>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.83rem" }}>
-                  <thead>
-                    <tr>
-                      <th style={{ textAlign: "left", padding: "0.5rem 0.75rem", color: "#64748b", fontWeight: 600, borderBottom: "1px solid #1e293b", width: "45%" }}>Funcționalitate</th>
-                      {roles.map(r => (
-                        <th key={r} style={{ textAlign: "center", padding: "0.5rem 0.5rem", color: ROLE_COLORS[r], fontWeight: 700, borderBottom: "1px solid #1e293b", whiteSpace: "nowrap" }}>
-                          {ROLE_LABELS[r]}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {REPORT_GROUPS.map(grp => (
-                      <>
-                        <tr key={grp.group}>
-                          <td colSpan={5} style={{ padding: "0.75rem 0.75rem 0.25rem", fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            {grp.group}
-                          </td>
-                        </tr>
-                        {grp.items.map(item => (
-                          <tr key={item.key} style={{ borderBottom: "1px solid #0f172a" }}>
-                            <td style={{ padding: "0.45rem 0.75rem", color: "#cbd5e1" }}>{item.label}</td>
-                            {roles.map(role => {
-                              const locked = item.locked?.includes(role);
-                              const checked = perms[role][item.key] ?? false;
-                              return (
-                                <td key={role} style={{ textAlign: "center", padding: "0.4rem" }}>
-                                  {locked ? (
-                                    <span title="Activ permanent" style={{ color: ROLE_COLORS[role], fontSize: "1rem" }}>🔒</span>
-                                  ) : (
-                                    <input type="checkbox" checked={checked}
-                                      onChange={() => toggle(role, item.key)}
-                                      style={{ accentColor: ROLE_COLORS[role], width: 16, height: 16, cursor: "pointer" }}
-                                    />
-                                  )}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        ))}
-                      </>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
-          {err   && <div className="wizard__error" style={{ marginTop: "0.75rem" }}>{err}</div>}
-          {saved && <div style={{ marginTop: "0.75rem", color: "#4ade80", fontSize: "0.82rem" }}>✓ Configurare salvată</div>}
-        </div>
-        <div className="modal__footer">
-          <button className="btn btn--secondary" onClick={onClose}>Închide</button>
-          <button className="btn btn--primary" onClick={handleSave} disabled={saving || loading}>
-            {saving ? "Se salvează..." : "Salvează configurarea"}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -367,7 +146,7 @@ function ProprietarModal({
                 </label>
               ))}
               <p style={{ fontSize: "0.75rem", color: "#475569", marginTop: "0.75rem" }}>
-                Drepturile detaliate per rol se configurează din butonul <strong>⚙ Drepturi roluri</strong>.
+                Drepturile detaliate per rol se configurează din pagina <strong>Drepturi & roluri</strong>.
               </p>
             </div>
           )}
@@ -426,12 +205,11 @@ function ProprietarModal({
 
 export default function AsociatieContacteClient() {
   const { activeId: asociatieId } = useAsociatie();
-  const [rows,       setRows]       = useState<ProprietarRow[]>([]);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState<string | null>(null);
-  const [search,     setSearch]     = useState("");
-  const [selected,   setSelected]   = useState<ProprietarRow | null>(null);
-  const [showMatrix, setShowMatrix] = useState(false);
+  const [rows,     setRows]     = useState<ProprietarRow[]>([]);
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const [search,   setSearch]   = useState("");
+  const [selected, setSelected] = useState<ProprietarRow | null>(null);
 
   const load = useCallback(async () => {
     if (!asociatieId) { setRows([]); return; }
@@ -470,9 +248,9 @@ export default function AsociatieContacteClient() {
           <h1 className="page-title">Contacte proprietari</h1>
           <p className="page-sub">Click pe orice rând pentru calitate și date de contact</p>
         </div>
-        <button className="btn btn--secondary" onClick={() => setShowMatrix(true)}>
-          ⚙ Drepturi roluri
-        </button>
+        <Link className="btn btn--secondary" href="/utilizatori/drepturi">
+          ⚙ Drepturi & roluri
+        </Link>
       </div>
 
       {/* Căutare + statistici */}
@@ -545,7 +323,6 @@ export default function AsociatieContacteClient() {
       {selected && (
         <ProprietarModal row={selected} onClose={() => setSelected(null)} onSaved={load} />
       )}
-      {showMatrix && <DreptMatriceModal onClose={() => setShowMatrix(false)} />}
     </div>
   );
 }

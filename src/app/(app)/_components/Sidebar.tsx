@@ -9,7 +9,7 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 
-type Leaf  = { type: "link";  href: string; label: string };
+type Leaf  = { type: "link";  href: string; label: string; badge?: "mesaje" };
 type Label = { type: "label"; label: string };
 type Group = { type: "group"; label: string; key: string; children: (Leaf | Label)[] };
 type Item  = Leaf | Group;
@@ -20,6 +20,7 @@ const nav: Item[] = [
   { type: "link",  href: "/setari-asociatie",   label: "Setări asociație" },
   { type: "link",  href: "/facturi",            label: "Facturi" },
   { type: "link",  href: "/incasari",           label: "Încasări" },
+  { type: "link",  href: "/mesaje",             label: "Mesaje", badge: "mesaje" },
   {
     type: "group", label: "Rapoarte", key: "rapoarte",
     children: [
@@ -95,6 +96,7 @@ const nav: Item[] = [
     children: [
       { type: "link", href: "/utilizatori",            label: "Corporate" },
       { type: "link", href: "/utilizatori/asociatie",  label: "Asociație" },
+      { type: "link", href: "/utilizatori/drepturi",   label: "Drepturi & roluri" },
     ],
   },
   { type: "link", href: "/initializare", label: "Inițializare" },
@@ -157,10 +159,11 @@ export default function Sidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`snav-link${isActive(item.href) ? " snav-link--active" : ""}`}
+                  className={`snav-link${item.badge ? " snav-link--flex" : ""}${isActive(item.href) ? " snav-link--active" : ""}`}
                   onClick={close}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {item.badge === "mesaje" && <MesajeBadge />}
                 </Link>
               );
             }
@@ -224,6 +227,31 @@ export default function Sidebar({
       </aside>
     </>
   );
+}
+
+// ─── Badge mesaje necitite ──────────────────────────────────────────────────
+
+function MesajeBadge() {
+  const { activeId } = useAsociatie();
+  const pathname = usePathname();
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!activeId) { setCount(0); return; }
+    let alive = true;
+    const load = () => {
+      fetch(`/api/mesaje/unread?asociatieId=${activeId}`)
+        .then(r => r.json())
+        .then(d => { if (alive) setCount(d.unread ?? 0); })
+        .catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 30000);
+    return () => { alive = false; clearInterval(t); };
+  }, [activeId, pathname]);
+
+  if (count <= 0) return null;
+  return <span className="snav-badge">{count > 99 ? "99+" : count}</span>;
 }
 
 // ─── BNR Widget ───────────────────────────────────────────────────────────────

@@ -1883,3 +1883,265 @@
 
   &__value { color: #e2e8f0; }
 }
+
+// ─── Chat / Mesaje ─────────────────────────────────────────────────────────────
+
+.chat {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 1rem;
+  height: calc(100vh - 230px);
+  min-height: 420px;
+
+  @media (max-width: $md) {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    padding: 0.5rem;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+
+    @media (max-width: $md) { max-height: 280px; }
+  }
+
+  &__item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    width: 100%;
+    text-align: left;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid transparent;
+    border-radius: $radius-md;
+    background: none;
+    cursor: pointer;
+    transition: background 0.12s, border 0.12s;
+
+    &:hover { background: $bg-card-hover; }
+    &--active {
+      background: rgba(124,58,237,0.12);
+      border-color: $violet-border;
+    }
+  }
+
+  &__item-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  &__item-title {
+    color: $text-secondary;
+    font-weight: 600;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  &__item-preview {
+    color: $text-faint;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  &__badge {
+    flex-shrink: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: $violet;
+    color: #fff;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+  }
+  &__empty, &__placeholder {
+    color: $text-faint;
+    font-size: 0.85rem;
+    padding: 1rem;
+    text-align: center;
+  }
+
+  &__main {
+    display: flex;
+    flex-direction: column;
+    background: $bg-card;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-lg;
+    overflow: hidden;
+    min-height: 0;
+  }
+  &__placeholder {
+    margin: auto;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid $border-subtle;
+    flex-shrink: 0;
+  }
+  &__header-title { color: $text-primary; font-weight: 700; }
+
+  &__pinned {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid $border-subtle;
+    background: rgba(251,191,36,0.06);
+  }
+  &__pin {
+    font-size: 0.8rem;
+    color: #fcd34d;
+    padding: 0.15rem 0;
+  }
+
+  &__messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-height: 0;
+  }
+
+  &__msg {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    max-width: 78%;
+    align-self: flex-start;
+
+    &--mine { align-self: flex-end; align-items: flex-end; }
+  }
+  &__msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.7rem;
+  }
+  &__msg-name { color: $text-secondary; font-weight: 600; }
+  &__msg-role {
+    color: $violet-light;
+    background: $violet-subtle;
+    padding: 1px 6px;
+    border-radius: 99px;
+    font-weight: 600;
+  }
+  &__msg-time { color: $text-faint; }
+
+  &__bubble {
+    padding: 0.55rem 0.8rem;
+    border-radius: 0 $radius-md $radius-md $radius-md;
+    background: $bg-input;
+    color: $text-secondary;
+    font-size: 0.88rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    .chat__msg--mine & {
+      background: rgba(124,58,237,0.22);
+      color: #ede9fe;
+      border-radius: $radius-md 0 $radius-md $radius-md;
+    }
+  }
+
+  &__msg-actions {
+    display: flex;
+    gap: 0.6rem;
+    opacity: 0;
+    transition: opacity 0.12s;
+
+    button {
+      background: none;
+      border: none;
+      color: $text-faint;
+      font-size: 0.7rem;
+      cursor: pointer;
+      padding: 0;
+      &:hover { color: $violet-light; }
+    }
+  }
+  &__msg:hover &__msg-actions { opacity: 1; }
+
+  &__composer {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-end;
+    padding: 0.75rem 1rem;
+    border-top: 1px solid $border-subtle;
+    flex-shrink: 0;
+
+    textarea { flex: 1; resize: none; }
+  }
+  &__readonly {
+    padding: 0.85rem 1rem;
+    border-top: 1px solid $border-subtle;
+    color: $text-faint;
+    font-size: 0.8rem;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  &__recipient {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.65rem 0.8rem;
+    margin-bottom: 0.4rem;
+    border: 1px solid $border-subtle;
+    border-radius: $radius-md;
+    background: $bg-card;
+    color: $text-secondary;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: background 0.12s, border 0.12s;
+
+    &:hover { background: $bg-card-hover; border-color: $violet-border; }
+  }
+}
+
+// ─── Drepturi & roluri ─────────────────────────────────────────────────────────
+
+.drepturi-matrix {
+  th, td { padding: 0.45rem 0.6rem; }
+  input[type="checkbox"] { cursor: pointer; }
+}
+.drepturi-grouphead {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: $text-faint;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 0.85rem !important;
+}
+.drepturi-subtitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: $text-primary;
+  margin: 0 0 0.4rem;
+}
+.drepturi-broadcast {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.drepturi-chk {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.88rem;
+}

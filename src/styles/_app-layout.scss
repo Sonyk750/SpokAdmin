@@ -148,6 +148,28 @@ $header-h:  60px;
     color: #c4b5fd;
     font-weight: 600;
   }
+
+  &--flex {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+}
+
+.snav-badge {
+  flex-shrink: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: $violet;
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.4);
 }
 
 // ─── Collapsible group ────────────────────────────────────────────────────────
