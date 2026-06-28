@@ -315,6 +315,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [plataSaving, setPlataSaving] = useState(false);
   const [plataErr,    setPlataErr]    = useState<string | null>(null);
 
+  // ── Plată din fond la creare ─────────────────────────────────────────────────
+  const [platesteDinFond, setPlatesteDinFond] = useState(false);
+  const [fondPlataId,     setFondPlataId]     = useState("");
+
   // ── Avans disponibil la furnizorul din formularul de adăugare ───────────────
   const [avansFurnizor, setAvansFurnizor] = useState(0);
 
@@ -398,7 +402,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
   function openAdauga() {
     setSelected(null); setForm(emptyForm(effLuna, effAn));
-    setFormErr(null); setPdfMsg(null); setPdfFile(null); setPdfDeleted(false); setModal("adauga");
+    setFormErr(null); setPdfMsg(null); setPdfFile(null); setPdfDeleted(false);
+    setPlatesteDinFond(false); setFondPlataId("");
+    if (asociatieId) {
+      fetch(`/api/asociatii/${asociatieId}/fonduri`)
+        .then(r => r.json())
+        .then(d => setFonduriList(Array.isArray(d) ? d : []))
+        .catch(() => setFonduriList([]));
+    }
+    setModal("adauga");
   }
 
   function openEditeaza(f: FacturaRow) {
@@ -562,6 +574,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     setPdfFile(null); setPdfDeleted(false);
     setPlataData(null); setPlataErr(null);
     setReviewIds(new Set()); setAutoErr(null); setAutoInfo(null);
+    setPlatesteDinFond(false); setFondPlataId("");
   }
 
   // ── Auto-distribuire (AI) ─────────────────────────────────────────────────
@@ -665,6 +678,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     const valoare = parseFloat(form.valoare);
     if (!asociatieId) return setFormErr("Selectează o asociație din antet.");
     if (!form.valoare || isNaN(valoare) || valoare <= 0) return setFormErr("Valoarea trebuie să fie un număr pozitiv.");
+    if (modal === "adauga" && platesteDinFond && !fondPlataId) return setFormErr("Alege fondul din care se plătește factura.");
     setSaving(true); setFormErr(null);
     try {
       const payload = {
@@ -690,6 +704,18 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       const facturaId = modal === "adauga" ? json.id : selected!.id;
       try { if (facturaId) await uploadPdf(facturaId); }
       catch (e: any) { setFormErr(e.message); setSaving(false); fetchFacturi(); return; }
+      // Plata din fond (la creare): achită integral factura din fondul ales
+      if (modal === "adauga" && platesteDinFond && fondPlataId && facturaId) {
+        const pr = await fetch(`/api/facturi/${facturaId}/plati`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ suma: valoare, metoda: "banca", fondId: fondPlataId }),
+        });
+        if (!pr.ok) {
+          const j = await pr.json().catch(() => ({}));
+          setFormErr(j.error ?? "Factura s-a creat, dar plata din fond a eșuat.");
+          setSaving(false); fetchFacturi(); return;
+        }
+      }
       const freshFurn = await fetch("/api/furnizori").then(r => r.json());
       setFurnizori(freshFurn);
       closeModal(); fetchFacturi();
@@ -920,9 +946,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               </td></tr>
             )}
             {facturi.map(f => {
-              const restDist    = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
-              const areDist     = !!f.distribuireJson;
-              const distComplet = restDist <= 0.01;
+              const restDist      = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
+              const areDist       = !!f.distribuireJson;
+              const distComplet   = restDist <= 0.01;
+              const platitDinFond = (f.fondPaid ?? 0) >= f.valoare - 0.01; // achitată integral din fond
               return (
               <tr key={f.id}>
                 <td style={{ fontWeight: 600 }}>{f.furnizor?.nume ?? <span style={{ color: "#475569" }}>—</span>}</td>
@@ -935,12 +962,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {!areDist
-                    ? <span className="pill pill--red" title="Factura nu a fost distribuită pe apartamente">nedistribuit</span>
-                    : distComplet
-                      ? <span className="pill pill--green" title="Distribuită integral pe apartamente">{f.luna ? `${LUNI[f.luna - 1]}${f.an ? " " + f.an : ""}` : "Distribuită"}</span>
-                      : <span className="pill pill--red" title={`Mai sunt ${fmt2(restDist)} lei de distribuit — deschide Distribuire`}>⚠ {fmt2(restDist)} lei</span>}
-                  {f.dinFond && (
+                  {platitDinFond
+                    ? <span title={`Plătită din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — nu se distribuie pe apartamente`}
+                        style={{ display: "inline-block", padding: "2px 9px", borderRadius: 99, background: "rgba(56,189,248,0.14)", color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond</span>
+                    : !areDist
+                      ? <span className="pill pill--red" title="Factura nu a fost distribuită pe apartamente">nedistribuit</span>
+                      : distComplet
+                        ? <span className="pill pill--green" title="Distribuită integral pe apartamente">{f.luna ? `${LUNI[f.luna - 1]}${f.an ? " " + f.an : ""}` : "Distribuită"}</span>
+                        : <span className="pill pill--red" title={`Mai sunt ${fmt2(restDist)} lei de distribuit — deschide Distribuire`}>⚠ {fmt2(restDist)} lei</span>}
+                  {f.dinFond && !platitDinFond && (
                     <span title={`${fmt2(f.fondPaid ?? 0)} lei din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — partea aceasta nu se distribuie în lista de întreținere`}
                       style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 4 }}>
                       −{fmt2(f.fondPaid ?? 0)} fond
@@ -955,7 +985,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                       <button className="btn-action" onClick={() => openEditeaza(f)} title="Fără PDF — atașează din editare" style={{ opacity: 0.4 }}>👁</button>
                     )}
                     <button className="btn-action" onClick={() => openPlata(f)} title="Achită / plăți">💳</button>
-                    <button className="btn-action" onClick={() => openDistribuie(f)} title="Distribuire pe apartamente">⊞</button>
+                    <button className="btn-action" onClick={() => openDistribuie(f)} disabled={platitDinFond}
+                      title={platitDinFond ? "Plătită din fond — nu se distribuie pe apartamente" : "Distribuire pe apartamente"}
+                      style={platitDinFond ? { opacity: 0.35, cursor: "not-allowed" } : undefined}>⊞</button>
                     <button className="btn-action" onClick={() => openEditeaza(f)} title="Editează">✎</button>
                     <button className="btn-action btn-action--danger" onClick={() => deleteFactura(f)} title="Șterge">×</button>
                   </div>
@@ -1045,6 +1077,36 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   <label className="form-field__label">Note</label>
                   <textarea className="input" rows={2} style={{ resize: "vertical" }} value={form.notes} onChange={e => setF("notes", e.target.value)} />
                 </div>
+
+                {modal === "adauga" && (
+                  <div className="form-field form-field--full">
+                    <label style={{ display: "flex", alignItems: "center", gap: "0.55rem", cursor: "pointer" }}>
+                      <input type="checkbox" checked={platesteDinFond}
+                        onChange={e => setPlatesteDinFond(e.target.checked)}
+                        style={{ accentColor: "#7c3aed", width: 16, height: 16 }} />
+                      <span style={{ color: "#cbd5e1", fontSize: "0.88rem" }}>
+                        Plătesc factura dintr-un fond <span style={{ color: "#64748b", fontSize: "0.78rem" }}>(nu se distribuie pe apartamente)</span>
+                      </span>
+                    </label>
+                    {platesteDinFond && (
+                      <>
+                        <select className="input" style={{ marginTop: "0.5rem" }} value={fondPlataId} onChange={e => setFondPlataId(e.target.value)}>
+                          <option value="">— alege fondul —</option>
+                          {fonduriList.filter(f => f.sold > 0).map(f => (
+                            <option key={f.id} value={f.id}>
+                              {f.name} ({f.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei)
+                            </option>
+                          ))}
+                        </select>
+                        {fonduriList.filter(f => f.sold > 0).length === 0 && (
+                          <p style={{ fontSize: "0.78rem", color: "#fbbf24", marginTop: "0.3rem" }}>
+                            Niciun fond cu sold disponibil.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {formErr && <div className="wizard__error" style={{ marginTop: "1rem" }}>{formErr}</div>}
