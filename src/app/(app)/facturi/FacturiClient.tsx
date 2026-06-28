@@ -253,7 +253,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   // ── Plată state ─────────────────────────────────────────────────────────────
   const [plataData,   setPlataData]   = useState<PlataData | null>(null);
   const [plataForm,   setPlataForm]   = useState({ suma: "", metoda: "banca", fondId: "", data: todayISO(), notes: "" });
-  const [fonduriList, setFonduriList] = useState<{ id: string; name: string }[]>([]);
+  const [fonduriList, setFonduriList] = useState<{ id: string; name: string; sold: number }[]>([]);
   const [plataLoading,setPlataLoading]= useState(false);
   const [plataSaving, setPlataSaving] = useState(false);
   const [plataErr,    setPlataErr]    = useState<string | null>(null);
@@ -452,6 +452,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     if (!selected) return;
     const suma = parseFloat(plataForm.suma);
     if (!plataForm.suma || isNaN(suma) || suma <= 0) return setPlataErr("Suma trebuie să fie un număr pozitiv.");
+    const fondSel = fonduriList.find(f => f.id === plataForm.fondId);
+    if (fondSel && fondSel.sold <= 0) return setPlataErr(`Fondul "${fondSel.name}" nu are sold disponibil — alege alt fond sau plătește fără fond.`);
     setPlataSaving(true); setPlataErr(null);
     try {
       const res = await fetch(`/api/facturi/${selected.id}/plati`, {
@@ -940,8 +942,24 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                     <label className="form-field__label">Fond</label>
                     <select className="input" value={plataForm.fondId} onChange={e => setPlataForm(p => ({ ...p, fondId: e.target.value }))}>
                       <option value="">— fără fond —</option>
-                      {fonduriList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      {fonduriList.map(f => {
+                        const insuf = f.sold <= 0;
+                        return (
+                          <option key={f.id} value={f.id} style={insuf ? { color: "#f87171" } : undefined}>
+                            {insuf ? "⚠ " : ""}{f.name} ({f.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei)
+                          </option>
+                        );
+                      })}
                     </select>
+                    {(() => {
+                      const sel = fonduriList.find(f => f.id === plataForm.fondId);
+                      if (!sel || sel.sold > 0) return null;
+                      return (
+                        <p style={{ color: "#f87171", fontSize: "0.78rem", marginTop: "0.3rem" }}>
+                          Fondul &quot;{sel.name}&quot; nu are sold disponibil ({sel.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2 })} lei) — plata nu este posibilă.
+                        </p>
+                      );
+                    })()}
                   </div>
                   <div className="form-field">
                     <label className="form-field__label">Data</label>
