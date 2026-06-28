@@ -103,10 +103,18 @@ const fmt4 = (v: number) => v.toFixed(4);
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLuna: number; defaultAn: number }) {
-  const { activeId: asociatieId } = useAsociatie();
+  const { activeId: asociatieId, primaListaLuna, primaListaAn } = useAsociatie();
 
-  const [luna,     setLuna]     = useState(defaultLuna);
-  const [an,       setAn]       = useState(defaultAn);
+  const [luna, setLuna] = useState(defaultLuna);
+  const [an,   setAn]   = useState(defaultAn);
+
+  // Când se încarcă primaListaLuna din context, setează implicit
+  useEffect(() => {
+    if (primaListaLuna && primaListaAn) {
+      setLuna(primaListaLuna);
+      setAn(primaListaAn);
+    }
+  }, [primaListaLuna, primaListaAn]);
 
   const [fondMode,     setFondMode]     = useState<FondMode>("detaliat");
   const [data,         setData]         = useState<ListaData | null>(null);

@@ -20,6 +20,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!a) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   let banci: { name: string; iban?: string }[] = [];
+  let primaListaLuna: number | null = null;
+  let primaListaAn:   number | null = null;
   try {
     const wd = a.wizardData ? JSON.parse(a.wizardData) : {};
     if (Array.isArray(wd.banci) && wd.banci.length > 0) {
@@ -27,6 +29,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         .filter((b: any) => b.name)
         .map((b: any) => ({ name: b.name, iban: b.iban || a.iban || undefined }));
     }
+    if (wd.primaListaLuna) primaListaLuna = parseInt(wd.primaListaLuna);
+    if (wd.primaListaAn)   primaListaAn   = parseInt(wd.primaListaAn);
   } catch {}
   if (banci.length === 0 && a.bank) {
     banci = [{ name: a.bank, iban: a.iban || undefined }];
@@ -44,7 +48,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     presedinteName: a.presedinteName ?? null,
     cenzorName:     a.cenzorName     ?? null,
     banci,
-    fonduri: a.fonduri ?? [],
+    fonduri:        a.fonduri ?? [],
+    primaListaLuna,
+    primaListaAn,
   });
 }
 

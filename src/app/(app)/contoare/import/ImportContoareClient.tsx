@@ -33,11 +33,18 @@ function parseNum(s: string): number {
 }
 
 export default function ImportContoareClient() {
-  const { activeId: asociatieId } = useAsociatie();
+  const { activeId: asociatieId, primaListaLuna, primaListaAn } = useAsociatie();
   const now = new Date();
 
   const [luna, setLuna] = useState(now.getMonth() + 1);
-  const [an, setAn]     = useState(now.getFullYear());
+  const [an,   setAn]   = useState(now.getFullYear());
+
+  useEffect(() => {
+    if (primaListaLuna && primaListaAn) {
+      setLuna(primaListaLuna);
+      setAn(primaListaAn);
+    }
+  }, [primaListaLuna, primaListaAn]);
 
   const [rows, setRows]       = useState<string[][]>([]);
   const [fileName, setFileName] = useState("");
