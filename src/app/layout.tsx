@@ -8,9 +8,13 @@ export const metadata: Metadata = {
     template: "%s | SpokAdmin",
   },
   description:
-    "SpokAdmin este platforma completa de administrare pentru asociatii de proprietari: liste de plata, contabilitate, registre, e-Factura ANAF, incasari online si rapoarte. 100% in cloud, conform legislatiei din Romania.",
+    "SpokAdmin este prima aplicatie de administrare a asociatiilor de proprietari din Romania care foloseste AI (inteligenta artificiala) in crearea listei de plata: citeste facturile si distribuie automat, fara erori, cheltuielile pe apartamente. Plus contabilitate, registre, e-Factura ANAF, incasari online si rapoarte. 100% in cloud, conform legislatiei din Romania.",
   keywords: [
     "software administrare asociatii de proprietari",
+    "lista de plata cu AI",
+    "distribuire automata facturi asociatie",
+    "inteligenta artificiala administrare asociatii",
+    "lista de plata fara erori",
     "program administrare bloc",
     "aplicatie administrare imobile",
     "liste de plata asociatie",
@@ -40,23 +44,23 @@ export const metadata: Metadata = {
     locale: "ro_RO",
     url: "https://spokadmin.ro",
     siteName: "SpokAdmin",
-    title: "SpokAdmin | Software de administrare asociatii de proprietari",
+    title: "SpokAdmin | Prima administrare cu AI in lista de plata",
     description:
-      "Platforma completa de administrare asociatii: liste de plata, contabilitate, e-Factura ANAF, incasari online si rapoarte. 100% in cloud, conform legislatiei din Romania.",
+      "Prima aplicatie de administrare a asociatiilor cu AI in crearea listei de plata — distribuie automat si fara erori facturile pe apartamente. Plus contabilitate, e-Factura ANAF, incasari online si rapoarte. 100% in cloud.",
     images: [
       {
         url: "/og-image.jpg",
         width: 1200,
         height: 630,
-        alt: "SpokAdmin — Software de administrare asociatii de proprietari",
+        alt: "SpokAdmin — administrare asociatii de proprietari cu AI in lista de plata",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SpokAdmin | Software de administrare asociatii de proprietari",
+    title: "SpokAdmin | Prima administrare cu AI in lista de plata",
     description:
-      "Liste de plata, contabilitate, e-Factura ANAF, incasari online si rapoarte — intr-o singura platforma. 100% in cloud.",
+      "AI care citeste facturile si le distribuie automat, fara erori, in lista de plata. Plus contabilitate, e-Factura ANAF, incasari si rapoarte. 100% in cloud.",
     images: ["/og-image.jpg"],
   },
   alternates: {
@@ -75,7 +79,7 @@ const jsonLd = {
       applicationCategory: "BusinessApplication",
       operatingSystem: "Web",
       description:
-        "Platforma completa de administrare pentru asociatii de proprietari: liste de plata, contabilitate, registre, e-Factura ANAF, incasari online, contoare, salarizare si rapoarte — 100% in cloud, conform legislatiei din Romania.",
+        "Prima aplicatie de administrare a asociatiilor de proprietari din Romania care foloseste AI in crearea listei de plata: citeste facturile si distribuie automat, fara erori, cheltuielile pe apartamente. Include si contabilitate, registre, e-Factura ANAF, incasari online, contoare, salarizare si rapoarte — 100% in cloud, conform legislatiei din Romania.",
       url: "https://spokadmin.ro",
       inLanguage: "ro-RO",
       offers: {
@@ -85,6 +89,8 @@ const jsonLd = {
         description: "Plan Start gratuit 14 zile, fara card.",
       },
       featureList: [
+        "Creare lista de plata asistata de AI",
+        "Distribuire automata a facturilor pe apartamente, fara erori",
         "Liste de plata si intretinere",
         "Contabilitate si registre (casa, banca, jurnal, fond rulment)",
         "e-Factura ANAF (SPV)",
@@ -119,6 +125,14 @@ const jsonLd = {
       "@type": "FAQPage",
       "@id": "https://spokadmin.ro/#faq",
       mainEntity: [
+        {
+          "@type": "Question",
+          name: "Cum ajuta AI-ul la crearea listei de plata in SpokAdmin?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "SpokAdmin este prima aplicatie de administrare a asociatiilor de proprietari din Romania care foloseste inteligenta artificiala in fluxul de creare a listei de plata. AI-ul citeste facturile primite, identifica articolele (apa, canalizare, salubritate, energie etc.) si propune distribuirea lor automata pe apartamente, dupa criteriul corect (consum, cota indiviza, numar de persoane) — fara erori de calcul. Administratorul doar verifica si confirma.",
+          },
+        },
         {
           "@type": "Question",
           name: "Pentru cine este SpokAdmin?",
