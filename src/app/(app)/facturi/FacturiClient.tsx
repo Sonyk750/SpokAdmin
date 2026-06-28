@@ -426,6 +426,14 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       an:   f.an   ? String(f.an)   : String(effAn),
       notes: f.notes ?? "",
     });
+    // Alocare pe fond: pre-completează bifa din starea curentă a facturii.
+    setPlatesteDinFond(!!f.fondId); setFondPlataId(f.fondId ?? "");
+    if (f.asociatieId) {
+      fetch(`/api/asociatii/${f.asociatieId}/fonduri`)
+        .then(r => r.json())
+        .then(d => setFonduriList(Array.isArray(d) ? d : []))
+        .catch(() => setFonduriList([]));
+    }
     setFormErr(null); setPdfMsg(null); setModal("editeaza");
   }
 
@@ -680,7 +688,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     const valoare = parseFloat(form.valoare);
     if (!asociatieId) return setFormErr("Selectează o asociație din antet.");
     if (!form.valoare || isNaN(valoare) || valoare <= 0) return setFormErr("Valoarea trebuie să fie un număr pozitiv.");
-    if (modal === "adauga" && platesteDinFond && !fondPlataId) return setFormErr("Alege fondul din care se plătește factura.");
+    if (platesteDinFond && !fondPlataId) return setFormErr("Alege fondul din care se acoperă factura.");
     setSaving(true); setFormErr(null);
     try {
       const payload = {
@@ -693,7 +701,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
         luna:         form.luna ? parseInt(form.luna) : undefined,
         an:           form.an   ? parseInt(form.an)   : undefined,
         notes:        form.notes.trim()  || undefined,
-        fondId:       (modal === "adauga" && platesteDinFond && fondPlataId) ? fondPlataId : undefined,
+        // Creare: trimite fondId doar dacă e bifat. Editare: trimite mereu
+        // fondId (id-ul fondului sau null) ca să poată fi și scoasă alocarea.
+        fondId:       platesteDinFond && fondPlataId ? fondPlataId : (modal === "editeaza" ? null : undefined),
       };
       let res: Response;
       if (modal === "adauga") {
@@ -1069,7 +1079,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   <textarea className="input" rows={2} style={{ resize: "vertical" }} value={form.notes} onChange={e => setF("notes", e.target.value)} />
                 </div>
 
-                {modal === "adauga" && (
+                {(modal === "adauga" || modal === "editeaza") && (
                   <div className="form-field form-field--full">
                     <label style={{ display: "flex", alignItems: "center", gap: "0.55rem", cursor: "pointer" }}>
                       <input type="checkbox" checked={platesteDinFond}
@@ -1079,23 +1089,28 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                         Acopăr factura dintr-un fond <span style={{ color: "#64748b", fontSize: "0.78rem" }}>(scade din fond, nu se distribuie pe apartamente; plata se face separat din casă/bancă)</span>
                       </span>
                     </label>
-                    {platesteDinFond && (
+                    {platesteDinFond && (() => {
+                      // La editare, fondul deja alocat trebuie să rămână vizibil chiar dacă
+                      // soldul lui calculat e ≤ 0 (tocmai această factură i l-a scăzut).
+                      const optiuni = fonduriList.filter(f => f.sold > 0 || f.id === fondPlataId);
+                      return (
                       <>
                         <select className="input" style={{ marginTop: "0.5rem" }} value={fondPlataId} onChange={e => setFondPlataId(e.target.value)}>
                           <option value="">— alege fondul —</option>
-                          {fonduriList.filter(f => f.sold > 0).map(f => (
+                          {optiuni.map(f => (
                             <option key={f.id} value={f.id}>
                               {f.name} ({f.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei)
                             </option>
                           ))}
                         </select>
-                        {fonduriList.filter(f => f.sold > 0).length === 0 && (
+                        {optiuni.length === 0 && (
                           <p style={{ fontSize: "0.78rem", color: "#fbbf24", marginTop: "0.3rem" }}>
                             Niciun fond cu sold disponibil.
                           </p>
                         )}
                       </>
-                    )}
+                      );
+                    })()}
                   </div>
                 )}
               </div>

@@ -33,7 +33,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     categorie?:    string | null;
     notes?:        string | null;
     status?:       string;
+    fondId?:       string | null;
   };
+
+  // Alocare pe fond: factura acoperită din fond (reduce soldul fondului, nedistribuită).
+  // null → scoate alocarea (soldul fondului se restituie automat, fiind calculat dinamic).
+  let fondName: string | null | undefined = undefined;
+  if (body.fondId !== undefined) {
+    if (body.fondId === null) {
+      fondName = null;
+    } else {
+      const fond = await db.fondAsociatie.findFirst({
+        where:  { id: body.fondId, asociatieId: factura.asociatieId },
+        select: { id: true, name: true },
+      });
+      if (!fond) return NextResponse.json({ error: "Fond invalid." }, { status: 400 });
+      fondName = fond.name;
+    }
+  }
 
   // Resolve furnizor by name if needed
   let furnizorId = body.furnizorId;
@@ -72,6 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ...(body.categorie    !== undefined && { categorie:    body.categorie }),
       ...(body.notes        !== undefined && { notes:        body.notes?.trim() || null }),
       ...(body.status       !== undefined && { status:       body.status }),
+      ...(body.fondId       !== undefined && { fondId:       body.fondId, fondName }),
     },
     include: {
       furnizor:  { select: { id: true, nume: true } },
