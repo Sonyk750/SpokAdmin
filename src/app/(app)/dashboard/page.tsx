@@ -114,7 +114,14 @@ export default async function DashboardPage() {
   }
 
   const fonduriTop = [...byName.entries()]
-    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .filter(([, v]) => v !== 0)
+    .sort((a, b) => {
+      const aPos = a[1] > 0, bPos = b[1] > 0;
+      if (aPos && !bPos) return -1;   // pozitive primele
+      if (!aPos && bPos) return 1;
+      if (aPos && bPos) return b[1] - a[1];  // pozitive: descrescător
+      return a[1] - b[1];            // negative: cel mai mic (mai negativ) ultimul
+    })
     .map(([label, value]) => ({ label, value }));
 
   // Ultimele asociații / facturi pentru panourile de jos
