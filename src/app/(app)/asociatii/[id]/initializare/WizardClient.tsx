@@ -1091,6 +1091,31 @@ export default function WizardClient({
                   </tr>
                 ))}
               </tbody>
+              {(() => {
+                const totalSuprafata = apartamente.reduce((s, ap) => s + (parseFloat(ap.suprafata) || 0), 0);
+                const totalPersone   = apartamente.reduce((s, ap) => s + (parseInt(ap.nrPersone)   || 0), 0);
+                const totalCota      = apartamente.reduce((s, ap) => s + (parseFloat(ap.cotaParte)  || 0), 0);
+                const hasSuprafata   = apartamente.some(ap => ap.suprafata !== "");
+                const hasPersone     = apartamente.some(ap => ap.nrPersone !== "");
+                const hasCota        = apartamente.some(ap => ap.cotaParte !== "");
+                if (!hasSuprafata && !hasPersone && !hasCota) return null;
+                return (
+                  <tfoot>
+                    <tr>
+                      <td colSpan={3} style={{ paddingTop: "0.75rem", fontWeight: 700, fontSize: "0.8125rem", color: "#94a3b8" }}>Total:</td>
+                      <td style={{ paddingTop: "0.75rem", fontWeight: 800, color: "#a78bfa", textAlign: "right" }}>
+                        {hasSuprafata ? totalSuprafata.toFixed(2) : ""}
+                      </td>
+                      <td style={{ paddingTop: "0.75rem", fontWeight: 800, color: "#a78bfa", textAlign: "right" }}>
+                        {hasPersone ? totalPersone : ""}
+                      </td>
+                      <td style={{ paddingTop: "0.75rem", fontWeight: 800, color: "#a78bfa", textAlign: "right" }}>
+                        {hasCota ? totalCota.toFixed(4) : ""}
+                      </td>
+                    </tr>
+                  </tfoot>
+                );
+              })()}
             </table>
           </div>
           <div className="wizard__footer">
