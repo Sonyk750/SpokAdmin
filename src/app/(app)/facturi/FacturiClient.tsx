@@ -258,7 +258,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [autoLoading, setAutoLoading] = useState(false);
   const [autoErr,     setAutoErr]     = useState<string | null>(null);
   const [reviewIds,   setReviewIds]   = useState<Set<string>>(new Set());
-  const [autoInfo,    setAutoInfo]    = useState<{ mem: number; ai: number } | null>(null);
+  const [autoInfo,    setAutoInfo]    = useState<{ mem: number; ai: number; sum: number; valoare: number } | null>(null);
 
   // ── Grupuri state ─────────────────────────────────────────────────────────
   const [grupuri,     setGrupuri]     = useState<GrupDist[]>([]);
@@ -550,9 +550,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       });
 
       if (!built.length) { setAutoErr("AI nu a găsit articole în factură."); return; }
+      const sum = built.reduce((s, t) => s + (parseFloat(t.valoare) || 0), 0);
       setTransse(built);
       setReviewIds(review);
-      setAutoInfo({ mem, ai });
+      setAutoInfo({ mem, ai, sum: Math.round(sum * 100) / 100, valoare: selected.valoare });
     } catch (e: any) {
       setAutoErr(e.message);
     } finally {
@@ -1184,12 +1185,28 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
               {autoErr && <div className="wizard__error" style={{ marginBottom: "1rem" }}>{autoErr}</div>}
 
-              {autoInfo && (
-                <div style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #7c3aed", borderRadius: "0.5rem", padding: "0.6rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#c4b5fd" }}>
-                  ✨ Distribuire propusă de AI: {autoInfo.mem > 0 && <><strong>{autoInfo.mem}</strong> din memorie · </>}<strong>{autoInfo.ai}</strong> de verificat.
-                  {" "}Verifică criteriile și sumele înainte de a confirma.
-                </div>
-              )}
+              {autoInfo && (() => {
+                const diff = Math.round((autoInfo.sum - autoInfo.valoare) * 100) / 100;
+                const mismatch = Math.abs(diff) > 0.5;
+                return (
+                  <div style={{
+                    background: mismatch ? "rgba(248,113,113,0.1)" : "rgba(124,58,237,0.1)",
+                    border: `1px solid ${mismatch ? "#f87171" : "#7c3aed"}`,
+                    borderRadius: "0.5rem", padding: "0.6rem 1rem", marginBottom: "1rem",
+                    fontSize: "0.82rem", color: mismatch ? "#fca5a5" : "#c4b5fd",
+                  }}>
+                    ✨ Distribuire propusă de AI: {autoInfo.mem > 0 && <><strong>{autoInfo.mem}</strong> din memorie · </>}<strong>{autoInfo.ai}</strong> de verificat.
+                    {mismatch ? (
+                      <div style={{ marginTop: "0.35rem", fontWeight: 600 }}>
+                        ⚠ Articolele extrase însumează <strong>{fmt2(autoInfo.sum)} lei</strong>, dar factura e <strong>{fmt2(autoInfo.valoare)} lei</strong>
+                        {" "}(diferență {fmt2(Math.abs(diff))} lei). AI-ul a citit greșit sumele — corectează valorile articolelor înainte de a confirma.
+                      </div>
+                    ) : (
+                      <> Verifică criteriile înainte de a confirma.</>
+                    )}
+                  </div>
+                );
+              })()}
 
               {selected.dinFond && (
                 <div style={{ background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf8", borderRadius: "0.5rem", padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#7dd3fc" }}>
