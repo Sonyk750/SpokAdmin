@@ -55,9 +55,9 @@ Returnează EXCLUSIV un JSON valid (fără markdown, fără explicații):
 
 Reguli stricte:
 - Folosește EXACT denumirile coloanelor din model (literă cu literă, cu diacritice).
-- Fiecare coloană din model apare o singură dată. Dacă o coloană nu are nicio linie aferentă, pune valoarea 0.
-- CEL MAI IMPORTANT: citește CORECT sumele coloanelor care NU sunt de consum (ex: apă meteo, taxe fixe, abonament). Coloana de consum (apă rece) se calculează automat ca REST din totalul facturii, deci nu o supraevalua.
-- Totalul facturii este ${factura.valoare} lei — suma valorilor NU trebuie să depășească această valoare.`
+- Identifică fiecare linie/articol din factură cu suma lui EXACTĂ (cu TVA), apoi adună liniile în coloana potrivită (ex: apă potabilă + canalizare + TMAU → apă rece). Citește sumele REALE de pe factură — nu inventa, nu estima; dacă o linie nu există, nu o include.
+- Fiecare coloană din model apare o singură dată.
+- Totalul facturii CURENTE este ${factura.valoare} lei. Suma coloanelor trebuie să fie EGALĂ cu acest total și NU are voie să-l depășească. Verifică adunarea înainte de a răspunde.`
     : `Ești un asistent care analizează facturi de utilități românești pentru asociații de proprietari.
 Extrage ARTICOLELE/serviciile facturate și, pentru fiecare, sugerează cum ar trebui distribuit pe apartamente.
 
@@ -80,7 +80,8 @@ Alte reguli:
   let aiArticole: any[] = [];
   try {
     const response = await client.messages.create({
-      model:      "claude-haiku-4-5",
+      // Opus 4.8 — citește mult mai precis sumele din tabelele facturilor (acuratețea contează aici)
+      model:      "claude-opus-4-8",
       max_tokens: 1024,
       messages: [{
         role: "user",
@@ -108,6 +109,7 @@ Alte reguli:
 
   if (hasTemplate) {
     // Mod template: mapăm răspunsul AI pe coloanele modelului (consolidat), criteriile vin din model.
+    // Citim sumele REALE ale facturii (fiecare factură cu specificul ei) — fără a forța vreo coloană.
     const memMap = new Map(template.map(m => [m.articolKey, m]));
     const valByKey = new Map<string, number>();
     for (const a of aiArticole) {
@@ -116,32 +118,12 @@ Alte reguli:
       if (!memMap.has(key)) continue; // ignorăm coloane care nu sunt în model
       valByKey.set(key, r2((valByKey.get(key) ?? 0) + Math.max(0, Number(a.valoare) || 0)));
     }
-
-    // GARANȚIE: suma = exact valoarea facturii. O coloană "absoarbe" diferența — de obicei
-    // cea de consum (apă rece) — fiindcă AI-ul citește bine liniile distincte mici (apă meteo)
-    // dar greșește pe coloana mare consolidată. Astfel nu se depășește și nu se ratează totalul.
-    const total = factura.valoare;
-    const cols = template.map(m => ({ m, val: valByKey.get(m.articolKey) ?? 0 }));
-    let absorber = cols.findIndex(c => c.m.criteriu === "consum");
-    if (absorber < 0) absorber = cols.reduce((bi, c, i, arr) => c.val > arr[bi].val ? i : bi, 0);
-    if (cols.length) {
-      const sumOthers = cols.reduce((s, c, i) => i === absorber ? s : s + c.val, 0);
-      if (sumOthers > total + 0.01) {
-        // celelalte depășesc deja totalul (rar) — scalează-le să încapă, absorber = 0
-        const k = sumOthers > 0 ? Math.max(0, total) / sumOthers : 0;
-        cols.forEach((c, i) => { if (i !== absorber) c.val = r2(c.val * k); });
-        cols[absorber].val = 0;
-      } else {
-        cols[absorber].val = r2(total - sumOthers);
-      }
-    }
-
-    articole = cols
-      .map(c => ({
-        denumire:    c.m.articolLabel,
-        valoare:     c.val,
-        criteriu:    c.m.criteriu,
-        consumTip:   c.m.consumTip ?? null,
+    articole = template
+      .map(m => ({
+        denumire:    m.articolLabel,
+        valoare:     valByKey.get(m.articolKey) ?? 0,
+        criteriu:    m.criteriu,
+        consumTip:   m.consumTip ?? null,
         source:      "memorie" as const,
         needsReview: false,
       }))
