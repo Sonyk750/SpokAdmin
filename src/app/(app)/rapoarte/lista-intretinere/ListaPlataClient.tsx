@@ -80,6 +80,13 @@ function buildMovCols(coloane: Coloane): MovCol[] {
   return cols;
 }
 
+// „Total lună" rămâne mereu ultima coloană mobilă (înaintea restanțelor/fondurilor)
+function withTotalLast(cols: MovCol[]): MovCol[] {
+  const total = cols.filter(c => c.kind === "totalLuna");
+  const rest  = cols.filter(c => c.kind !== "totalLuna");
+  return [...rest, ...total];
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LUNI = [
@@ -198,9 +205,9 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
       const savedIds: string[] = JSON.parse(localStorage.getItem(key) ?? "null") ?? [];
       const saved    = savedIds.map(id => fresh.find(c => c.id === id)).filter((c): c is MovCol => !!c);
       const newCols  = fresh.filter(c => !savedIds.includes(c.id));
-      if (saved.length > 0) { setMovCols([...saved, ...newCols]); return; }
+      if (saved.length > 0) { setMovCols(withTotalLast([...saved, ...newCols])); return; }
     } catch {}
-    setMovCols(fresh);
+    setMovCols(withTotalLast(fresh));
   }, [data, asociatieId]);
 
   // Persist order when user drags
@@ -297,7 +304,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
         const arr = [...prev];
         const [moved] = arr.splice(dragIdx.current!, 1);
         arr.splice(idx, 0, moved);
-        return arr;
+        return withTotalLast(arr);
       });
     }
     dragIdx.current = null; setDragOverIdx(null);

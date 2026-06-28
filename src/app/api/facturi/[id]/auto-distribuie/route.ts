@@ -28,10 +28,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const pdf = await db.facturaPdf.findUnique({ where: { facturaId: id }, select: { data: true } });
   if (!pdf) return NextResponse.json({ error: "Factura nu are PDF atașat. Atașează un PDF întâi." }, { status: 400 });
 
-  // Model învățat (template) pentru acest furnizor — coloanele preferate
-  const template = factura.furnizorId
+  // Model învățat (template) pentru acest furnizor — coloanele preferate.
+  // Colapsăm intrările vechi acumulate de același tip (criteriu+consumTip) păstrând
+  // cea mai recentă denumire — ex: Apă potabilă/Canalizare/TMAU (toate consum/apa_rece)
+  // devin o singură coloană, ca să nu apară carduri duplicate.
+  const templateRaw = factura.furnizorId
     ? await db.distributieModel.findMany({ where: { furnizorId: factura.furnizorId }, orderBy: { createdAt: "asc" } })
     : [];
+  const dedupMap = new Map<string, (typeof templateRaw)[number]>();
+  for (const m of templateRaw) dedupMap.set(`${m.criteriu}:${m.consumTip ?? ""}`, m);
+  const template = [...dedupMap.values()];
   const hasTemplate = template.length > 0;
 
   const base64 = Buffer.from(pdf.data).toString("base64");
@@ -109,14 +115,17 @@ Alte reguli:
       if (!memMap.has(key)) continue; // ignorăm coloane care nu sunt în model
       valByKey.set(key, r2((valByKey.get(key) ?? 0) + Math.max(0, Number(a.valoare) || 0)));
     }
-    articole = template.map(m => ({
-      denumire:    m.articolLabel,
-      valoare:     valByKey.get(m.articolKey) ?? 0,
-      criteriu:    m.criteriu,
-      consumTip:   m.consumTip ?? null,
-      source:      "memorie" as const,
-      needsReview: !valByKey.has(m.articolKey), // marcat dacă AI nu a pus nimic în coloană
-    }));
+    articole = template
+      .map(m => ({
+        denumire:    m.articolLabel,
+        valoare:     valByKey.get(m.articolKey) ?? 0,
+        criteriu:    m.criteriu,
+        consumTip:   m.consumTip ?? null,
+        source:      "memorie" as const,
+        needsReview: false,
+      }))
+      // Nu adăuga coloane goale (valoare 0) — fără carduri inutile
+      .filter(a => a.valoare > 0.005);
   } else {
     // Mod liber: extragere + sugestii AI
     articole = aiArticole
