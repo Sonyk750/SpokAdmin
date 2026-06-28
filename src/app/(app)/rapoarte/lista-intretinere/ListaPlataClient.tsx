@@ -281,6 +281,9 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   coloane?.consumuri.filter(c => c.valoareLeiKey).forEach(c => {
     totPerConsumLei[c.tip] = rows.reduce((s, r) => s + (r.cheltuieli[c.valoareLeiKey!] ?? 0), 0);
   });
+  const totPers   = rows.reduce((s, r) => s + (r.nrPersone ?? 0), 0);
+  const totCota   = rows.reduce((s, r) => s + (r.cotaParte  ?? 0), 0);
+  const totSupraf = rows.reduce((s, r) => s + (r.suprafata  ?? 0), 0);
 
   // ── Drag handlers ─────────────────────────────────────────────────────────
 
@@ -596,7 +599,18 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
 
                 <tfoot>
                   <tr className="lp-tfoot">
-                    <td className="lp-tfoot__label" colSpan={fixedStartCount}>TOTAL</td>
+                    <td className="lp-tfoot__label" colSpan={2}>TOTAL</td>
+                    {coloane.nrPersone && <td className="lp-td--num lp-tfoot__val">{totPers}</td>}
+                    {coloane.cotaParte && <td className="lp-td--num lp-tfoot__val">{fmt4(totCota)}</td>}
+                    {coloane.suprafata && <td className="lp-td--num lp-tfoot__val">{fmt2(totSupraf)}</td>}
+                    {coloane.consumuri.map(c => (
+                      <React.Fragment key={c.tip}>
+                        <td className="lp-td--num lp-tfoot__val"><span className="lp-val--consum">{fmt3(totPerConsum[c.tip] ?? 0)}</span></td>
+                        {c.valoareLeiKey && (
+                          <td className="lp-td--num lp-tfoot__val lp-td--lei">{fmt2(totPerConsumLei[c.tip] ?? 0)}</td>
+                        )}
+                      </React.Fragment>
+                    ))}
                     {movCols.map(col => (
                       <td key={col.id} className={`lp-td--num lp-tfoot__val${col.kind === "totalLuna" ? " lp-td--subtotal" : ""}`}>
                         {fmt2(movColTotals[col.id] ?? 0)}

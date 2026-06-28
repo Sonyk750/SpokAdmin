@@ -225,11 +225,8 @@ function buildDocDef(
   hdr.push(th("TOTAL\n(lei)", "right")); widths.push(TOT_W);
   if (opts.showNrEnd) { hdr.push(th("Nr.\nAp.", "center")); widths.push(NR_W); }
 
-  // Count fixed-left columns (for TOTAL row colSpan)
-  let fixN = 1 + (opts.showProprietar ? 1 : 0);
-  if (coloane.nrPersone && opts.showNrPersone) fixN++;
-  if (coloane.cotaParte && opts.showCotaParte) fixN++;
-  if (coloane.suprafata && opts.showSuprafata) fixN++;
+  // TOTAL label acoperă doar Nr. Ap. + Proprietar; totalurile Pers/CPI/Supraf apar separat
+  const labelSpan = 1 + (opts.showProprietar ? 1 : 0);
 
   // Data rows
   const dataRows: any[][] = rows.map((row) => {
@@ -293,13 +290,20 @@ function buildDocDef(
   const totRow: any[] = [];
   totRow.push({
     text: `TOTAL (${rows.length} ap.)`,
-    colSpan: fixN,
+    colSpan: labelSpan,
     alignment: "right",
     bold: true,
     fontSize: fs,
     border: [true, true, false, true],
   });
-  for (let i = 1; i < fixN; i++) totRow.push({});
+  for (let i = 1; i < labelSpan; i++) totRow.push({});
+
+  if (coloane.nrPersone && opts.showNrPersone)
+    totRow.push({ text: String(rows.reduce((s, r) => s + (r.nrPersone ?? 0), 0)), alignment: "center", bold: true, fontSize: fs });
+  if (coloane.cotaParte && opts.showCotaParte)
+    totRow.push({ text: fmt2(rows.reduce((s, r) => s + (r.cotaParte ?? 0), 0)), alignment: "center", bold: true, fontSize: fs });
+  if (coloane.suprafata && opts.showSuprafata)
+    totRow.push({ text: fmt2(rows.reduce((s, r) => s + (r.suprafata ?? 0), 0)), alignment: "right", bold: true, fontSize: fs });
 
   for (const c of coloane.consumuri) {
     if (opts.consumViz[c.tip]) {
