@@ -47,18 +47,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
 
-  // Învață maparea articol → criteriu pentru acest furnizor (memorie de distribuire).
+  // Învață MODELUL (coloanele preferate) pentru acest furnizor: înlocuiește modelul
+  // existent cu coloanele distribuirii curente (dedup pe nume). Astfel modelul reflectă
+  // mereu ultima structură confirmată (ex: "Apă rece" + "Apă meteo"), iar AI-ul o reutilizează.
   if (factura.furnizorId && Array.isArray(invata) && invata.length) {
+    const fid = factura.furnizorId;
+    const seen = new Set<string>();
+    const cols: { key: string; denumire: string; criteriu: string; consumTip: string | null }[] = [];
     for (const it of invata) {
       const denumire = (it?.denumire ?? "").trim();
       const key = articolKey(denumire);
-      if (!key || !it?.criteriu) continue;
-      const consumTip = it.criteriu === "consum" ? (it.consumTip ?? null) : null;
-      await db.distributieModel.upsert({
-        where:  { furnizorId_articolKey: { furnizorId: factura.furnizorId, articolKey: key } },
-        create: { organizationId: orgId, furnizorId: factura.furnizorId, articolKey: key, articolLabel: denumire, criteriu: it.criteriu, consumTip },
-        update: { criteriu: it.criteriu, consumTip, articolLabel: denumire },
-      }).catch(() => { /* nu bloca salvarea distribuirii dacă învățarea eșuează */ });
+      if (!key || !it?.criteriu || seen.has(key)) continue;
+      seen.add(key);
+      cols.push({ key, denumire, criteriu: it.criteriu, consumTip: it.criteriu === "consum" ? (it.consumTip ?? null) : null });
+    }
+    if (cols.length) {
+      await db.$transaction([
+        db.distributieModel.deleteMany({ where: { furnizorId: fid } }),
+        ...cols.map(c => db.distributieModel.create({
+          data: { organizationId: orgId, furnizorId: fid, articolKey: c.key, articolLabel: c.denumire, criteriu: c.criteriu, consumTip: c.consumTip },
+        })),
+      ]).catch(() => { /* nu bloca salvarea distribuirii dacă învățarea eșuează */ });
     }
   }
 
