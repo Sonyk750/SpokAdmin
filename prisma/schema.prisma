@@ -358,7 +358,27 @@ model Furnizor {
   asociatii    FurnizorAsociatie[]
   facturi      Factura[]
   avansuri     AvansFurnizor[]
+  distributieModele DistributieModel[]
 
+  @@index([organizationId])
+}
+
+// Memorie de distribuire: per furnizor + articol → criteriu (învățat din confirmările userului).
+// Permite auto-completarea distribuirii pentru facturi recurente de la același furnizor.
+model DistributieModel {
+  id             String   @id @default(cuid())
+  organizationId String
+  furnizorId     String
+  articolKey     String   // numele articolului normalizat (lowercase, fără diacritice/spații extra)
+  articolLabel   String   // eticheta afișată (ex: "Apă rece")
+  criteriu       String   // egal | persoane | cota_parte | suprafata | consum | manual
+  consumTip      String?  // apa_rece | apa_calda | electric | gaz (când criteriu = consum)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  furnizor Furnizor @relation(fields: [furnizorId], references: [id], onDelete: Cascade)
+
+  @@unique([furnizorId, articolKey])
   @@index([organizationId])
 }
 

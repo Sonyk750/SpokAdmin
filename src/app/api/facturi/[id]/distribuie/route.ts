@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { articolKey } from "@/lib/distributie";
 
 interface DistRow {
   apartamentId: string;
@@ -10,6 +11,8 @@ interface DistRow {
   coloane?:     Record<string, number>;
 }
 
+interface InvataItem { denumire: string; criteriu: string; consumTip?: string | null }
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const orgId = session?.user?.organizationId;
@@ -18,14 +21,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const factura = await db.factura.findFirst({
     where:  { id, organizationId: orgId },
-    select: { id: true, valoare: true, luna: true, an: true },
+    select: { id: true, valoare: true, luna: true, an: true, furnizorId: true },
   });
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
 
-  const { rows, criteriuByCol, consumTipByCol } = await req.json() as {
+  const { rows, criteriuByCol, consumTipByCol, invata } = await req.json() as {
     rows:            DistRow[];
     criteriuByCol?:  Record<string, string>;
     consumTipByCol?: Record<string, string>;
+    invata?:         InvataItem[];
   };
   if (!rows?.length) return NextResponse.json({ error: "Distribuirea este goală." }, { status: 400 });
 
@@ -42,6 +46,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }),
     },
   });
+
+  // Învață maparea articol → criteriu pentru acest furnizor (memorie de distribuire).
+  if (factura.furnizorId && Array.isArray(invata) && invata.length) {
+    for (const it of invata) {
+      const denumire = (it?.denumire ?? "").trim();
+      const key = articolKey(denumire);
+      if (!key || !it?.criteriu) continue;
+      const consumTip = it.criteriu === "consum" ? (it.consumTip ?? null) : null;
+      await db.distributieModel.upsert({
+        where:  { furnizorId_articolKey: { furnizorId: factura.furnizorId, articolKey: key } },
+        create: { organizationId: orgId, furnizorId: factura.furnizorId, articolKey: key, articolLabel: denumire, criteriu: it.criteriu, consumTip },
+        update: { criteriu: it.criteriu, consumTip, articolLabel: denumire },
+      }).catch(() => { /* nu bloca salvarea distribuirii dacă învățarea eșuează */ });
+    }
+  }
 
   return NextResponse.json({ ok: true, total });
 }

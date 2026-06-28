@@ -251,6 +251,12 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [distSaving,  setDistSaving]  = useState(false);
   const [distErr,     setDistErr]     = useState<string | null>(null);
 
+  // ── Auto-distribuire (AI) ───────────────────────────────────────────────────
+  const [autoLoading, setAutoLoading] = useState(false);
+  const [autoErr,     setAutoErr]     = useState<string | null>(null);
+  const [reviewIds,   setReviewIds]   = useState<Set<string>>(new Set());
+  const [autoInfo,    setAutoInfo]    = useState<{ mem: number; ai: number } | null>(null);
+
   // ── Grupuri state ─────────────────────────────────────────────────────────
   const [grupuri,     setGrupuri]     = useState<GrupDist[]>([]);
   const [grupLoading, setGrupLoading] = useState(false);
@@ -357,6 +363,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
   async function openDistribuie(f: FacturaRow) {
     setSelected(f); setTransse([]); setDistErr(null); setGrupForm(null);
+    setReviewIds(new Set()); setAutoErr(null); setAutoInfo(null);
     setModal("distribuie"); setDistLoading(true);
     try {
       const params = new URLSearchParams();
@@ -500,6 +507,45 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     setGrupForm(null); setPdfMsg(null);
     setPdfFile(null); setPdfDeleted(false);
     setPlataData(null); setPlataErr(null);
+    setReviewIds(new Set()); setAutoErr(null); setAutoInfo(null);
+  }
+
+  // ── Auto-distribuire (AI) ─────────────────────────────────────────────────
+  async function autoDistribuie() {
+    if (!selected) return;
+    setAutoLoading(true); setAutoErr(null);
+    try {
+      const res  = await fetch(`/api/facturi/${selected.id}/auto-distribuie`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Eroare");
+
+      const review = new Set<string>();
+      let mem = 0, ai = 0;
+      const built: Transa[] = (data.articole ?? []).map((a: any) => {
+        const tid = uid();
+        const consumTip = a.consumTip || availableConsumuri[0]?.value || "apa_rece";
+        const consumMissing = a.criteriu === "consum" && !availableConsumuri.some(ct => ct.value === consumTip);
+        if (a.needsReview || consumMissing) { review.add(tid); ai++; } else { mem++; }
+        return {
+          id: tid,
+          label: a.denumire || "",
+          valoare: a.valoare != null ? String(a.valoare) : "",
+          criteriu: (a.criteriu ?? "egal") as CriteriuExt,
+          consumTip,
+          manualRows: {},
+          filtru: { type: "toate", value: "" },
+        };
+      });
+
+      if (!built.length) { setAutoErr("AI nu a găsit articole în factură."); return; }
+      setTransse(built);
+      setReviewIds(review);
+      setAutoInfo({ mem, ai });
+    } catch (e: any) {
+      setAutoErr(e.message);
+    } finally {
+      setAutoLoading(false);
+    }
   }
 
   // ── Form update ───────────────────────────────────────────────────────────
@@ -633,6 +679,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   }
 
   function setTransaCriteriu(id: string, criteriu: CriteriuExt) {
+    setReviewIds(prev => { if (!prev.has(id)) return prev; const n = new Set(prev); n.delete(id); return n; });
     setTransse(prev => prev.map(t => {
       if (t.id !== id) return t;
       const updated: Transa = { ...t, criteriu };
@@ -734,9 +781,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
         apartamentId: r.apartamentId, numar: r.numar, proprietar: r.proprietar,
         suma: r.suma, coloane: r.coloane,
       }));
+      // Memorează maparea articol → criteriu pentru acest furnizor (pentru luna viitoare).
+      const invata = transse.map((t, i) => ({
+        denumire:  t.label || `Distribuire ${i + 1}`,
+        criteriu:  t.criteriu,
+        consumTip: t.criteriu === "consum" ? t.consumTip : null,
+      }));
       const res = await fetch(`/api/facturi/${selected.id}/distribuie`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, criteriuByCol, consumTipByCol }),
+        body: JSON.stringify({ rows, criteriuByCol, consumTipByCol, invata }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare");
@@ -1117,9 +1170,28 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   {" · "}{lunaPeriod(selected.luna, selected.an)}
                 </p>
               </div>
-              <button className="modal__close" onClick={closeModal}>✕</button>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <button
+                  className="btn btn--secondary btn--sm"
+                  onClick={autoDistribuie}
+                  disabled={autoLoading || distLoading || !selected.hasPdf}
+                  title={selected.hasPdf ? "Citește articolele din PDF și propune distribuirea" : "Atașează un PDF facturii întâi (din Editare)"}
+                >
+                  {autoLoading ? "Se analizează…" : "✨ Distribuie automat"}
+                </button>
+                <button className="modal__close" onClick={closeModal}>✕</button>
+              </div>
             </div>
             <div className="modal__body">
+
+              {autoErr && <div className="wizard__error" style={{ marginBottom: "1rem" }}>{autoErr}</div>}
+
+              {autoInfo && (
+                <div style={{ background: "rgba(124,58,237,0.1)", border: "1px solid #7c3aed", borderRadius: "0.5rem", padding: "0.6rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#c4b5fd" }}>
+                  ✨ Distribuire propusă de AI: {autoInfo.mem > 0 && <><strong>{autoInfo.mem}</strong> din memorie · </>}<strong>{autoInfo.ai}</strong> de verificat.
+                  {" "}Verifică criteriile și sumele înainte de a confirma.
+                </div>
+              )}
 
               {selected.dinFond && (
                 <div style={{ background: "rgba(56,189,248,0.1)", border: "1px solid #38bdf8", borderRadius: "0.5rem", padding: "0.75rem 1rem", marginBottom: "1rem", fontSize: "0.82rem", color: "#7dd3fc" }}>
@@ -1146,7 +1218,12 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                       <div key={t.id} className="dist-transa">
                         {/* Header row */}
                         <div className="dist-transa__header">
-                          <span className="dist-transa__nr">Distribuire {ti + 1}</span>
+                          <span className="dist-transa__nr">
+                            Distribuire {ti + 1}
+                            {reviewIds.has(t.id) && (
+                              <span title="Criteriu propus de AI — verifică-l" style={{ marginLeft: 6, fontSize: "0.62rem", color: "#fbbf24", fontWeight: 700 }}>⚠ verifică</span>
+                            )}
+                          </span>
                           <div className="dist-transa__inputs">
                             <input type="text" className="input input--sm dist-transa__label"
                               placeholder="ex: Apă rece"
