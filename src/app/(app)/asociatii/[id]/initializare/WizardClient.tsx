@@ -633,7 +633,41 @@ export default function WizardClient({
   const xlsInputRef      = useRef<HTMLInputElement>(null);
   const xlsPropInputRef  = useRef<HTMLInputElement>(null);
   const xlsSoldInputRef  = useRef<HTMLInputElement>(null);
-  const xlsFondInputRef  = useRef<HTMLInputElement>(null);
+  const xlsFondInputRef        = useRef<HTMLInputElement>(null);
+  const xlsSoldFondInputRef    = useRef<HTMLInputElement>(null);
+
+  function handleXlsSoldFondImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const data = ev.target?.result;
+      if (!data) return;
+      const wb = XLSX.read(data, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const dataRows = rows.filter(r => {
+        const first = String(r[0] ?? "").trim();
+        return !isNaN(Number(first)) && first !== "";
+      });
+      if (dataRows.length === 0) return;
+      setSoldContribFonduri(prev => {
+        const next = [...prev];
+        dataRows.forEach(row => {
+          const numar = String(row[0] ?? "").trim();
+          fondActive.forEach((fond, fi) => {
+            const val = String(row[fi + 1] ?? "").trim();
+            if (val === "" || isNaN(Number(val))) return;
+            const gi = next.findIndex(sf => sf.numar === numar && sf.fondName === fond.name);
+            if (gi >= 0) next[gi] = { ...next[gi], sold: val };
+          });
+        });
+        return next;
+      });
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
 
   function handleXlsFondImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1484,6 +1518,37 @@ export default function WizardClient({
         <div className="wizard__body">
           <h2 className="wizard__step-title">Solduri — Fonduri</h2>
           <p className="wizard__step-desc">Contribuțiile acumulate de proprietari la fiecare fond de-a lungul timpului. Lasă gol dacă nu există sold acumulat.</p>
+
+          {fondActive.length > 0 && (
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", margin: "1rem 0 0.5rem" }}>
+              <div>
+                <button
+                  type="button"
+                  className="btn btn--secondary"
+                  onClick={() => xlsSoldFondInputRef.current?.click()}
+                  title="Importă solduri fonduri din fișier Excel"
+                >
+                  ⬆ Importă XLS
+                </button>
+                <input
+                  ref={xlsSoldFondInputRef}
+                  type="file"
+                  accept=".xls,.xlsx,.ods,.csv"
+                  style={{ display: "none" }}
+                  onChange={handleXlsSoldFondImport}
+                />
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "#94a3b8", lineHeight: 1.55, paddingTop: "0.25rem" }}>
+                Fișierul trebuie să aibă <strong style={{ color: "#a78bfa" }}>{fondActive.length + 1} coloane</strong>, în această ordine:<br />
+                <span style={{ color: "#cbd5e1" }}>
+                  Coloana 1: Nr. apartament &nbsp;·&nbsp;
+                  {fondActive.map((f, i) => `Coloana ${i + 2}: ${f.name}`).join(" · ")}
+                </span><br />
+                Potrivire după numărul apartamentului. Primul rând cu text este ignorat automat.
+              </div>
+            </div>
+          )}
+
           {fondActive.length === 0 ? (
             <div className="dash-panel__empty">Niciun fond activ.</div>
           ) : (
