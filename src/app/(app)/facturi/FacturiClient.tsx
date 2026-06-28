@@ -306,7 +306,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       const label = t.label || `Distribuire ${transse.indexOf(t) + 1}`;
       const r = rows.find(r => r.apartamentId === ap.id);
       const s = r?.suma ?? 0;
-      coloane[label] = s;
+      // Mai multe tranșe cu același nume → se adună în aceeași coloană (nu se suprascriu)
+      coloane[label] = Math.round(((coloane[label] ?? 0) + s) * 100) / 100;
       suma += s;
     }
     return { apartamentId: ap.id, numar: ap.numar, proprietar: ap.proprietar, suma: Math.round(suma * 100) / 100, coloane };
