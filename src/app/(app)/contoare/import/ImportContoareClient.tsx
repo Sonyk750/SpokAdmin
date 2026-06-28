@@ -98,7 +98,12 @@ export default function ImportContoareClient() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare la import");
       const r: string[][] = json.rows ?? [];
-      setRows(r); setFileName(file.name); setFormat(json.format ?? "generic");
+      const fmt: string = json.format ?? "generic";
+      setRows(r); setFileName(file.name); setFormat(fmt);
+      // Salvează furnizorul detectat în localStorage (per asociație) — pentru meniul lateral
+      if (fmt !== "generic" && asociatieId) {
+        try { localStorage.setItem(`furnizorCitiri-${asociatieId}`, fmt); } catch {}
+      }
       // auto-detect coloane din antet (funcționează și pentru formate pre-procesate)
       const hdr = (r[0] ?? []).map(x => (x ?? "").toLowerCase());
       const findCol = (re: RegExp) => hdr.findIndex(h => re.test(h));

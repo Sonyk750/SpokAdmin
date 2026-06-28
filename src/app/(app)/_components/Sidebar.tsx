@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/lib/SidebarContext";
+import { useAsociatie } from "@/lib/AsociatieContext";
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ const nav: Item[] = [
     children: [
       { type: "label", label: "CITIRI" },
       { type: "link",  href: "/contoare/citiri",  label: "Citiri manuale" },
-      { type: "link",  href: "/contoare/import",  label: "Import ISTA / Techem" },
+      { type: "link",  href: "/contoare/import",  label: "Import citiri" },
       { type: "link",  href: "/contoare/istoric", label: "Istoric citiri" },
       { type: "label", label: "GESTIONARE" },
       { type: "link",  href: "/contoare/aparate", label: "Aparate înregistrate" },
@@ -102,8 +103,18 @@ export default function Sidebar({
   userRole?: string
   canManageUsers?: boolean
 }) {
-  const pathname = usePathname();
+  const pathname  = usePathname();
   const { isOpen, close } = useSidebar();
+  const { activeId } = useAsociatie();
+  const [furnizorCitiri, setFurnizorCitiri] = useState<string>("");
+
+  useEffect(() => {
+    if (!activeId) return;
+    try {
+      const v = localStorage.getItem(`furnizorCitiri-${activeId}`) ?? "";
+      setFurnizorCitiri(v);
+    } catch { setFurnizorCitiri(""); }
+  }, [activeId]);
 
   const defaultOpen = nav
     .filter((i): i is Group => i.type === "group")
@@ -165,6 +176,9 @@ export default function Sidebar({
                       if (child.type === "label") {
                         return <span key={`${item.key}-label-${ci}`} className="snav-section-label">{child.label}</span>;
                       }
+                      const dynLabel = child.href === "/contoare/import" && furnizorCitiri
+                        ? `Import ${furnizorCitiri.charAt(0).toUpperCase() + furnizorCitiri.slice(1)}`
+                        : child.label;
                       return (
                         <Link
                           key={child.href}
@@ -172,7 +186,7 @@ export default function Sidebar({
                           className={`snav-sub${isActive(child.href) ? " snav-sub--active" : ""}`}
                           onClick={close}
                         >
-                          {child.label}
+                          {dynLabel}
                         </Link>
                       );
                     })}
