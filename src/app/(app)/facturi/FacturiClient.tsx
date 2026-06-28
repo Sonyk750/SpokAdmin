@@ -889,29 +889,30 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 Nicio factură{fStatus || fLuna || fAn ? " pentru filtrele selectate" : ""}.
               </td></tr>
             )}
-            {facturi.map(f => (
+            {facturi.map(f => {
+              const restDist    = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
+              const areDist     = !!f.distribuireJson;
+              const distComplet = restDist <= 0.01;
+              return (
               <tr key={f.id}>
                 <td style={{ fontWeight: 600 }}>{f.furnizor?.nume ?? <span style={{ color: "#475569" }}>—</span>}</td>
                 <td style={{ color: "#94a3b8", fontFamily: "monospace", fontSize: "0.8rem" }}>
                   {[f.serie, f.numar].filter(Boolean).join("/") || "—"}
                 </td>
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
-                {(() => {
-                  const restDist = Math.round((f.valoare - distribuitFactura(f.distribuireJson)) * 100) / 100;
-                  const ok = restDist <= 0.01;
-                  return (
-                    <td style={{ textAlign: "right", fontWeight: 700, color: ok ? "#475569" : "#f87171" }}
-                      title={ok ? "Factură distribuită integral" : `${fmt2(restDist)} lei nedistribuiți pe apartamente`}>
-                      {ok ? "—" : fmt2(restDist)}
-                    </td>
-                  );
-                })()}
+                <td style={{ textAlign: "right" }}>
+                  {distComplet
+                    ? <span style={{ color: "#475569", fontWeight: 700 }}>—</span>
+                    : <span className="pill pill--red" title={`${fmt2(restDist)} lei nedistribuiți pe apartamente — deschide Distribuire`}>⚠ {fmt2(restDist)}</span>}
+                </td>
                 <td>{lunaPeriod(f.luna, f.an)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {f.distribuireJson
-                    ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
-                    : <span style={{ color: "#475569" }}>—</span>}
+                  {!areDist
+                    ? <span style={{ color: "#475569" }}>—</span>
+                    : distComplet
+                      ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
+                      : <span className="pill pill--yellow" title={`Distribuit parțial — ${fmt2(restDist)} lei rămași`}>parțial</span>}
                   {f.dinFond && (
                     <span title={`${fmt2(f.fondPaid ?? 0)} lei din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — partea aceasta nu se distribuie în lista de întreținere`}
                       style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 2 }}>
@@ -933,7 +934,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   </div>
                 </td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
