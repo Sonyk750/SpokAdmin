@@ -53,7 +53,7 @@ export default async function DashboardPage() {
     )
   )).filter((l): l is { id: string } => !!l).map(l => l.id);
 
-  const [listaAgg, listaHeaderAgg, facturiAgg, platiAgg, platiByMetoda, incByTip, fondRestAgg, fondSold, fondNames, platiFondAgg] = await Promise.all([
+  const [listaAgg, listaHeaderAgg, facturiAgg, platiAgg, platiByMetoda, incByTip, fondRestAgg, fondSold, fondNames] = await Promise.all([
     db.listaLunaApartament.aggregate({
       where: { listaId: { in: ultimeleListe } },
       _sum:  { totalDePlata: true, achitat: true, rest: true, restantaVeche: true, totalLuna: true },
@@ -66,7 +66,6 @@ export default async function DashboardPage() {
     db.fondApartament.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { restanta: true } }),
     db.fondApartament.groupBy({ by: ["fondId"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sold: true } }),
     db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds } }, select: { id: true, name: true } }),
-    db.plata.groupBy({ by: ["fondId"], where: { fondId: { not: null }, factura: { asociatieId: { in: asociatiiIds } } }, _sum: { suma: true } }),
   ]);
 
   const totalDePlata       = listaAgg._sum.totalDePlata  ?? 0;
@@ -85,34 +84,35 @@ export default async function DashboardPage() {
   const tip    = (t: string) => incByTip.find(x => x.tipPlata === t)?._sum.sumaIncasata ?? 0;
   const incTotal = incByTip.reduce((s, x) => s + (x._sum.sumaIncasata ?? 0), 0);
 
-  // Solduri fonduri agregate pe nume (între asociații), top 6 — minus plățile din fond
-  const nameById = new Map(fondNames.map(f => [f.id, f.name]));
-  const platiFondById = new Map(platiFondAgg.map(p => [p.fondId, p._sum.suma ?? 0]));
-  // Fonduri cu valori per-apartament (Fonduri detaliat)
-  const fonduriCuApartamente = new Set(
-    fondSold.filter(r => (r._sum.sold ?? 0) > 0).map(r => r.fondId)
-  );
-  const byName = new Map<string, number>();
+  // Solduri fonduri — folosim fondId ca cheie internă ca să evităm nepotriviri de nume
+  const soldByFondId = new Map<string, number>();
   for (const r of fondSold) {
-    const nm = nameById.get(r.fondId) ?? "Fond";
-    const platit = platiFondById.get(r.fondId) ?? 0;
-    byName.set(nm, (byName.get(nm) ?? 0) + (r._sum.sold ?? 0) - platit);
+    soldByFondId.set(r.fondId, (soldByFondId.get(r.fondId) ?? 0) + (r._sum.sold ?? 0));
   }
-  // Adaugă valorile "Fonduri asociație" (soldFondAsoc din wizardData) pentru fondurile
-  // care nu au valori per-apartament — evită dubla numărare
+
+  // Valori la nivel de asociație (soldFondAsoc din wizardData) — sursă alternativă
+  const soldAsocByFondId = new Map<string, number>();
   for (const asoc of asociatiiActive) {
     try {
       const wd = asoc.wizardData ? JSON.parse(asoc.wizardData) : {};
       if (!Array.isArray(wd.soldFondAsoc)) continue;
       for (const sf of wd.soldFondAsoc) {
-        if (!sf.fondId || !sf.fondName) continue;
+        if (!sf.fondId) continue;
         const val = parseFloat(sf.sold) || 0;
-        if (val <= 0) continue;
-        if (fonduriCuApartamente.has(sf.fondId)) continue; // are deja valori per-apartament
-        byName.set(sf.fondName, (byName.get(sf.fondName) ?? 0) + val);
+        soldAsocByFondId.set(sf.fondId, (soldAsocByFondId.get(sf.fondId) ?? 0) + val);
       }
     } catch {}
   }
+
+  // Construiește lista: per-apartament dacă există (> 0), altfel valoare asociație
+  const byName = new Map<string, number>();
+  for (const fond of fondNames) {
+    const perAp  = soldByFondId.get(fond.id) ?? 0;
+    const asocV  = soldAsocByFondId.get(fond.id) ?? 0;
+    const val    = perAp !== 0 ? perAp : asocV;
+    byName.set(fond.name, (byName.get(fond.name) ?? 0) + val);
+  }
+
   const fonduriTop = [...byName.entries()]
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .map(([label, value]) => ({ label, value }));
