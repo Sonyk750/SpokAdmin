@@ -19,14 +19,20 @@ export default async function DashboardPage() {
   const orgId = session.user.organizationId;
 
   const asociatiiActive = await db.asociatie.findMany({
-    where: { organizationId: orgId, isActive: true }, select: { id: true },
+    where: { organizationId: orgId, isActive: true }, select: { id: true, wizardData: true },
   });
   const asociatiiIds = asociatiiActive.map(a => a.id);
 
   const [nrAsociatii, nrApartamente, nrProprietari, nrFacturiNeplatite] = await Promise.all([
     db.asociatie.count({ where: { organizationId: orgId, isActive: true } }),
     db.apartament.count({ where: { organizationId: orgId, isActive: true } }),
-    db.proprietar.count({ where: { organizationId: orgId } }),
+    // Numără doar proprietarii legați de cel puțin un apartament activ
+    db.proprietar.count({
+      where: {
+        organizationId: orgId,
+        apartamente: { some: { apartament: { isActive: true, organizationId: orgId } } },
+      },
+    }),
     db.factura.count({ where: { organizationId: orgId, status: "neplatita" } }),
   ]);
 
@@ -82,13 +88,34 @@ export default async function DashboardPage() {
   // Solduri fonduri agregate pe nume (între asociații), top 6 — minus plățile din fond
   const nameById = new Map(fondNames.map(f => [f.id, f.name]));
   const platiFondById = new Map(platiFondAgg.map(p => [p.fondId, p._sum.suma ?? 0]));
-  const byName   = new Map<string, number>();
+  // Fonduri cu valori per-apartament (Fonduri detaliat)
+  const fonduriCuApartamente = new Set(
+    fondSold.filter(r => (r._sum.sold ?? 0) > 0).map(r => r.fondId)
+  );
+  const byName = new Map<string, number>();
   for (const r of fondSold) {
     const nm = nameById.get(r.fondId) ?? "Fond";
     const platit = platiFondById.get(r.fondId) ?? 0;
     byName.set(nm, (byName.get(nm) ?? 0) + (r._sum.sold ?? 0) - platit);
   }
-  const fonduriTop = [...byName.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+  // Adaugă valorile "Fonduri asociație" (soldFondAsoc din wizardData) pentru fondurile
+  // care nu au valori per-apartament — evită dubla numărare
+  for (const asoc of asociatiiActive) {
+    try {
+      const wd = asoc.wizardData ? JSON.parse(asoc.wizardData) : {};
+      if (!Array.isArray(wd.soldFondAsoc)) continue;
+      for (const sf of wd.soldFondAsoc) {
+        if (!sf.fondId || !sf.fondName) continue;
+        const val = parseFloat(sf.sold) || 0;
+        if (val <= 0) continue;
+        if (fonduriCuApartamente.has(sf.fondId)) continue; // are deja valori per-apartament
+        byName.set(sf.fondName, (byName.get(sf.fondName) ?? 0) + val);
+      }
+    } catch {}
+  }
+  const fonduriTop = [...byName.entries()]
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1]).slice(0, 6)
     .map(([label, value]) => ({ label, value }));
 
   // Ultimele asociații / facturi pentru panourile de jos
