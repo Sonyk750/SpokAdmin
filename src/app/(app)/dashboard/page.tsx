@@ -65,7 +65,7 @@ export default async function DashboardPage() {
     db.incasare.groupBy({ by: ["tipPlata"], where: { organizationId: orgId }, _sum: { sumaIncasata: true } }),
     db.fondApartament.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { restanta: true } }),
     db.fondApartament.groupBy({ by: ["fondId"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sold: true } }),
-    db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds } }, select: { id: true, name: true } }),
+    db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds }, isEnabled: true }, select: { id: true, name: true } }),
   ]);
 
   const totalDePlata       = listaAgg._sum.totalDePlata  ?? 0;
@@ -114,13 +114,15 @@ export default async function DashboardPage() {
   }
 
   const fonduriTop = [...byName.entries()]
-    .filter(([, v]) => v !== 0)
     .sort((a, b) => {
       const aPos = a[1] > 0, bPos = b[1] > 0;
-      if (aPos && !bPos) return -1;   // pozitive primele
-      if (!aPos && bPos) return 1;
-      if (aPos && bPos) return b[1] - a[1];  // pozitive: descrescător
-      return a[1] - b[1];            // negative: cel mai mic (mai negativ) ultimul
+      const aZero = a[1] === 0, bZero = b[1] === 0;
+      if (aPos  && !bPos)  return -1;  // pozitive primele
+      if (!aPos && bPos)   return 1;
+      if (aZero && !bZero) return 1;   // zero după negative
+      if (!aZero && bZero) return -1;
+      if (aPos  && bPos)   return b[1] - a[1];  // pozitive: descrescător
+      return a[1] - b[1];                        // negative: cel mai negativ ultimul
     })
     .map(([label, value]) => ({ label, value }));
 
