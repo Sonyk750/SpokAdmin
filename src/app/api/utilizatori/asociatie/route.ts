@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
               nume:         true,
               telefon:      true,
               emailuriJson: true,
+              calitati:     true,
             },
           },
         },
@@ -46,12 +47,16 @@ export async function GET(req: NextRequest) {
         const raw = lnk.proprietar.emailuriJson;
         if (raw) emailuri = JSON.parse(raw);
       } catch {}
+      let calitati: string[] = [];
+      try { calitati = JSON.parse(lnk.proprietar.calitati || "[]"); } catch {}
+      if (!calitati.includes("proprietar")) calitati = ["proprietar", ...calitati];
       return {
         proprietarId:  lnk.proprietar.id,
         prenume:       lnk.proprietar.prenume,
         nume:          lnk.proprietar.nume,
         telefon:       lnk.proprietar.telefon,
         emailuri,
+        calitati,
         apartamentNr:  `Ap. ${ap.numar}`,
         apartamentId:  ap.id,
         isMain:        lnk.isMain,

@@ -262,6 +262,7 @@ model Proprietar {
   telefon        String?
   adresa         String?
   tip            String   @default("proprietar") // proprietar / chirias
+  calitati       String   @default("[]")         // JSON array: ["proprietar","presedinte"|"cenzor"|"membru_cex"]
   emailuriJson   String?  // JSON array de email-uri
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

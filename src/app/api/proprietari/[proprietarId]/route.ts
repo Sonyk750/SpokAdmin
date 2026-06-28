@@ -14,14 +14,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
   });
   if (!proprietar) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { prenume, nume, telefon, emailuri } = await req.json() as {
+  const { prenume, nume, telefon, emailuri, calitati } = await req.json() as {
     prenume:  string;
     nume:     string;
     telefon:  string;
     emailuri: string[];
+    calitati?: string[];
   };
 
   const emailuriCurate = (emailuri ?? []).map(e => e.trim()).filter(Boolean);
+
+  // Validare combinații calitate: proprietar + maxim o calitate extra
+  const EXTRA = ["presedinte", "cenzor", "membru_cex"] as const;
+  let calitatiSave = ["proprietar"];
+  if (Array.isArray(calitati)) {
+    const extra = calitati.filter(c => EXTRA.includes(c as typeof EXTRA[number]));
+    if (extra.length > 0) calitatiSave = ["proprietar", extra[0]];
+  }
 
   const updated = await db.proprietar.update({
     where: { id: proprietarId },
@@ -31,8 +40,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
       telefon:      telefon?.trim() || null,
       email:        emailuriCurate[0] ?? null,
       emailuriJson: emailuriCurate.length ? JSON.stringify(emailuriCurate) : null,
+      calitati:     JSON.stringify(calitatiSave),
     },
-    select: { id: true, prenume: true, nume: true, telefon: true, email: true, emailuriJson: true },
+    select: { id: true, prenume: true, nume: true, telefon: true, email: true, emailuriJson: true, calitati: true },
   });
 
   return NextResponse.json(updated);
