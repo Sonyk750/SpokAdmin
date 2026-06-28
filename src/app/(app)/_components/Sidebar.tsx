@@ -90,7 +90,13 @@ const nav: Item[] = [
       { type: "link",  href: "/spv/setari",             label: "Setări SPV" },
     ],
   },
-  { type: "link", href: "/utilizatori",  label: "Utilizatori"  },
+  {
+    type: "group", label: "Utilizatori", key: "utilizatori",
+    children: [
+      { type: "link", href: "/utilizatori",            label: "Corporate" },
+      { type: "link", href: "/utilizatori/asociatie",  label: "Asociație" },
+    ],
+  },
   { type: "link", href: "/initializare", label: "Inițializare" },
 ];
 

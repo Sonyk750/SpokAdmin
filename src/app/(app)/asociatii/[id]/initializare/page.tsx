@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 import WizardClient from "./WizardClient";
 
 export const metadata = { title: "Inițializare asociație" };
@@ -10,47 +9,6 @@ export default async function InitializarePage({ params }: { params: Promise<{ i
   const { id } = await params;
   const session = await auth();
   if (!session?.user?.organizationId) redirect("/login");
-
-  // Verifică dacă există cel puțin o listă de plată închisă — dacă da, wizard-ul se blochează
-  const listaInchisa = await db.listaLuna.findFirst({
-    where:  { asociatieId: id, status: "inchisa" },
-    select: { luna: true, an: true, inchisaAt: true },
-    orderBy: { inchisaAt: "asc" },
-  });
-
-  if (listaInchisa) {
-    const luna = ["Ianuarie","Februarie","Martie","Aprilie","Mai","Iunie",
-                  "Iulie","August","Septembrie","Octombrie","Noiembrie","Decembrie"][listaInchisa.luna - 1];
-    return (
-      <div className="page-shell">
-        <div className="page-header">
-          <div>
-            <Link href={`/asociatii/${id}`} className="back-link" style={{ marginBottom: "0.25rem", display: "inline-block" }}>
-              ← Înapoi la asociație
-            </Link>
-            <h1 className="page-title">Inițializare blocată</h1>
-          </div>
-        </div>
-        <div className="dash-panel" style={{ maxWidth: 560, padding: "2rem 2rem", textAlign: "center" }}>
-          <div style={{ fontSize: "2.5rem", marginBottom: "1rem" }}>🔒</div>
-          <h2 style={{ color: "#e2e8f0", marginBottom: "0.75rem", fontSize: "1.1rem" }}>
-            Valorile inițiale nu mai pot fi modificate
-          </h2>
-          <p style={{ color: "#94a3b8", lineHeight: 1.6, marginBottom: "1.5rem" }}>
-            Lista de plată pentru <strong style={{ color: "#e2e8f0" }}>{luna} {listaInchisa.an}</strong> a fost
-            închisă{listaInchisa.inchisaAt
-              ? ` pe ${listaInchisa.inchisaAt.toLocaleDateString("ro-RO", { day: "2-digit", month: "long", year: "numeric" })}`
-              : ""}.
-            <br />
-            Modificarea valorilor inițiale ar afecta istoricul și rapoartele existente.
-          </p>
-          <Link href={`/asociatii/${id}`} className="btn btn--secondary">
-            ← Înapoi la asociație
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   const a = await db.asociatie.findFirst({
     where:   { id, organizationId: session.user.organizationId },
