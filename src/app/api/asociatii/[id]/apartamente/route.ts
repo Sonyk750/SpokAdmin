@@ -28,19 +28,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         include: { proprietar: { select: { nume: true, prenume: true } } },
         take:    1,
       },
-      ...(withConsum ? {
-        contoare: {
-          where:  { isActive: true },
-          select: {
-            tip: true,
-            citiri: {
-              where:  { luna, an },
-              select: { consum: true, valoare: true, valoarePrev: true },
-              take:   1,
-            },
+      // Mereu încărcăm contoarele: dacă nu există citire pe luna/anul facturii,
+      // folosim cea mai recentă citire, ca opțiunea „consum" să fie disponibilă.
+      contoare: {
+        where:  { isActive: true },
+        select: {
+          tip: true,
+          citiri: {
+            orderBy: [{ an: "desc" }, { luna: "desc" }],
+            take:    12,
+            select:  { consum: true, valoare: true, valoarePrev: true, luna: true, an: true },
           },
         },
-      } : {}),
+      },
     },
   });
 
@@ -48,17 +48,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     apartamente: apartamente.map((ap: any) => {
       const p = ap.proprietari[0]?.proprietar;
       const consumByTip: Record<string, number> = {};
-      if (withConsum && ap.contoare) {
-        for (const contor of ap.contoare) {
-          const citire = contor.citiri?.[0];
-          if (!citire) continue;
-          let val = citire.consum;
-          if (val === null && citire.valoare !== null && citire.valoarePrev !== null) {
-            val = citire.valoare - citire.valoarePrev;
-          }
-          if (val !== null && val >= 0) {
-            consumByTip[contor.tip] = (consumByTip[contor.tip] ?? 0) + val;
-          }
+      for (const contor of ap.contoare ?? []) {
+        const citiri = contor.citiri ?? [];
+        // Preferă citirea pe perioada facturii; altfel cea mai recentă.
+        const citire = (withConsum ? citiri.find((c: any) => c.luna === luna && c.an === an) : null) ?? citiri[0];
+        if (!citire) continue;
+        let val = citire.consum;
+        if (val === null && citire.valoare !== null && citire.valoarePrev !== null) {
+          val = citire.valoare - citire.valoarePrev;
+        }
+        if (val !== null && val >= 0) {
+          consumByTip[contor.tip] = (consumByTip[contor.tip] ?? 0) + val;
         }
       }
       return {

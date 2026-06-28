@@ -279,6 +279,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     distAps.some(a => (a.consumByTip[ct.value] ?? 0) > 0)
   );
 
+  // Criterii condiționate de datele completate la inițializare
+  const hasSuprafata = distAps.some(a => (a.suprafata ?? 0) > 0);
+  const hasCotaParte = distAps.some(a => (a.cotaParte  ?? 0) > 0);
+  const criteriiDisponibile = CRITERII_EXT.filter(c =>
+    (c.value !== "consum"     || availableConsumuri.length > 0) &&
+    (c.value !== "suprafata"  || hasSuprafata) &&
+    (c.value !== "cota_parte" || hasCotaParte)
+  );
+
   const scari = [...new Set(distAps.map(a => a.scara).filter(Boolean))].sort() as string[];
 
   const transaRows = transse.map(t => {
@@ -1231,7 +1240,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
                         {/* Criteriu */}
                         <div className="dist-criterii dist-criterii--compact">
-                          {CRITERII_EXT.filter(c => c.value !== "consum" || availableConsumuri.length > 0).map(c => (
+                          {criteriiDisponibile.map(c => (
                             <button key={c.value} type="button" title={c.desc}
                               className={`dist-criteriu dist-criteriu--sm${t.criteriu === c.value ? " dist-criteriu--active" : ""}`}
                               onClick={() => setTransaCriteriu(t.id, c.value)}>
