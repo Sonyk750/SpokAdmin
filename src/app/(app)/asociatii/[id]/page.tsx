@@ -8,20 +8,26 @@ export default async function AsociatieDetailPage({ params }: { params: Promise<
   const session = await auth();
   if (!session?.user?.organizationId) redirect("/login");
 
-  const a = await db.asociatie.findFirst({
-    where: { id, organizationId: session.user.organizationId },
-    include: {
-      apartamente: {
-        where:   { isActive: true },
-        include: {
-          proprietari: { include: { proprietar: true }, take: 1 },
-          solduri:     true,
+  const [a, listaInchisa] = await Promise.all([
+    db.asociatie.findFirst({
+      where: { id, organizationId: session.user.organizationId },
+      include: {
+        apartamente: {
+          where:   { isActive: true },
+          include: {
+            proprietari: { include: { proprietar: true }, take: 1 },
+            solduri:     true,
+          },
+          orderBy: { numar: "asc" },
         },
-        orderBy: { numar: "asc" },
+        fonduri: { where: { isEnabled: true }, orderBy: { sortOrder: "asc" } },
       },
-      fonduri: { where: { isEnabled: true }, orderBy: { sortOrder: "asc" } },
-    },
-  });
+    }),
+    db.listaLuna.findFirst({
+      where:  { asociatieId: id, status: "inchisa" },
+      select: { id: true },
+    }),
+  ]);
 
   if (!a) notFound();
 
@@ -85,9 +91,15 @@ export default async function AsociatieDetailPage({ params }: { params: Promise<
             {a.phone        && <InfoRow label="Telefon"       value={a.phone} />}
             {a.email        && <InfoRow label="Email"         value={a.email} />}
           </div>
-          <Link href={`/asociatii/${a.id}/initializare`} className="btn btn--secondary btn--full" style={{ marginTop: "1rem" }}>
-            {a.wizardData ? "✎ Modifică inițializarea" : "🧙 Pornește inițializarea"}
-          </Link>
+          {listaInchisa ? (
+            <div style={{ marginTop: "1rem", padding: "0.6rem 1rem", borderRadius: "0.5rem", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.25)", color: "#fbbf24", fontSize: "0.8rem", textAlign: "center" }}>
+              🔒 Inițializarea este blocată — există o listă de plată închisă
+            </div>
+          ) : (
+            <Link href={`/asociatii/${a.id}/initializare`} className="btn btn--secondary btn--full" style={{ marginTop: "1rem" }}>
+              {a.wizardData ? "✎ Modifică inițializarea" : "🧙 Pornește inițializarea"}
+            </Link>
+          )}
         </div>
 
         {/* Lista apartamente */}
