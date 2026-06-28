@@ -903,20 +903,19 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
             <tr>
               <th>Furnizor</th>
               <th>Serie / Nr.</th>
+              <th>Data emiterii</th>
               <th style={{ textAlign: "right" }}>Valoare (lei)</th>
-              <th style={{ textAlign: "right" }}>Rest de distribuit</th>
-              <th>Perioadă</th>
               <th>Status</th>
-              <th style={{ textAlign: "center" }}>Distribuit</th>
+              <th style={{ textAlign: "center" }}>Status distribuire</th>
               <th style={{ textAlign: "right" }}>Acțiuni</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
-              <tr><td colSpan={8} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>Se încarcă...</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>Se încarcă...</td></tr>
             )}
             {!loading && facturi.length === 0 && (
-              <tr><td colSpan={8} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>
+              <tr><td colSpan={7} style={{ textAlign: "center", color: "#475569", padding: "2rem" }}>
                 Nicio factură{fStatus || fLuna || fAn ? " pentru filtrele selectate" : ""}.
               </td></tr>
             )}
@@ -930,23 +929,20 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td style={{ color: "#94a3b8", fontFamily: "monospace", fontSize: "0.8rem" }}>
                   {[f.serie, f.numar].filter(Boolean).join("/") || "—"}
                 </td>
-                <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
-                <td style={{ textAlign: "right" }}>
-                  {distComplet
-                    ? <span style={{ color: "#475569", fontWeight: 700 }}>—</span>
-                    : <span className="pill pill--red" title={`${fmt2(restDist)} lei nedistribuiți pe apartamente — deschide Distribuire`}>⚠ {fmt2(restDist)}</span>}
+                <td style={{ color: "#cbd5e1", fontSize: "0.83rem", whiteSpace: "nowrap" }}>
+                  {f.dataEmiterii ? isoToRo(f.dataEmiterii.slice(0, 10)) : "—"}
                 </td>
-                <td>{lunaPeriod(f.luna, f.an)}</td>
+                <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
                   {!areDist
-                    ? <span style={{ color: "#475569" }}>—</span>
+                    ? <span className="pill pill--red" title="Factura nu a fost distribuită pe apartamente">nedistribuit</span>
                     : distComplet
-                      ? <span style={{ color: "#4ade80", fontWeight: 700 }}>✓</span>
-                      : <span className="pill pill--yellow" title={`Distribuit parțial — ${fmt2(restDist)} lei rămași`}>parțial</span>}
+                      ? <span className="pill pill--green" title="Distribuită integral pe apartamente">{f.luna ? `${LUNI[f.luna - 1]}${f.an ? " " + f.an : ""}` : "Distribuită"}</span>
+                      : <span className="pill pill--red" title={`Mai sunt ${fmt2(restDist)} lei de distribuit — deschide Distribuire`}>⚠ {fmt2(restDist)} lei</span>}
                   {f.dinFond && (
                     <span title={`${fmt2(f.fondPaid ?? 0)} lei din fond${f.fonduri?.length ? " (" + f.fonduri.join(", ") + ")" : ""} — partea aceasta nu se distribuie în lista de întreținere`}
-                      style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 2 }}>
+                      style={{ display: "block", color: "#38bdf8", fontWeight: 700, fontSize: "0.62rem", marginTop: 4 }}>
                       −{fmt2(f.fondPaid ?? 0)} fond
                     </span>
                   )}
