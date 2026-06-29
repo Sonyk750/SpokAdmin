@@ -33,6 +33,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         furnizor = await db.furnizor.create({ data: { organizationId: orgId, nume: numeT } });
       }
 
+      // Dezactivează orice duplicat cu același nume (scriere diferită) care nu are date reale
+      await db.furnizor.updateMany({
+        where: {
+          organizationId: orgId,
+          isActive: true,
+          id: { not: furnizor.id },
+          nume: { equals: numeT, mode: "insensitive" },
+          facturi: { none: {} },
+          avansuri: { none: {} },
+        },
+        data: { isActive: false },
+      });
+
       await db.furnizorAsociatie.upsert({
         where: { furnizorId_asociatieId: { furnizorId: furnizor.id, asociatieId: id } },
         create: { furnizorId: furnizor.id, asociatieId: id },
