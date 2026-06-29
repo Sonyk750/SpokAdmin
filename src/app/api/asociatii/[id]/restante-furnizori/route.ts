@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     for (const item of restante ?? []) {
       const numeT = item.furnizorNume?.trim();
       const val   = parseFloat(item.restanta);
-      if (!numeT || isNaN(val) || val <= 0) continue;
+      if (!numeT || isNaN(val) || val === 0) continue;
 
       let furnizor = await db.furnizor.findFirst({ where: { organizationId: orgId, nume: numeT } });
       if (!furnizor) {
@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
     wd.dataRestanteFurnizori = dataRestante;
     // salvăm cu câmpul "nome" ca să corespundă formatului de reîncărcare în wizard
-    wd.furnizoriRestante = restante.map(r => ({ nome: r.furnizorNume, restanta: r.restanta }));
+    wd.furnizoriRestante = restante.map(r => ({ nume: r.furnizorNume, restanta: r.restanta }));
 
     await db.asociatie.update({
       where: { id },

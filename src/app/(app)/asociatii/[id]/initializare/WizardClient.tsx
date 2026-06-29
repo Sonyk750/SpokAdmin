@@ -390,9 +390,9 @@ export default function WizardClient({
   // ── Step 8: Restanțe furnizori ──
   const [restFurnTab, setRestFurnTab] = useState<"furnizori" | "restante">("furnizori");
   const [furnizoriRestante, setFurnizoriRestante] = useState<FurnizorRestantaRow[]>(() => {
-    const raw = wizardInitData.furnizoriRestante as Array<{ id?: unknown; nume?: unknown; restanta?: unknown }> | null | undefined;
+    const raw = wizardInitData.furnizoriRestante as Array<Record<string, unknown>> | null | undefined;
     if (Array.isArray(raw) && raw.length > 0) {
-      return raw.map(r => ({ id: String(r.id ?? Math.random()), nume: String(r.nume ?? ""), restanta: String(r.restanta ?? "") }));
+      return raw.map(r => ({ id: String(r.id ?? Math.random()), nume: String(r["nume"] ?? r["nome"] ?? ""), restanta: String(r.restanta ?? "") }));
     }
     return [];
   });

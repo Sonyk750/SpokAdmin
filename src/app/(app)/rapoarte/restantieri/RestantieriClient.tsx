@@ -73,7 +73,7 @@ async function generateAndDownloadPdf(asoc: AsocInfo | null, rows: Row[]) {
         { stack: [{ text: "Situație la data", fontSize: 9, color: "#666" }, { text: roToday(), bold: true, fontSize: 10 }], width: "auto", alignment: "right" },
       ] },
       { canvas: [{ type: "line", x1: 0, y1: 6, x2: 515, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 0] },
-      { text: "LISTĂ RESTANȚIERI", style: "title", alignment: "center", margin: [0, 14, 0, 14] },
+      { text: "RESTANȚE PROPRIETARI", style: "title", alignment: "center", margin: [0, 14, 0, 14] },
       {
         table: { headerRows: 1, widths: [28, "*", 75, 60, 55, 60], body },
         layout: {
@@ -99,7 +99,7 @@ async function generateAndDownloadPdf(asoc: AsocInfo | null, rows: Row[]) {
   };
 
   const pm = pdfMake.default ?? pdfMake;
-  pm.createPdf(docDefinition).download(`restantieri-${new Date().toISOString().slice(0, 10)}.pdf`);
+  pm.createPdf(docDefinition).download(`restante-proprietari-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export default function RestantieriClient() {
@@ -166,7 +166,7 @@ export default function RestantieriClient() {
       <div className="page-shell">
         <div className="page-header">
           <div>
-            <h1 className="page-title">Restanțieri</h1>
+            <h1 className="page-title">Restanțe proprietari</h1>
             <p className="page-sub">Apartamentele cu datorii — situație la zi ({roToday()})</p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -186,7 +186,7 @@ export default function RestantieriClient() {
       {rows.length > 0 && (
         <div className="dash-panel" style={{ margin: "0 1.5rem 1rem", padding: "1rem 1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Restanțieri</div>
+            <div style={{ fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem" }}>Proprietari cu datorii</div>
             <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#a78bfa" }}>{rows.length}</div>
           </div>
           <div>
@@ -258,7 +258,7 @@ export default function RestantieriClient() {
             <div style={{ fontSize: "10pt", fontWeight: "bold" }}>{roToday()}</div>
           </div>
         </div>
-        <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 12pt" }}>Listă restanțieri</div>
+        <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: "bold", textTransform: "uppercase", margin: "10pt 0 12pt" }}>Restanțe proprietari</div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
           <thead>
             <tr>
