@@ -44,8 +44,9 @@ export async function GET(req: NextRequest) {
     const acoperit  = computeAcoperit(f.plati, f.avansMiscari);
     const fonduri   = [...new Set(f.plati.filter(p => p.fondId).map(p => p.fondName ?? "Fond"))];
     const fondPaid  = r2(f.plati.filter(p => p.fondId).reduce((s, p) => s + p.suma, 0));
-    const { pdf, ...rest } = f;
-    return { ...rest, acoperit, rest: r2(f.valoare - acoperit), dinFond: fondPaid > 0, fondPaid, fonduri, hasPdf: !!pdf };
+    const { pdf, aiData, ...rest } = f;
+    const spvId = aiData?.startsWith("spv:") ? aiData.slice(4) : null;
+    return { ...rest, acoperit, rest: r2(f.valoare - acoperit), dinFond: fondPaid > 0, fondPaid, fonduri, hasPdf: !!pdf, spvId };
   });
 
   return NextResponse.json(withRest);
@@ -100,6 +101,22 @@ export async function POST(req: NextRequest) {
   let furnizorId = body.furnizorId ?? null;
   if (!furnizorId && (body.furnizorNume?.trim() || body.furnizorCui?.trim())) {
     furnizorId = await resolveFurnizorId(db, orgId, { nume: body.furnizorNume, cui: body.furnizorCui });
+  }
+
+  // Anti-dublură: aceeași factură (furnizor + număr, opțional serie) există deja?
+  // Previne introducerea accidentală de două ori, inclusiv a celor venite din SPV.
+  if (furnizorId && body.numar?.trim()) {
+    const dup = await db.factura.findFirst({
+      where: {
+        organizationId: orgId,
+        asociatieId:    body.asociatieId,
+        furnizorId,
+        numar:          body.numar.trim(),
+        ...(body.serie?.trim() ? { serie: body.serie.trim() } : {}),
+      },
+      select: { id: true },
+    });
+    if (dup) return NextResponse.json({ error: "Această factură există deja (același furnizor și număr)." }, { status: 409 });
   }
 
   const { factura, avansAplicat } = await db.$transaction(async (tx) => {

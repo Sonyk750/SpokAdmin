@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useAsociatie } from "@/lib/AsociatieContext"
+import { roDate } from "@/lib/date"
 
 type SpvStatus = { connected: boolean; expired?: boolean }
 
@@ -207,11 +208,7 @@ export default function FacturiPrimitePage() {
                     <td style={{ fontFamily: "monospace", fontSize: "0.75rem", color: "#9ca3af" }}>
                       {inv.uploadId || "—"}
                     </td>
-                    <td>
-                      {inv.issueDate
-                        ? new Date(inv.issueDate).toLocaleDateString("ro-RO")
-                        : "—"}
-                    </td>
+                    <td>{roDate(inv.issueDate)}</td>
                     <td style={{ textAlign: "right" }}>
                       {inv.total != null
                         ? <strong>{inv.total.toFixed(2)} <span style={{ color: "#9ca3af", fontSize: "0.75rem" }}>{inv.currency}</span></strong>

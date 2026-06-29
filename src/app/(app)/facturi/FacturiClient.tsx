@@ -34,6 +34,7 @@ interface FacturaRow {
   fondId?:        string | null;   // alocare pe fond (acoperită din fond, nedistribuită)
   fondName?:      string | null;
   hasPdf?:        boolean;
+  spvId?:         string | null;   // factură importată din SPV → legătură la documentul ANAF
 }
 
 interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; }
@@ -989,6 +990,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   <div style={{ display: "flex", gap: "0.375rem", justifyContent: "flex-end" }}>
                     {f.hasPdf ? (
                       <a className="btn-action" href={`/api/facturi/${f.id}/pdf`} target="_blank" rel="noopener noreferrer" title="Vezi factura (PDF)">👁</a>
+                    ) : f.spvId ? (
+                      <a className="btn-action" href={`/spv/facturi-primite/factura/${f.spvId}`} target="_blank" rel="noopener noreferrer" title="Vezi factura (din SPV / ANAF)">👁</a>
                     ) : (
                       <button className="btn-action" onClick={() => openEditeaza(f)} title="Fără PDF — atașează din editare" style={{ opacity: 0.4 }}>👁</button>
                     )}

@@ -1,7 +1,64 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
+import { resolveFurnizorId } from "@/lib/furnizor"
 import { unzipSync } from "fflate"
+
+// Importă facturile primite din SPV în lista de facturi (idempotent — nu dublează).
+// Factura intră NEdistribuită; utilizatorul o distribuie manual (AI învață din asta).
+// Luna/anul implicit = data emiterii (editabile ulterior din factură).
+async function importSpvToFacturi(orgId: string, asociatieId: string) {
+  // Doar cele neprocesate încă: dacă o factură a fost importată o dată (și eventual
+  // ștearsă intenționat), nu o reintroducem la următoarea sincronizare.
+  const spvInvoices = await db.spvInvoice.findMany({
+    where: { asociatieId, organizationId: orgId, total: { not: null }, status: { not: "PROCESSED" } },
+  })
+
+  for (const inv of spvInvoices) {
+    // Deja importată (legată de acest mesaj SPV)?
+    const already = await db.factura.findFirst({
+      where:  { organizationId: orgId, aiData: `spv:${inv.id}` },
+      select: { id: true },
+    })
+    if (already) {
+      if (inv.status !== "PROCESSED") await db.spvInvoice.update({ where: { id: inv.id }, data: { status: "PROCESSED" } })
+      continue
+    }
+
+    const furnizorId = await resolveFurnizorId(db, orgId, { nume: inv.supplier, cui: inv.supplierCui })
+
+    // A fost deja adăugată manual (același furnizor + număr)? Atunci doar o legăm de SPV.
+    if (furnizorId && inv.invoiceNumber) {
+      const dup = await db.factura.findFirst({
+        where:  { organizationId: orgId, asociatieId, furnizorId, numar: inv.invoiceNumber },
+        select: { id: true },
+      })
+      if (dup) {
+        await db.factura.update({ where: { id: dup.id }, data: { aiData: `spv:${inv.id}` } })
+        await db.spvInvoice.update({ where: { id: inv.id }, data: { status: "PROCESSED" } })
+        continue
+      }
+    }
+
+    const d = inv.issueDate ?? null
+    await db.factura.create({
+      data: {
+        organizationId: orgId,
+        asociatieId,
+        furnizorId:   furnizorId ?? null,
+        numar:        inv.invoiceNumber ?? null,
+        valoare:      inv.total ?? 0,
+        tva:          inv.vatAmount ?? 0,
+        dataEmiterii: d,
+        luna:         d ? d.getUTCMonth() + 1 : null,
+        an:           d ? d.getUTCFullYear()  : null,
+        status:       "neplatita",
+        aiData:       `spv:${inv.id}`,
+      },
+    })
+    await db.spvInvoice.update({ where: { id: inv.id }, data: { status: "PROCESSED" } })
+  }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -173,6 +230,8 @@ export async function GET(req: NextRequest) {
           })
         }
       }
+      // După sincronizare, importă automat facturile SPV în lista de facturi.
+      await importSpvToFacturi(orgId, asociatieId)
     } catch (e) {
       console.error("SPV inbox sync error:", e)
       return NextResponse.json({ error: "Eroare la sincronizare ANAF" }, { status: 500 })

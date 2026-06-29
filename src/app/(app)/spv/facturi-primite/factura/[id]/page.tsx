@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
+import { roDate } from "@/lib/date"
 
 type Line  = { id: string; name: string; description: string; quantity: number; unit: string; unitPrice: number; lineTotal: number; vatPct: number }
 type Party = { name: string; vat: string; regCom: string; address: string; city: string; county: string; email: string; phone: string }
@@ -29,7 +30,7 @@ export default function FacturaSPVPage() {
   }, [data])
 
   const fmt     = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ".")
-  const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString("ro-RO") : "—"
+  const fmtDate = (s: string) => roDate(s)
 
   if (error) return <div style={{ padding: "2rem", color: "#f87171", fontFamily: "Arial" }}>{error}</div>
   if (!data)  return <div style={{ padding: "2rem", color: "#94a3b8", fontFamily: "Arial" }}>Se încarcă factura...</div>
