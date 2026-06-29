@@ -8,7 +8,17 @@ export async function GET() {
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const furnizori = await db.furnizor.findMany({
-    where:   { organizationId: orgId, isActive: true },
+    where: {
+      organizationId: orgId,
+      isActive: true,
+      // Exclude furnizori care au DOAR facturi din initializare (fara valori reale)
+      NOT: {
+        AND: [
+          { facturi: { some: {} } },
+          { facturi: { every: { notes: "wizard-init-restante-furnizori" } } },
+        ],
+      },
+    },
     orderBy: { nume: "asc" },
     select:  { id: true, nume: true, cui: true },
   });
