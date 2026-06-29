@@ -1,9 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import AsociatieCard from "./_components/AsociatieCard";
-import AsociatieNouaBtn from "./_components/AsociatieNouaBtn";
 
 export default async function AsociatiiPage() {
   const session = await auth();
@@ -25,7 +23,6 @@ export default async function AsociatiiPage() {
           <h1 className="page-title">Asociații</h1>
           <p className="page-sub">Administrează toate asociațiile de proprietari din portofoliu.</p>
         </div>
-        <AsociatieNouaBtn />
       </div>
 
       {asociatii.length === 0 ? (
@@ -33,9 +30,8 @@ export default async function AsociatiiPage() {
           <span className="empty-state__icon">🏢</span>
           <h2 className="empty-state__title">Nicio asociație adăugată</h2>
           <p className="empty-state__desc">
-            Adaugă prima asociație de proprietari pentru a începe administrarea.
+            Folosește butonul <strong>Inițializare</strong> din meniu pentru a adăuga prima asociație.
           </p>
-          <AsociatieNouaBtn primary />
         </div>
       ) : (
         <div className="asociatii-grid">
