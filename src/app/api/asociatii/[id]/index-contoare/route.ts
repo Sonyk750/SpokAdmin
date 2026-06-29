@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const asociatie = await db.asociatie.findFirst({
     where:  { id, organizationId: session.user.organizationId },
-    select: { id: true, wizardData: true },
+    select: { id: true, wizardData: true, wizardStep: true },
   });
   if (!asociatie) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   }
 
-  await db.asociatie.update({ where: { id }, data: { wizardStep: 9 } });
+  await db.asociatie.update({ where: { id }, data: { wizardStep: Math.max(asociatie.wizardStep, 11) } });
 
   return NextResponse.json({ ok: true });
 }

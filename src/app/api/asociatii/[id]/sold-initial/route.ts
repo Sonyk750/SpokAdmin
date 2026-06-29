@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         primaListaLuna: body.primaListaLuna ?? null,
         primaListaAn:   body.primaListaAn   ?? null,
       }),
-      wizardStep: Math.max(a.wizardStep, 7),
+      wizardStep: Math.max(a.wizardStep, 9),
     },
   });
 

@@ -22,7 +22,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   await db.asociatie.update({
     where: { id },
     data: {
-      wizardStep: 9,
+      wizardStep: 12,
       wizardData: JSON.stringify({
         ...existing,
         completedAt:    new Date().toISOString(),

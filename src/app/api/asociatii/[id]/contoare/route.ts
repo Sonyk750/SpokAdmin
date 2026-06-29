@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await db.contor.deleteMany({ where: { asociatieId: id, numarSerie: null, citiri: { none: {} } } });
 
     if (tmpls.length === 0 || asociatie.apartamente.length === 0) {
-      await db.asociatie.update({ where: { id }, data: { wizardStep: 8 } });
+      await db.asociatie.update({ where: { id }, data: { wizardStep: Math.max(asociatie.wizardStep, 10) } });
       return NextResponse.json({ contoare: [] });
     }
 
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       orderBy: [{ apartament: { numar: "asc" } }, { tip: "asc" }],
     });
 
-    await db.asociatie.update({ where: { id }, data: { wizardStep: 8 } });
+    await db.asociatie.update({ where: { id }, data: { wizardStep: Math.max(asociatie.wizardStep, 10) } });
 
     return NextResponse.json({
       contoare: saved.map(c => ({
