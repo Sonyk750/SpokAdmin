@@ -401,6 +401,24 @@ export default function WizardClient({
   const [dataRestanteFurnizori, setDataRestanteFurnizori] = useState<string>(
     wizardInitData.dataRestanteFurnizori ? String(wizardInitData.dataRestanteFurnizori) : new Date().toISOString().slice(0, 10)
   );
+  // CUI obligatoriu la furnizori: stare per-rând pentru căutarea ANAF după CUI.
+  const [furnizorCuiStatus, setFurnizorCuiStatus] = useState<Record<string, { loading: boolean; msg: string; ok: boolean }>>({});
+
+  // Caută denumirea firmei după CUI (ANAF/openapi.ro) și completează numele.
+  const lookupFurnizorCui = useCallback(async (rowId: string, cuiRaw: string) => {
+    const cui = (cuiRaw || "").replace(/\D/g, "");
+    if (cui.length < 2) { setFurnizorCuiStatus(p => ({ ...p, [rowId]: { loading: false, msg: "CUI invalid", ok: false } })); return; }
+    setFurnizorCuiStatus(p => ({ ...p, [rowId]: { loading: true, msg: "", ok: false } }));
+    try {
+      const res  = await fetch(`/api/anaf?cui=${encodeURIComponent(cui)}`);
+      const data = await res.json();
+      if (!res.ok) { setFurnizorCuiStatus(p => ({ ...p, [rowId]: { loading: false, msg: data.error ?? "CUI negăsit", ok: false } })); return; }
+      setFurnizoriRestante(prev => prev.map(r => r.id === rowId ? { ...r, cui, nume: data.denumire || r.nume } : r));
+      setFurnizorCuiStatus(p => ({ ...p, [rowId]: { loading: false, msg: data.denumire ? `✓ ${data.denumire}` : "✓ CUI valid", ok: true } }));
+    } catch {
+      setFurnizorCuiStatus(p => ({ ...p, [rowId]: { loading: false, msg: "Eroare interogare", ok: false } }));
+    }
+  }, []);
 
   // ── Step 9: Sold casă / bancă + prima listă de plată ──
   const _today = new Date().toISOString().slice(0, 10);
@@ -590,10 +608,18 @@ export default function WizardClient({
   }, [soldContribFonduri, soldFondAsoc]);
 
   const saveRestanteFurnizori = useCallback(async () => {
+    // CUI obligatoriu: orice rând cu nume sau sumă trebuie să aibă CUI (identitate
+    // sigură, fără dubluri). Blocăm salvarea dacă lipsește.
+    const incomplete = furnizoriRestante.filter(f => (f.nume.trim() || f.restanta.trim()) && !f.cui.trim());
+    if (incomplete.length) {
+      setError(`Completează CUI pentru toți furnizorii (e obligatoriu). Lipsește la: ${incomplete.map(f => f.nume.trim() || "rând fără nume").join(", ")}.`);
+      setRestFurnTab("furnizori");
+      return;
+    }
     setSaving(true); setError(null);
     try {
       const restante = furnizoriRestante
-        .filter(f => f.nume.trim() || f.cui.trim())
+        .filter(f => f.cui.trim())
         .map(f => ({ furnizorNume: f.nume.trim(), furnizorCui: f.cui.trim(), restanta: f.restanta }));
       await api("restante-furnizori", { restante, dataRestante: dataRestanteFurnizori });
       setMaxStep(p => Math.max(p, 9)); setStep(9);
@@ -1846,31 +1872,47 @@ export default function WizardClient({
 
           {restFurnTab === "furnizori" && (
             <div className="contur-tab-body">
-              <p className="wizard__step-desc" style={{ marginBottom: "1rem" }}>Adaugă furnizorii față de care există datorii:</p>
+              <p className="wizard__step-desc" style={{ marginBottom: "1rem" }}>
+                Adaugă furnizorii față de care există solduri la preluare. <strong>CUI-ul este obligatoriu</strong> — îl introduci, apeși „Caută" și numele se completează automat (identitate sigură, fără dubluri).
+              </p>
               <div className="fond-list">
-                {furnizoriRestante.map((f, i) => (
-                  <div key={f.id} className="fond-row">
-                    <input
-                      type="text"
-                      className="input input--sm fond-row__name"
-                      placeholder="Nume furnizor (ex: E.ON, Romgaz...)"
-                      value={f.nume}
-                      onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, nume: e.target.value } : r))}
-                      style={{ flex: 1 }}
-                    />
-                    <input
-                      type="text"
-                      className="input input--sm"
-                      placeholder="CUI"
-                      value={f.cui}
-                      onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, cui: e.target.value } : r))}
-                      style={{ width: "120px" }}
-                      title="Cod fiscal (opțional) — dacă CUI coincide, e considerat același furnizor"
-                    />
-                    <button type="button" className="fond-row__del"
-                      onClick={() => setFurnizoriRestante(prev => prev.filter((_, j) => j !== i))}>×</button>
+                {furnizoriRestante.map((f, i) => {
+                  const st = furnizorCuiStatus[f.id];
+                  return (
+                  <div key={f.id} style={{ marginBottom: "0.6rem" }}>
+                    <div className="fond-row">
+                      <input
+                        type="text"
+                        className="input input--sm"
+                        placeholder="CUI *"
+                        value={f.cui}
+                        onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, cui: e.target.value } : r))}
+                        onBlur={e => e.target.value.trim() && lookupFurnizorCui(f.id, e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); lookupFurnizorCui(f.id, (e.target as HTMLInputElement).value); } }}
+                        style={{ width: "130px" }}
+                        title="Cod fiscal — obligatoriu. Identifică unic furnizorul (fără dubluri)."
+                      />
+                      <button type="button" className="btn btn--secondary" style={{ whiteSpace: "nowrap", padding: "0 0.75rem", fontSize: "0.78rem" }}
+                        onClick={() => lookupFurnizorCui(f.id, f.cui)} disabled={st?.loading || !f.cui.trim()}>
+                        {st?.loading ? "..." : "Caută"}
+                      </button>
+                      <input
+                        type="text"
+                        className="input input--sm fond-row__name"
+                        placeholder="Nume furnizor (se completează din CUI)"
+                        value={f.nume}
+                        onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, nume: e.target.value } : r))}
+                        style={{ flex: 1 }}
+                      />
+                      <button type="button" className="fond-row__del"
+                        onClick={() => { setFurnizoriRestante(prev => prev.filter((_, j) => j !== i)); setFurnizorCuiStatus(p => { const n = { ...p }; delete n[f.id]; return n; }); }}>×</button>
+                    </div>
+                    {st?.msg && (
+                      <p style={{ fontSize: "0.72rem", marginTop: "0.2rem", marginLeft: "2px", color: st.ok ? "#4ade80" : "#f87171" }}>{st.msg}</p>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <div className="fond-add" style={{ marginTop: "0.75rem" }}>
                 <button type="button" className="btn btn--secondary"

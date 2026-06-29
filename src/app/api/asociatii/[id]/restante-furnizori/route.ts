@@ -30,7 +30,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
       for (const item of restante ?? []) {
         const val = parseFloat(item.restanta);
-        if ((!item.furnizorNume?.trim() && !item.furnizorCui?.trim()) || isNaN(val) || val === 0) continue;
+        // CUI obligatoriu la preluare: fără CUI nu creăm furnizor (evită dublurile).
+        // Rândurile fără CUI rămân totuși salvate ca draft în wizardData (mai jos).
+        if (!item.furnizorCui?.trim() || isNaN(val) || val === 0) continue;
 
         // Potrivire după CUI (identitate sigură), apoi după nume — fără a dubla.
         const furnizorId = await resolveFurnizorId(tx, orgId, { nume: item.furnizorNume, cui: item.furnizorCui });
