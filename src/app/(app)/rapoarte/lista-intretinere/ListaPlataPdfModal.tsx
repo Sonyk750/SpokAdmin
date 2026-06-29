@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import RoDate from "@/components/RoDate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -753,13 +754,12 @@ export default function ListaPlataPdfModal({
             <SectionLabel>Date listă</SectionLabel>
             <div style={{ marginBottom: "0.5rem" }}>
               <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.25rem" }}>Data afișării</div>
-              <input
-                type="date"
+              <RoDate
                 className="input"
                 value={opts.dataAfisare}
                 style={{ width: "100%", fontSize: "0.8rem" }}
-                onChange={e => {
-                  const d = e.target.value;
+                onChange={v => {
+                  const d = v;
                   setOpts(prev => ({
                     ...prev,
                     dataAfisare: d,
@@ -789,12 +789,11 @@ export default function ListaPlataPdfModal({
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", color: "#94a3b8", marginBottom: "0.25rem" }}>Termen de plată</div>
-              <input
-                type="date"
+              <RoDate
                 className="input"
                 value={opts.termenPlata}
                 style={{ width: "100%", fontSize: "0.8rem" }}
-                onChange={e => upd("termenPlata", e.target.value)}
+                onChange={v => upd("termenPlata", v)}
               />
             </div>
           </div>

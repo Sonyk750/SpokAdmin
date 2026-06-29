@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import RoDate from "@/components/RoDate";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 
@@ -1890,9 +1891,9 @@ export default function WizardClient({
               <div className="dash-panel" style={{ padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
                 <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Data situației</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
-                  <input type="date" className="input" style={{ width: "180px" }}
+                  <RoDate className="input" style={{ width: "180px" }}
                     value={dataRestanteFurnizori}
-                    onChange={e => setDataRestanteFurnizori(e.target.value)} />
+                    onChange={v => setDataRestanteFurnizori(v)} />
                   {dataRestanteFurnizori && (
                     <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>
                       {dataRestanteFurnizori.split("-").reverse().join("/")}
@@ -1958,7 +1959,7 @@ export default function WizardClient({
               </div>
               <div className="form-field">
                 <label className="form-field__label">La data de</label>
-                <input type="date" className="input" value={dataSoldCasa} onChange={e => setDateSoldCasa(e.target.value)} />
+                <RoDate className="input" value={dataSoldCasa} onChange={v => setDateSoldCasa(v)} />
               </div>
             </div>
           </div>
@@ -1980,8 +1981,8 @@ export default function WizardClient({
                 </div>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   {i === 0 && <label className="form-field__label">La data de</label>}
-                  <input type="date" className="input"
-                    value={b.data} onChange={e => setBanci(prev => prev.map((r, j) => j === i ? { ...r, data: e.target.value } : r))} />
+                  <RoDate className="input"
+                    value={b.data} onChange={v => setBanci(prev => prev.map((r, j) => j === i ? { ...r, data: v } : r))} />
                 </div>
                 <button type="button" className="fond-row__del" style={{ marginBottom: "2px" }}
                   onClick={() => setBanci(prev => prev.filter((_, j) => j !== i))}>×</button>

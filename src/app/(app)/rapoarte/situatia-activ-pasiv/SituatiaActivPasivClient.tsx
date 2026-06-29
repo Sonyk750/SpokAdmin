@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate from "@/components/RoDate";
 
 interface Sub { label: string; valoare: number; }
 interface Detaliu { label: string; valoare: number; sub?: Sub[]; }
@@ -217,7 +218,7 @@ export default function SituatiaActivPasivClient({ defaultDate }: { defaultDate:
         <div className="lp-controls" style={{ marginBottom: "1rem", alignItems: "flex-end" }}>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">La data</label>
-            <input type="date" className="input" value={data} onChange={e => setData(e.target.value)} />
+            <RoDate className="input" value={data} onChange={v => setData(v)} />
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">Formă</label>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useAsociatie } from "@/lib/AsociatieContext"
 import { roDate } from "@/lib/date"
+import RoDate from "@/components/RoDate"
 
 type SpvStatus = { connected: boolean; expired?: boolean }
 
@@ -111,22 +112,20 @@ export default function FacturiPrimitePage() {
           </p>
         </div>
         <div className="spv-toolbar">
-          <input
-            type="date"
+          <RoDate
             value={dateFrom}
-            onChange={e => {
-              setDateFrom(e.target.value)
-              handleDateChange(e.target.value, dateTo)
+            onChange={v => {
+              setDateFrom(v)
+              handleDateChange(v, dateTo)
             }}
             className="spv-date-input"
           />
           <span className="spv-date-sep">—</span>
-          <input
-            type="date"
+          <RoDate
             value={dateTo}
-            onChange={e => {
-              setDateTo(e.target.value)
-              handleDateChange(dateFrom, e.target.value)
+            onChange={v => {
+              setDateTo(v)
+              handleDateChange(dateFrom, v)
             }}
             className="spv-date-input"
           />

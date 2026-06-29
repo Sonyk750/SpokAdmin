@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate from "@/components/RoDate";
 
 interface FondBalance { id: string; name: string; balance: number; }
 
@@ -151,7 +152,7 @@ export default function TransferuriFonduriClient() {
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label className="form-field__label">Data</label>
-              <input type="date" className="input" value={data} onChange={e => setData(e.target.value)} />
+              <RoDate className="input" value={data} onChange={v => setData(v)} />
             </div>
           </div>
           <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end", marginTop: "1rem" }}>

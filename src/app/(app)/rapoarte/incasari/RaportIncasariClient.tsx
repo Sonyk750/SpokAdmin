@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate from "@/components/RoDate";
 
 interface Pozitie   { tip: string; denumire: string; suma: number; fondId?: string; }
 interface AvansItem { tip?: string; denumire?: string; suma: number; }
@@ -326,13 +327,13 @@ export default function RaportIncasariClient({
         <div className="lp-controls" style={{ marginBottom: "1.5rem" }}>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">De la</label>
-            <input type="date" className="input" value={dataStart}
-              onChange={e => setDataStart(e.target.value)} />
+            <RoDate className="input" value={dataStart}
+              onChange={v => setDataStart(v)} />
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">Până la</label>
-            <input type="date" className="input" value={dataEnd}
-              onChange={e => setDataEnd(e.target.value)} />
+            <RoDate className="input" value={dataEnd}
+              onChange={v => setDataEnd(v)} />
           </div>
           <button className="btn btn--secondary" onClick={fetchData}
             disabled={loading} style={{ alignSelf: "flex-end" }}>

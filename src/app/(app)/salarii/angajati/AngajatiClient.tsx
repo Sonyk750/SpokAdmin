@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import { useAsociatie } from "@/lib/AsociatieContext"
 import DocumenteAngajatModal from "./DocumenteAngajatModal"
+import RoDate from "@/components/RoDate"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -445,15 +446,15 @@ export default function AngajatiClient() {
         </div>
         <div className="form-field">
           <label className="form-field__label">Data contractului</label>
-          <input className="input" type="date" value={form.dataAngajare} onChange={e => setF("dataAngajare", e.target.value)} style={{ colorScheme: "dark" }} />
+          <RoDate className="input" value={form.dataAngajare} onChange={v => setF("dataAngajare", v)} style={{ colorScheme: "dark" }} />
         </div>
         <div className="form-field">
           <label className="form-field__label">Prima zi lucrată</label>
-          <input className="input" type="date" value={form.dataIntrareVigoare} onChange={e => setF("dataIntrareVigoare", e.target.value)} style={{ colorScheme: "dark" }} />
+          <RoDate className="input" value={form.dataIntrareVigoare} onChange={v => setF("dataIntrareVigoare", v)} style={{ colorScheme: "dark" }} />
         </div>
         <div className="form-field">
           <label className="form-field__label">Data încetare</label>
-          <input className="input" type="date" value={form.dataIncetare} onChange={e => setF("dataIncetare", e.target.value)} style={{ colorScheme: "dark" }} />
+          <RoDate className="input" value={form.dataIncetare} onChange={v => setF("dataIncetare", v)} style={{ colorScheme: "dark" }} />
         </div>
         {form.dataIncetare && (
           <div className="form-field">

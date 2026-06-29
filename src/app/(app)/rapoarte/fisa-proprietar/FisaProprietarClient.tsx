@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate from "@/components/RoDate";
 
 interface IncRow { id: string; data: string; document: string; tipPlata: string; suma: number; detalii: string; }
 interface ListaRow { id: string; luna: number; an: number; totalLuna: number; totalDePlata: number; achitat: number; rest: number; }
@@ -160,11 +161,11 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">De la</label>
-            <input type="date" className="input" value={dataStart} onChange={e => setDataStart(e.target.value)} />
+            <RoDate className="input" value={dataStart} onChange={v => setDataStart(v)} />
           </div>
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">Până la</label>
-            <input type="date" className="input" value={dataEnd} onChange={e => setDataEnd(e.target.value)} />
+            <RoDate className="input" value={dataEnd} onChange={v => setDataEnd(v)} />
           </div>
           <button className="btn btn--secondary" onClick={fetchData} disabled={loading} style={{ alignSelf: "flex-end" }}>{loading ? "..." : "Actualizează"}</button>
         </div>

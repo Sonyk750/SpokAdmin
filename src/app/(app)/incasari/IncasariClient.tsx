@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate from "@/components/RoDate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -535,7 +536,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr", gap: "1rem" }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Data încasării</label>
-                  <input type="date" className="input" value={dataDoc} onChange={e => setDataDoc(e.target.value)} />
+                  <RoDate className="input" value={dataDoc} onChange={v => setDataDoc(v)} />
                 </div>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Tip document</label>
@@ -978,7 +979,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Data</label>
-                      <input type="date" className="input" value={editData} onChange={e => setEditData(e.target.value)} />
+                      <RoDate className="input" value={editData} onChange={v => setEditData(v)} />
                     </div>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Tip document</label>

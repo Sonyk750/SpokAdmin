@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import RoDate from "@/components/RoDate"
 
 interface Angajat {
   id: string; nume: string; prenume: string | null; cnp: string | null
@@ -571,8 +572,8 @@ export default function DocumenteAngajatModal({ angajat, asociatieId, onClose }:
               <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                 <div className="form-field" style={{ flex: 1, minWidth: 160 }}>
                   <label className="form-field__label">Data documentului</label>
-                  <input className="input" type="date" value={dataDoc}
-                    onChange={e => setDataDoc(e.target.value)} style={{ colorScheme: "dark" }} />
+                  <RoDate className="input" value={dataDoc}
+                    onChange={v => setDataDoc(v)} style={{ colorScheme: "dark" }} />
                 </div>
                 {(docType === "contract-munca" || docType === "cerere-demisie") && (
                   <div className="form-field" style={{ flex: 1, minWidth: 120 }}>

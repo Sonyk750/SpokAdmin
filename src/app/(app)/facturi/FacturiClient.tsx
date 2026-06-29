@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import RoDate, { isoToRo } from "@/components/RoDate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,35 +142,6 @@ function distribuitFactura(distribuireJson: string | null): number {
 }
 
 // ─── Dată în format românesc zz/ll/aaaa (stocată intern ca ISO YYYY-MM-DD) ──────
-
-function isoToRo(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || "");
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
-}
-function roToIso(ro: string): string {
-  const m = /^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/.exec((ro || "").trim());
-  if (!m) return "";
-  const d = +m[1], mo = +m[2], y = +m[3];
-  if (d < 1 || d > 31 || mo < 1 || mo > 12) return "";
-  return `${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
-
-// Câmp de dată RO (zz/ll/aaaa) — afișaj consecvent indiferent de localizarea browserului
-function RoDate({ value, onChange }: { value: string; onChange: (iso: string) => void }) {
-  const [txt, setTxt] = useState(() => isoToRo(value));
-  useEffect(() => { if (roToIso(txt) !== value) setTxt(isoToRo(value)); /* eslint-disable-next-line */ }, [value]);
-  return (
-    <input type="text" inputMode="numeric" className="input" placeholder="zz/ll/aaaa"
-      value={txt} maxLength={10}
-      onChange={e => {
-        const v = e.target.value;
-        setTxt(v);
-        const iso = roToIso(v);
-        if (iso) onChange(iso);
-        else if (!v.trim()) onChange("");
-      }} />
-  );
-}
 
 function lunaPeriod(luna: number | null, an: number | null): string {
   if (!luna || !an) return "—";
@@ -1214,7 +1186,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   </div>
                   <div className="form-field">
                     <label className="form-field__label">Data</label>
-                    <input type="date" className="input" value={plataForm.data} onChange={e => setPlataForm(p => ({ ...p, data: e.target.value }))} />
+                    <RoDate value={plataForm.data} onChange={v => setPlataForm(p => ({ ...p, data: v }))} />
                   </div>
                   <div className="form-field">
                     <label className="form-field__label">Note</label>
