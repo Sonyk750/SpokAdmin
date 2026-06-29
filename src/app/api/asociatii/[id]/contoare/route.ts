@@ -67,8 +67,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (config.electric.enabled) addSimple("electric", config.electric.locatii, config.electric.custom);
     if (config.gaz.enabled)      addSimple("gaz",      config.gaz.locatii,      config.gaz.custom);
 
-    // Ștergem ce a creat wizardul anterior (fără număr de serie = create de wizard)
-    await db.contor.deleteMany({ where: { asociatieId: id, numarSerie: null } });
+    // Ștergem doar contoarele create de wizard (fără serie) care nu au citiri salvate
+    await db.contor.deleteMany({ where: { asociatieId: id, numarSerie: null, citiri: { none: {} } } });
 
     if (tmpls.length === 0 || asociatie.apartamente.length === 0) {
       await db.asociatie.update({ where: { id }, data: { wizardStep: 8 } });
