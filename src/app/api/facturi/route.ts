@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       ...(status      && { status }),
       ...(luna        && { luna }),
       ...(an          && { an }),
+      NOT: { notes: "wizard-init-restante-furnizori" },
     },
     include: {
       furnizor:     { select: { id: true, nume: true } },
