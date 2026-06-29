@@ -376,10 +376,8 @@ export default function WizardClient({
   const initFonduriActive = (existingFonduri.length > 0 ? existingFonduri : DEFAULT_FONDURI).filter(f => f.isEnabled);
   const [soldFondAsoc, setSoldFondAsoc] = useState<{ fondId: string; fondName: string; sold: string }[]>(() => {
     const raw = wizardInitData.soldFondAsoc as Array<{ fondId?: unknown; fondName?: unknown; sold?: unknown }> | null | undefined;
-    if (Array.isArray(raw) && raw.length > 0) {
-      return raw.map(r => ({ fondId: String(r.fondId ?? ""), fondName: String(r.fondName ?? ""), sold: String(r.sold ?? "") }));
-    }
-    return initFonduriActive.map(f => ({ fondId: f.id ?? "", fondName: f.name, sold: "" }));
+    const rawMap = new Map(Array.isArray(raw) ? raw.map(r => [String(r.fondId ?? ""), String(r.sold ?? "")]) : []);
+    return initFonduriActive.map(f => ({ fondId: f.id ?? "", fondName: f.name, sold: rawMap.get(f.id ?? "") ?? "" }));
   });
 
   // ── Step 8: Sold casă / bancă + prima listă de plată ──
