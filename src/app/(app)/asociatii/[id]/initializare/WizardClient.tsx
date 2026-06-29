@@ -119,7 +119,8 @@ const TIP_LABEL: Record<string, string> = {
 
 const STEP_LABELS = [
   "Info asociație", "Apartamente", "Proprietari", "Solduri",
-  "Fonduri", "Restanțe fonduri", "Solduri fonduri", "Sold casă / bancă", "Contoare", "Indecși", "Finalizare",
+  "Fonduri", "Restanțe fonduri", "Solduri fonduri", "Restanțe furnizori",
+  "Sold casă / bancă", "Contoare", "Indecși", "Finalizare",
 ];
 
 const LUNI_NAMES = [
@@ -133,6 +134,12 @@ interface BancaRow {
   name: string;
   sold: string;
   data: string;
+}
+
+interface FurnizorRestantaRow {
+  id:       string;
+  nume:     string;
+  restanta: string;
 }
 
 interface ExistingSoldFond {
@@ -336,7 +343,7 @@ export default function WizardClient({
 }: Props) {
   const router = useRouter();
 
-  const initStep = Math.min(Math.max(wizardStep, 0) + 1, 11);
+  const initStep = Math.min(Math.max(wizardStep, 0) + 1, 12);
   const [step,    setStep]    = useState<number>(initStep);
   const [maxStep, setMaxStep] = useState<number>(initStep);
   const [saving,  setSaving]  = useState(false);
@@ -380,7 +387,20 @@ export default function WizardClient({
     return initFonduriActive.map(f => ({ fondId: f.id ?? "", fondName: f.name, sold: rawMap.get(f.id ?? "") ?? "" }));
   });
 
-  // ── Step 8: Sold casă / bancă + prima listă de plată ──
+  // ── Step 8: Restanțe furnizori ──
+  const [restFurnTab, setRestFurnTab] = useState<"furnizori" | "restante">("furnizori");
+  const [furnizoriRestante, setFurnizoriRestante] = useState<FurnizorRestantaRow[]>(() => {
+    const raw = wizardInitData.furnizoriRestante as Array<{ id?: unknown; nume?: unknown; restanta?: unknown }> | null | undefined;
+    if (Array.isArray(raw) && raw.length > 0) {
+      return raw.map(r => ({ id: String(r.id ?? Math.random()), nume: String(r.nume ?? ""), restanta: String(r.restanta ?? "") }));
+    }
+    return [];
+  });
+  const [dataRestanteFurnizori, setDataRestanteFurnizori] = useState<string>(
+    wizardInitData.dataRestanteFurnizori ? String(wizardInitData.dataRestanteFurnizori) : new Date().toISOString().slice(0, 10)
+  );
+
+  // ── Step 9: Sold casă / bancă + prima listă de plată ──
   const _today = new Date().toISOString().slice(0, 10);
   const _now   = new Date();
   const [soldCasa,       setSoldCasa]       = useState<string>(String(wizardInitData.soldCasa ?? ""));
@@ -403,13 +423,13 @@ export default function WizardClient({
     wizardInitData.primaListaAn ? String(wizardInitData.primaListaAn) : String(_now.getFullYear())
   );
 
-  // ── Step 8: Contoare ──
+  // ── Step 10: Contoare ──
   const [conturCfg, setConturCfg] = useState<ConturConfig>(
     existingContoare?.length ? buildConturConfig(existingContoare) : DEFAULT_CONTUR_CONFIG
   );
   const [conturTab, setConturTab] = useState<"tipuri" | "apa" | "electric" | "gaz">("tipuri");
 
-  // ── Step 9: Indecși ──
+  // ── Step 11: Indecși ──
   const [indexRows, setIndexRows] = useState<IndexRow[]>(
     existingContoare?.length ? buildIndexRows(existingContoare) : []
   );
@@ -567,6 +587,18 @@ export default function WizardClient({
     finally { setSaving(false); }
   }, [soldContribFonduri, soldFondAsoc]);
 
+  const saveRestanteFurnizori = useCallback(async () => {
+    setSaving(true); setError(null);
+    try {
+      const restante = furnizoriRestante
+        .filter(f => f.nume.trim())
+        .map(f => ({ furnizorNume: f.nume.trim(), restanta: f.restanta }));
+      await api("restante-furnizori", { restante, dataRestante: dataRestanteFurnizori });
+      setMaxStep(p => Math.max(p, 9)); setStep(9);
+    } catch (e: any) { setError(e.message); }
+    finally { setSaving(false); }
+  }, [furnizoriRestante, dataRestanteFurnizori]);
+
   const saveSoldInitial = useCallback(async () => {
     setSaving(true); setError(null);
     try {
@@ -577,7 +609,7 @@ export default function WizardClient({
         primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null,
         primaListaAn:   primaListaAn   ? parseInt(primaListaAn)   : null,
       });
-      setMaxStep(p => Math.max(p, 9)); setStep(9);
+      setMaxStep(p => Math.max(p, 10)); setStep(10);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
@@ -602,7 +634,7 @@ export default function WizardClient({
           indexNou:   match?.indexNou   ?? "",
         };
       }));
-      setMaxStep(p => Math.max(p, 10)); setStep(10);
+      setMaxStep(p => Math.max(p, 11)); setStep(11);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [conturCfg]);
@@ -615,7 +647,7 @@ export default function WizardClient({
           .filter(r => !disabledContorIds.has(r.contorId))
           .map(r => ({ contorId: r.contorId, numarSerie: r.numarSerie, indexVechi: r.indexVechi, indexNou: r.indexNou })),
       });
-      setMaxStep(p => Math.max(p, 11)); setStep(11);
+      setMaxStep(p => Math.max(p, 12)); setStep(12);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
   }, [indexRows]);
@@ -636,9 +668,10 @@ export default function WizardClient({
       else if (s === 4) await api("solduri", { solduri: solduri.map(s2 => ({ ...s2, restantaIntretinere: s2.restantaIntretinere || "0", restantaCurenta: s2.restantaCurenta || "0" })) });
       else if (s === 6) await api("sold-fonduri", { soldFonduri });
       else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })), soldFondAsoc });
-      else if (s === 8) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
+      else if (s === 8) await api("restante-furnizori", { restante: furnizoriRestante.filter(f => f.nume.trim()).map(f => ({ furnizorNume: f.nume.trim(), restanta: f.restanta })), dataRestante: dataRestanteFurnizori });
+      else if (s === 9) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
     } catch { /* silent — nu blocăm navigarea */ }
-  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
+  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, furnizoriRestante, dataRestanteFurnizori, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
 
   const finalizeaza = useCallback(async () => {
     setSaving(true); setError(null);
@@ -1785,8 +1818,113 @@ export default function WizardClient({
         </div>
       )}
 
-      {/* ── Step 8: Sold casă / bancă + prima listă de plată ───────────── */}
+      {/* ── Step 8: Restanțe furnizori ────────────────────────────────── */}
       {step === 8 && (
+        <div className="wizard__body">
+          <h2 className="wizard__step-title">Restanțe furnizori</h2>
+          <p className="wizard__step-desc">Introdu furnizorii față de care asociația are datorii la data preluării.</p>
+
+          <div className="contur-tabs">
+            {(["furnizori", "restante"] as const).map(t => (
+              <button key={t} type="button"
+                className={`contur-tab${restFurnTab === t ? " contur-tab--active" : ""}`}
+                onClick={() => setRestFurnTab(t)}>
+                {t === "furnizori" ? "Furnizori" : "Restanțe"}
+              </button>
+            ))}
+          </div>
+
+          {restFurnTab === "furnizori" && (
+            <div className="contur-tab-body">
+              <p className="wizard__step-desc" style={{ marginBottom: "1rem" }}>Adaugă furnizorii față de care există datorii:</p>
+              <div className="fond-list">
+                {furnizoriRestante.map((f, i) => (
+                  <div key={f.id} className="fond-row">
+                    <input
+                      type="text"
+                      className="input input--sm fond-row__name"
+                      placeholder="Nume furnizor (ex: E.ON, Romgaz...)"
+                      value={f.nume}
+                      onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, nume: e.target.value } : r))}
+                      style={{ flex: 1 }}
+                    />
+                    <button type="button" className="fond-row__del"
+                      onClick={() => setFurnizoriRestante(prev => prev.filter((_, j) => j !== i))}>×</button>
+                  </div>
+                ))}
+              </div>
+              <div className="fond-add" style={{ marginTop: "0.75rem" }}>
+                <button type="button" className="btn btn--secondary"
+                  onClick={() => setFurnizoriRestante(prev => [...prev, { id: String(Date.now()), nume: "", restanta: "" }])}>
+                  + Adaugă furnizor
+                </button>
+              </div>
+              {furnizoriRestante.length > 0 && (
+                <p style={{ fontSize: "0.8125rem", color: "#a78bfa", marginTop: "1rem" }}>
+                  Treci la tab-ul „Restanțe" pentru a introduce sumele datorate.
+                </p>
+              )}
+            </div>
+          )}
+
+          {restFurnTab === "restante" && (
+            <div className="contur-tab-body">
+              <div className="dash-panel" style={{ padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+                <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Data situației</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+                  <input type="date" className="input" style={{ width: "180px" }}
+                    value={dataRestanteFurnizori}
+                    onChange={e => setDataRestanteFurnizori(e.target.value)} />
+                  {dataRestanteFurnizori && (
+                    <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>
+                      {dataRestanteFurnizori.split("-").reverse().join("/")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {furnizoriRestante.length === 0 ? (
+                <div className="dash-panel__empty">
+                  Niciun furnizor adăugat. Mergi la tab-ul „Furnizori" pentru a adăuga.
+                </div>
+              ) : (
+                <div className="dash-panel" style={{ padding: "1.25rem 1.5rem" }}>
+                  <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Sume datorate</div>
+                  <table className="data-table" style={{ fontSize: "0.8125rem" }}>
+                    <thead>
+                      <tr>
+                        <th>Furnizor</th>
+                        <th style={{ textAlign: "right", width: "180px" }}>Restanță (lei)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {furnizoriRestante.map((f, i) => (
+                        <tr key={f.id}>
+                          <td style={{ color: f.nume ? "#e2e8f0" : "#475569" }}>{f.nume || <em>fără nume</em>}</td>
+                          <td style={{ textAlign: "right" }}>
+                            <input type="number" className="input input--sm" step="0.01" min="0" placeholder="0.00"
+                              value={f.restanta}
+                              onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, restanta: e.target.value } : r))}
+                              style={{ width: "160px", textAlign: "right" }} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="wizard__footer">
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(8).then(() => setStep(7)); }}>← Înapoi</button>
+            <button className="btn btn--primary" onClick={saveRestanteFurnizori} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 9: Sold casă / bancă + prima listă de plată ───────────── */}
+      {step === 9 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Sold casă / bancă inițial</h2>
           <p className="wizard__step-desc">Introdu soldurile inițiale ale casieriei și ale conturilor bancare la data preluării.</p>
@@ -1861,14 +1999,14 @@ export default function WizardClient({
           </div>
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(8).then(() => setStep(7)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { silentSaveStep(9).then(() => setStep(8)); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldInitial} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
       )}
 
-      {/* ── Step 9: Contoare ─────────────────────────────────────────────── */}
-      {step === 9 && (
+      {/* ── Step 10: Contoare ─────────────────────────────────────────────── */}
+      {step === 10 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Configurare contoare</h2>
           <p className="wizard__step-desc">Selectează tipurile de contoare existente în asociație și locațiile lor.</p>
@@ -1954,15 +2092,14 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(8)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(9)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveContoare} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
-
           </div>
         </div>
       )}
 
-      {/* ── Step 10: Indecși contoare ────────────────────────────────────── */}
-      {step === 10 && (
+      {/* ── Step 11: Indecși contoare ────────────────────────────────────── */}
+      {step === 11 && (
         <div className="wizard__body">
           <h2 className="wizard__step-title">Indecși contoare</h2>
           <p className="wizard__step-desc">Introdu indexul vechi și indexul nou pentru fiecare contor. Lasă gol dacă nu ai valori.</p>
@@ -2083,14 +2220,14 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => setStep(9)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(10)}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveIndecsi} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
       )}
 
-      {/* ── Step 11: Finalizare ──────────────────────────────────────────── */}
-      {step === 11 && (
+      {/* ── Step 12: Finalizare ──────────────────────────────────────────── */}
+      {step === 12 && (
         <div className="wizard__body wizard__body--center">
           <div className="wizard__success-icon">✓</div>
           <h2 className="wizard__step-title" style={{ textAlign: "center" }}>Inițializare completă!</h2>
@@ -2136,7 +2273,7 @@ export default function WizardClient({
             )}
           </div>
           <div className="wizard__footer wizard__footer--center">
-            <button className="btn btn--secondary" onClick={() => setStep(10)}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => setStep(11)}>← Înapoi</button>
             <button className="btn btn--primary btn--lg" onClick={finalizeaza} disabled={saving}>
               {saving ? "Se finalizează..." : "Finalizează și mergi la asociație →"}
             </button>
