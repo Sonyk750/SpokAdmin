@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canonicalFurnizorNume } from "@/lib/furnizor";
+import { canonicalFurnizorNume, normalizeCui } from "@/lib/furnizor";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -42,16 +42,20 @@ export async function POST(req: NextRequest) {
   if (!nume?.trim()) return NextResponse.json({ error: "Numele este obligatoriu." }, { status: 400 });
 
   const numeCanonic = canonicalFurnizorNume(nume);
+  const cuiNorm     = normalizeCui(cui);
 
-  // Refolosim furnizorul existent (potrivire case-insensitive) ca să nu se dubleze.
+  // Refolosim furnizorul existent ca să nu se dubleze: întâi după CUI, apoi după nume.
   const existing = await db.furnizor.findFirst({
-    where:  { organizationId: orgId, nume: { equals: numeCanonic, mode: "insensitive" } },
+    where: {
+      organizationId: orgId,
+      ...(cuiNorm ? { cui: cuiNorm } : { nume: { equals: numeCanonic, mode: "insensitive" } }),
+    },
     select: { id: true, nume: true, cui: true },
   });
   if (existing) return NextResponse.json(existing, { status: 200 });
 
   const furnizor = await db.furnizor.create({
-    data: { organizationId: orgId, nume: numeCanonic, cui: cui?.trim() || null },
+    data: { organizationId: orgId, nume: numeCanonic, cui: cuiNorm },
     select: { id: true, nume: true, cui: true },
   });
 

@@ -42,10 +42,11 @@ export async function POST(req: NextRequest) {
             text: `Ești un asistent care extrage date din facturi românești.
 
 Returnează EXCLUSIV un JSON valid (fără markdown, fără explicații):
-{"furnizor":string|null,"serie":string|null,"numar":string|null,"valoare":number|null,"dataEmiterii":string|null}
+{"furnizor":string|null,"cui":string|null,"serie":string|null,"numar":string|null,"valoare":number|null,"dataEmiterii":string|null}
 
 Reguli:
 - furnizor: numele firmei EMITENTE (nu destinatarul)
+- cui: codul fiscal (CUI/CIF) al firmei EMITENTE (nu al destinatarului). Doar cifrele, fără prefixul "RO". null dacă nu există.
 - serie: seria documentului (ex: "FACT", "RO", "FCV") — null dacă nu există
 - numar: numărul documentului (cifre/cod, fără serie)
 - valoare: valoarea facturii CURENTE (contravaloarea serviciilor facturate ÎN ACEASTĂ LUNĂ, cu TVA inclus). Caută "Total factură", "Total factură curentă", "Valoare factură", "Total de plată factură curentă". NU lua "Sold precedent / Rest de plată / Total de plată" dacă acela include restanțe sau sold din facturi anterioare — ai nevoie DOAR de factura curentă.

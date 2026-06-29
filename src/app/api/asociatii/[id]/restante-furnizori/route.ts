@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { canonicalFurnizorNume } from "@/lib/furnizor";
+import { resolveFurnizorId } from "@/lib/furnizor";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const body = await req.json();
   const { restante, dataRestante } = body as {
-    restante: { furnizorNume: string; restanta: string }[];
+    restante: { furnizorNume: string; furnizorCui?: string; restanta: string }[];
     dataRestante: string;
   };
 
@@ -25,31 +25,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     for (const item of restante ?? []) {
-      const numeT = item.furnizorNume?.trim() ? canonicalFurnizorNume(item.furnizorNume) : "";
-      const val   = parseFloat(item.restanta);
-      if (!numeT || isNaN(val) || val === 0) continue;
+      const val = parseFloat(item.restanta);
+      if ((!item.furnizorNume?.trim() && !item.furnizorCui?.trim()) || isNaN(val) || val === 0) continue;
 
-      let furnizor = await db.furnizor.findFirst({ where: { organizationId: orgId, nume: { equals: numeT, mode: "insensitive" } } });
-      if (!furnizor) {
-        furnizor = await db.furnizor.create({ data: { organizationId: orgId, nume: numeT } });
-      }
-
-      // Dezactivează orice duplicat cu același nume (scriere diferită) care nu are date reale
-      await db.furnizor.updateMany({
-        where: {
-          organizationId: orgId,
-          isActive: true,
-          id: { not: furnizor.id },
-          nume: { equals: numeT, mode: "insensitive" },
-          facturi: { none: {} },
-          avansuri: { none: {} },
-        },
-        data: { isActive: false },
-      });
+      // Potrivire după CUI (identitate sigură), apoi după nume — fără a dubla.
+      const furnizorId = await resolveFurnizorId(db, orgId, { nume: item.furnizorNume, cui: item.furnizorCui });
+      if (!furnizorId) continue;
 
       await db.furnizorAsociatie.upsert({
-        where: { furnizorId_asociatieId: { furnizorId: furnizor.id, asociatieId: id } },
-        create: { furnizorId: furnizor.id, asociatieId: id },
+        where:  { furnizorId_asociatieId: { furnizorId, asociatieId: id } },
+        create: { furnizorId, asociatieId: id },
         update: {},
       });
 
@@ -58,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         data: {
           organizationId: orgId,
           asociatieId:    id,
-          furnizorId:     furnizor.id,
+          furnizorId,
           valoare:        val,
           dataEmiterii:   dataDate,
           status:         "neplatita",
@@ -90,7 +75,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
     wd.dataRestanteFurnizori = dataRestante;
     // salvăm cu câmpul "nome" ca să corespundă formatului de reîncărcare în wizard
-    wd.furnizoriRestante = restante.map(r => ({ nume: r.furnizorNume, restanta: r.restanta }));
+    wd.furnizoriRestante = restante.map(r => ({ nume: r.furnizorNume, cui: r.furnizorCui ?? "", restanta: r.restanta }));
 
     await db.asociatie.update({
       where: { id },

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { recomputeFacturaStatus } from "@/lib/avans-furnizor";
-import { canonicalFurnizorNume } from "@/lib/furnizor";
+import { resolveFurnizorId } from "@/lib/furnizor";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const EPS = 0.01;
@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json() as {
     furnizorId?:   string | null;
     furnizorNume?: string;
+    furnizorCui?:  string;
     serie?:        string;
     numar?:        string;
     valoare?:      number;
@@ -53,27 +54,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
-  // Resolve furnizor by name if needed
+  // Resolve furnizor după CUI (identitate sigură), apoi după nume.
   let furnizorId = body.furnizorId;
   if (furnizorId === undefined && body.furnizorNume !== undefined) {
-    if (body.furnizorNume.trim()) {
-      const nume = canonicalFurnizorNume(body.furnizorNume);
-      const existing = await db.furnizor.findFirst({
-        where: { organizationId: orgId, nume: { equals: nume, mode: "insensitive" } },
-        select: { id: true },
-      });
-      if (existing) {
-        furnizorId = existing.id;
-      } else {
-        const nou = await db.furnizor.create({
-          data: { organizationId: orgId, nume },
-          select: { id: true },
-        });
-        furnizorId = nou.id;
-      }
-    } else {
-      furnizorId = null;
-    }
+    furnizorId = (body.furnizorNume.trim() || body.furnizorCui?.trim())
+      ? await resolveFurnizorId(db, orgId, { nume: body.furnizorNume, cui: body.furnizorCui })
+      : null;
   }
 
   const updated = await db.factura.update({

@@ -139,6 +139,7 @@ interface BancaRow {
 interface FurnizorRestantaRow {
   id:       string;
   nume:     string;
+  cui:      string;
   restanta: string;
 }
 
@@ -392,7 +393,7 @@ export default function WizardClient({
   const [furnizoriRestante, setFurnizoriRestante] = useState<FurnizorRestantaRow[]>(() => {
     const raw = wizardInitData.furnizoriRestante as Array<Record<string, unknown>> | null | undefined;
     if (Array.isArray(raw) && raw.length > 0) {
-      return raw.map(r => ({ id: String(r.id ?? Math.random()), nume: String(r["nume"] ?? r["nome"] ?? ""), restanta: String(r.restanta ?? "") }));
+      return raw.map(r => ({ id: String(r.id ?? Math.random()), nume: String(r["nume"] ?? r["nome"] ?? ""), cui: String(r.cui ?? ""), restanta: String(r.restanta ?? "") }));
     }
     return [];
   });
@@ -591,8 +592,8 @@ export default function WizardClient({
     setSaving(true); setError(null);
     try {
       const restante = furnizoriRestante
-        .filter(f => f.nume.trim())
-        .map(f => ({ furnizorNume: f.nume.trim(), restanta: f.restanta }));
+        .filter(f => f.nume.trim() || f.cui.trim())
+        .map(f => ({ furnizorNume: f.nume.trim(), furnizorCui: f.cui.trim(), restanta: f.restanta }));
       await api("restante-furnizori", { restante, dataRestante: dataRestanteFurnizori });
       setMaxStep(p => Math.max(p, 9)); setStep(9);
     } catch (e: any) { setError(e.message); }
@@ -668,7 +669,7 @@ export default function WizardClient({
       else if (s === 4) await api("solduri", { solduri: solduri.map(s2 => ({ ...s2, restantaIntretinere: s2.restantaIntretinere || "0", restantaCurenta: s2.restantaCurenta || "0" })) });
       else if (s === 6) await api("sold-fonduri", { soldFonduri });
       else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })), soldFondAsoc });
-      else if (s === 8) await api("restante-furnizori", { restante: furnizoriRestante.filter(f => f.nume.trim()).map(f => ({ furnizorNume: f.nume.trim(), restanta: f.restanta })), dataRestante: dataRestanteFurnizori });
+      else if (s === 8) await api("restante-furnizori", { restante: furnizoriRestante.filter(f => f.nume.trim() || f.cui.trim()).map(f => ({ furnizorNume: f.nume.trim(), furnizorCui: f.cui.trim(), restanta: f.restanta })), dataRestante: dataRestanteFurnizori });
       else if (s === 9) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
     } catch { /* silent — nu blocăm navigarea */ }
   }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, furnizoriRestante, dataRestanteFurnizori, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
@@ -1856,6 +1857,15 @@ export default function WizardClient({
                       onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, nume: e.target.value } : r))}
                       style={{ flex: 1 }}
                     />
+                    <input
+                      type="text"
+                      className="input input--sm"
+                      placeholder="CUI"
+                      value={f.cui}
+                      onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, cui: e.target.value } : r))}
+                      style={{ width: "120px" }}
+                      title="Cod fiscal (opțional) — dacă CUI coincide, e considerat același furnizor"
+                    />
                     <button type="button" className="fond-row__del"
                       onClick={() => setFurnizoriRestante(prev => prev.filter((_, j) => j !== i))}>×</button>
                   </div>
@@ -1863,7 +1873,7 @@ export default function WizardClient({
               </div>
               <div className="fond-add" style={{ marginTop: "0.75rem" }}>
                 <button type="button" className="btn btn--secondary"
-                  onClick={() => setFurnizoriRestante(prev => [...prev, { id: String(Date.now()), nume: "", restanta: "" }])}>
+                  onClick={() => setFurnizoriRestante(prev => [...prev, { id: String(Date.now()), nume: "", cui: "", restanta: "" }])}>
                   + Adaugă furnizor
                 </button>
               </div>

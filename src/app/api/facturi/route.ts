@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { computeAcoperit, consumaAvansPeFactura } from "@/lib/avans-furnizor";
-import { canonicalFurnizorNume } from "@/lib/furnizor";
+import { resolveFurnizorId } from "@/lib/furnizor";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     asociatieId:  string;
     furnizorId?:  string;
     furnizorNume?: string;
+    furnizorCui?:  string;
     serie?:        string;
     numar?:        string;
     valoare:       number;
@@ -97,21 +98,8 @@ export async function POST(req: NextRequest) {
 
   // Resolve furnizor: use existing id, or create by name
   let furnizorId = body.furnizorId ?? null;
-  if (!furnizorId && body.furnizorNume?.trim()) {
-    const nume = canonicalFurnizorNume(body.furnizorNume);
-    const existing = await db.furnizor.findFirst({
-      where: { organizationId: orgId, nume: { equals: nume, mode: "insensitive" } },
-      select: { id: true },
-    });
-    if (existing) {
-      furnizorId = existing.id;
-    } else {
-      const nou = await db.furnizor.create({
-        data: { organizationId: orgId, nume },
-        select: { id: true },
-      });
-      furnizorId = nou.id;
-    }
+  if (!furnizorId && (body.furnizorNume?.trim() || body.furnizorCui?.trim())) {
+    furnizorId = await resolveFurnizorId(db, orgId, { nume: body.furnizorNume, cui: body.furnizorCui });
   }
 
   const { factura, avansAplicat } = await db.$transaction(async (tx) => {

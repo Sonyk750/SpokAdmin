@@ -242,7 +242,7 @@ function filtruLabel(filtru: FiltruDist, grupuri: GrupDist[]): string {
 
 function emptyForm(defaultLuna: number, defaultAn: number) {
   return {
-    furnizorNume: "", serie: "", numar: "", valoare: "",
+    furnizorNume: "", furnizorCui: "", serie: "", numar: "", valoare: "",
     dataEmiterii: "", dataScadenta: "",
     luna: String(defaultLuna), an: String(defaultAn), notes: "",
   };
@@ -418,7 +418,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   function openEditeaza(f: FacturaRow) {
     setSelected(f); setPdfFile(null); setPdfDeleted(false);
     setForm({
-      furnizorNume: f.furnizor?.nume ?? "", serie: f.serie ?? "", numar: f.numar ?? "",
+      furnizorNume: f.furnizor?.nume ?? "", furnizorCui: "", serie: f.serie ?? "", numar: f.numar ?? "",
       valoare: String(f.valoare),
       dataEmiterii: f.dataEmiterii ? f.dataEmiterii.slice(0, 10) : "",
       dataScadenta: f.dataScadenta ? f.dataScadenta.slice(0, 10) : "",
@@ -647,6 +647,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       setForm(prev => ({
         ...prev,
         furnizorNume: data.furnizor     ?? prev.furnizorNume,
+        furnizorCui:  data.cui != null ? String(data.cui) : prev.furnizorCui,
         serie:        data.serie        ?? prev.serie,
         numar:        data.numar        ?? prev.numar,
         valoare:      data.valoare != null ? String(data.valoare) : prev.valoare,
@@ -699,6 +700,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       const payload = {
         asociatieId, valoare,
         furnizorNume: form.furnizorNume.trim() || undefined,
+        furnizorCui:  form.furnizorCui.trim()  || undefined,
         serie:        form.serie.trim()  || undefined,
         numar:        form.numar.trim()  || undefined,
         dataEmiterii: form.dataEmiterii  || undefined,
@@ -1037,7 +1039,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               )}
 
               <div className="form-grid form-grid--2">
-                <div className="form-field form-field--full">
+                <div className="form-field">
                   <label className="form-field__label">Furnizor</label>
                   <input type="text" className="input" placeholder="Tastează sau selectează..." list="furnizori-list"
                     value={form.furnizorNume} onChange={e => setF("furnizorNume", e.target.value)} />
@@ -1047,6 +1049,10 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                       ⓘ Avans disponibil la acest furnizor: <strong>{fmt2(avansFurnizor)} lei</strong> — se aplică automat pe factură la salvare.
                     </div>
                   )}
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">CUI furnizor</label>
+                  <input type="text" className="input" placeholder="ex: 1234567" value={form.furnizorCui} onChange={e => setF("furnizorCui", e.target.value)} />
                 </div>
                 <div className="form-field">
                   <label className="form-field__label">Serie</label>
