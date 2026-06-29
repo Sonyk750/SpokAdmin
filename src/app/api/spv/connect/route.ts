@@ -26,15 +26,16 @@ export async function GET(req: NextRequest) {
     })).toString("base64")
 
     const params = new URLSearchParams({
-      response_type:      "code",
-      client_id:          clientId,
-      redirect_uri:       redirectUri,
+      response_type: "code",
+      client_id:     clientId,
+      redirect_uri:  redirectUri,
       scope,
       state,
-      token_content_type: "jwt",
     })
 
-    return NextResponse.redirect(`${authUrl}?${params.toString()}`)
+    const finalUrl = `${authUrl}?${params.toString()}`
+    console.log("SPV connect → redirecting to:", finalUrl)
+    return NextResponse.redirect(finalUrl)
   } catch (e) {
     console.error("SPV connect error:", e)
     return NextResponse.redirect(`${origin}/spv/conectare?spv_error=server_error`)
