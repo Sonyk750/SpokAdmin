@@ -72,6 +72,12 @@ const features: Feature[] = [
     desc: "Acces 24/7 pentru locatari: situatia contului, plati, sesizari si documente, de pe orice telefon sau laptop.",
     icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg>),
   },
+  {
+    title: "Training la sediul tau",
+    desc: "Acordam training personalizat la sediul clientului pentru initializarea asociatiei si crearea primei liste de plata — pleci cu aplicatia configurata si stii exact cum o folosesti.",
+    tag: "La sediul clientului",
+    icon: (<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>),
+  },
 ];
 
 const whyStats = [
@@ -153,6 +159,7 @@ const faqs = [
   { q: "Este conform cu legislatia din Romania?", a: "Da. Registrele, listele de plata si declaratiile respecta legislatia asociatiilor de proprietari, iar modulul fiscal este conectat la cerintele ANAF." },
   { q: "Pot emite facturi prin e-Factura?",       a: "Da. SpokAdmin se conecteaza la SPV ANAF pentru facturi emise si primite, declaratii fiscale si jurnal ANAF, direct din aplicatie." },
   { q: "Pot administra mai multe asociatii?",     a: "Da. Poti gestiona oricate asociatii dintr-un singur cont, cu comutare rapida intre ele si date complet separate." },
+  { q: "Oferiti training pentru initializare?",   a: "Da. Acordam training personalizat la sediul clientului care include initializarea completa a asociatiei in aplicatie si crearea primei liste de plata. La finalul sesiunii pleci cu tot configurat si cu toate cunostintele necesare pentru a administra independent." },
 ];
 
 // ─── Hero illustration (dashboard mock) ───────────────────────────────────────
