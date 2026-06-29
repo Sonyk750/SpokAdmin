@@ -477,9 +477,10 @@
     &--active &-dot  { background: $violet; border-color: $violet; color: #fff; box-shadow: 0 0 12px rgba(124,58,237,0.5); }
     &--active &-label { color: $text-primary; font-weight: 600; }
 
-    &--clickable &-dot {
+    &--clickable {
       cursor: pointer;
-      &:hover { background: rgba(124,58,237,0.35); border-color: $violet-light; color: #fff; }
+      &:hover &-dot { background: rgba(124,58,237,0.35); border-color: $violet-light; color: #fff; }
+      &:hover &-label { color: $text-muted; }
     }
   }
 

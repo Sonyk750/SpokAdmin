@@ -1089,14 +1089,21 @@ export default function WizardClient({
         {STEP_LABELS.map((label, i) => {
           const n = i + 1; const done = n < step; const current = n === step;
           const clickable = n !== step && n <= maxStep;
+          const handleStepClick = () => {
+            if (!clickable) return;
+            silentSaveStep(step).catch(() => null).then(() => setStep(n));
+          };
           return (
-            <div key={n} className={`wizard__step${done ? " wizard__step--done" : current ? " wizard__step--active" : ""}${clickable ? " wizard__step--clickable" : ""}`}>
+            <div
+              key={n}
+              className={`wizard__step${done ? " wizard__step--done" : current ? " wizard__step--active" : ""}${clickable ? " wizard__step--clickable" : ""}`}
+              onClick={handleStepClick}
+            >
               <div
                 className="wizard__step-dot"
                 role={clickable ? "button" : undefined}
                 tabIndex={clickable ? 0 : undefined}
-                onClick={() => { if (clickable) { silentSaveStep(step).then(() => setStep(n)); } }}
-                onKeyDown={e => { if (clickable && e.key === "Enter") { silentSaveStep(step).then(() => setStep(n)); } }}
+                onKeyDown={e => { if (clickable && e.key === "Enter") handleStepClick(); }}
               >
                 {done ? "✓" : n}
               </div>
