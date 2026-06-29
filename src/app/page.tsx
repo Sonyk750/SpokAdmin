@@ -100,6 +100,13 @@ const steps = [
   { n: "03", title: "Administrezi simplu", desc: "Generezi liste, incasezi, emiti facturi si rapoarte din orice dispozitiv, oricand." },
 ];
 
+const blogTeaser = [
+  { slug: "lista-de-plata-cu-ai",                                  category: "Inteligenta Artificiala", cyan: true,  readTime: "7 min", title: "Lista de plata cu AI: cum distribuie inteligenta artificiala facturile pe apartamente" },
+  { slug: "software-administrare-asociatii-proprietari-ghid-2026", category: "Administrare Imobile",     cyan: false, readTime: "9 min", title: "Software administrare asociatii de proprietari: ghid complet 2026" },
+  { slug: "e-factura-anaf-asociatii-proprietari",                  category: "e-Factura ANAF",          cyan: true,  readTime: "8 min", title: "e-Factura ANAF pentru asociatii de proprietari: cum conectezi SPV in 2026" },
+  { slug: "fond-rulment-registre-cenzorat-digital",               category: "Contabilitate",           cyan: false, readTime: "8 min", title: "Fond de rulment, registre si cenzorat: cum le gestionezi digital" },
+];
+
 type Pkg = {
   key: string; name: string; price: string; unit?: string; range: string;
   color: "cyan" | "violet"; recommended?: boolean; cta: string; href: string; features: string[];
@@ -369,6 +376,7 @@ export default function Home() {
               <a href="#functionalitati">Functionalitati</a>
               <a href="#de-ce">De ce SpokAdmin</a>
               <a href="#preturi">Preturi</a>
+              <a href="#blog">Blog</a>
               <a href="#intrebari">Intrebari</a>
               <button onClick={() => setShowContact(true)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>Contact</button>
             </nav>
@@ -384,6 +392,7 @@ export default function Home() {
           <nav className="header__mobile-nav">
             <a href="#functionalitati">Functionalitati</a>
             <a href="#preturi">Preturi</a>
+            <a href="#blog">Blog</a>
             <a href="#intrebari">Intrebari</a>
             <button onClick={() => setShowContact(true)} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>Contact</button>
             <a href="/login" style={{ color: "inherit", fontSize: "inherit" }}>Conectare</a>
@@ -619,6 +628,42 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ─ Blog ─ */}
+        <section id="blog" className="section">
+          <div className="container">
+            <FadeIn>
+              <div className="section-intro section-intro--center">
+                <p className="section-label section-label--cyan">Blog & resurse</p>
+                <h2 className="section-heading">
+                  Ghiduri pentru<br /><span className="gradient">administrarea asociatiei</span>
+                </h2>
+                <p className="section-desc" style={{ margin: "1rem auto 0", textAlign: "center" }}>
+                  Lista de plata cu AI, software de administrare, e-Factura ANAF, fond de rulment si cenzorat — explicate pe intelesul administratorilor.
+                </p>
+              </div>
+            </FadeIn>
+            <div className="blog-teaser__grid">
+              {blogTeaser.map((p, i) => (
+                <FadeIn key={p.slug} delay={(i % 4) * 0.08}>
+                  <a href={`/blog/${p.slug}`} className="blog-card">
+                    <div className="blog-card__top">
+                      <span className={`blog-tag ${p.cyan ? "blog-tag--cyan" : "blog-tag--violet"}`}>{p.category}</span>
+                      <span className="blog-card__time">{p.readTime} citire</span>
+                    </div>
+                    <h3 className="blog-card__title">{p.title}</h3>
+                    <div className="blog-card__foot">
+                      <span className="blog-card__more">Citeste →</span>
+                    </div>
+                  </a>
+                </FadeIn>
+              ))}
+            </div>
+            <div className="blog-teaser__all">
+              <a href="/blog" className="btn btn--secondary btn--lg">Vezi toate articolele</a>
+            </div>
+          </div>
+        </section>
+
         {/* ─ CTA ─ */}
         <section id="contact" className="cta-section section--alt">
           <div className="cta-section__glow" />
@@ -664,6 +709,7 @@ export default function Home() {
                   <a href="#functionalitati">Functionalitati</a>
                   <a href="#preturi">Preturi</a>
                   <a href="#cum-functioneaza">Cum functioneaza</a>
+                  <a href="/blog">Blog</a>
                   <a href="/login">Conectare</a>
                   <a href="/register">Cont nou</a>
                 </div>
