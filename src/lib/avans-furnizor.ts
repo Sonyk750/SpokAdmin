@@ -136,3 +136,62 @@ export async function consumaAvansPeFactura(
 
   return aplicat;
 }
+
+// ── Avans de preluare (pasul 8 din wizard, valoare negativă) ──────────────────
+// Notă pe depunerea creată din wizard, ca pasul 8 să fie re-rulabil fără dublare.
+export const WIZARD_AVANS_NOTE = "wizard-init-avans";
+
+// Consumă avansul disponibil al unui furnizor pe TOATE facturile lui deschise
+// (pozitive, neachitate, exceptând restanțele generate de wizard). Folosit după ce
+// wizard-ul a înregistrat un avans de preluare, ca să stingă facturile deja
+// introduse. Facturile viitoare se sting prin `consumaAvansPeFactura` la creare.
+export async function consumaAvansPeFacturileFurnizorului(
+  client: DbClient,
+  params: { organizationId: string; asociatieId: string; furnizorId: string },
+): Promise<number> {
+  const facturi = await client.factura.findMany({
+    where: {
+      asociatieId: params.asociatieId,
+      furnizorId:  params.furnizorId,
+      valoare:     { gt: 0 },
+      // exclude restanțele generate de wizard; `notes` poate fi și null (factură normală)
+      OR: [{ notes: null }, { notes: { not: "wizard-init-restante-furnizori" } }],
+    },
+    orderBy: [{ dataEmiterii: "asc" }, { createdAt: "asc" }],
+    select:  { id: true, organizationId: true, asociatieId: true, furnizorId: true },
+  });
+  let total = 0;
+  for (const f of facturi) {
+    const sold = await getAvansSold(client, params.asociatieId, params.furnizorId);
+    if (sold <= EPS) break;
+    total += await consumaAvansPeFactura(client, f);
+  }
+  return r2(total);
+}
+
+// Anulează avansurile de preluare (wizard) ale unei asociații, ca pasul 8 să fie
+// re-rulabil fără dublare. Pentru fiecare avans cu o depunere de tip wizard: șterge
+// consumurile (le re-aplicăm după), șterge depunerile wizard, recalculează soldul
+// din mișcările rămase și statusul facturilor afectate. Avansurile reale (din
+// supraplăți) rămân în mișcările păstrate — doar se realocă la reconsum.
+export async function resetWizardInitAvans(client: DbClient, asociatieId: string): Promise<void> {
+  const avansuri = await client.avansFurnizor.findMany({
+    where:  { asociatieId, miscari: { some: { tip: "depunere", notes: WIZARD_AVANS_NOTE } } },
+    select: { id: true },
+  });
+  for (const av of avansuri) {
+    const consum = await client.avansFurnizorMiscare.findMany({
+      where:  { avansId: av.id, tip: "consum" },
+      select: { facturaId: true },
+    });
+    const facturaIds = [...new Set(consum.map(m => m.facturaId).filter((x): x is string => !!x))];
+
+    await client.avansFurnizorMiscare.deleteMany({ where: { avansId: av.id, tip: "consum" } });
+    await client.avansFurnizorMiscare.deleteMany({ where: { avansId: av.id, tip: "depunere", notes: WIZARD_AVANS_NOTE } });
+
+    const remaining = await client.avansFurnizorMiscare.findMany({ where: { avansId: av.id }, select: { suma: true } });
+    await client.avansFurnizor.update({ where: { id: av.id }, data: { sold: r2(remaining.reduce((s, m) => s + m.suma, 0)) } });
+
+    for (const fid of facturaIds) await recomputeFacturaStatus(client, fid);
+  }
+}

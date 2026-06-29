@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveFurnizorId } from "@/lib/furnizor";
+import { depuneAvans, consumaAvansPeFacturileFurnizorului, resetWizardInitAvans, WIZARD_AVANS_NOTE } from "@/lib/avans-furnizor";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -19,71 +20,83 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   };
 
   try {
-    // Șterge facturile generate anterior de wizard pentru această asociație
-    await db.factura.deleteMany({
-      where: { asociatieId: id, notes: "wizard-init-restante-furnizori" },
-    });
-
-    for (const item of restante ?? []) {
-      const val = parseFloat(item.restanta);
-      if ((!item.furnizorNume?.trim() && !item.furnizorCui?.trim()) || isNaN(val) || val === 0) continue;
-
-      // Potrivire după CUI (identitate sigură), apoi după nume — fără a dubla.
-      const furnizorId = await resolveFurnizorId(db, orgId, { nume: item.furnizorNume, cui: item.furnizorCui });
-      if (!furnizorId) continue;
-
-      await db.furnizorAsociatie.upsert({
-        where:  { furnizorId_asociatieId: { furnizorId, asociatieId: id } },
-        create: { furnizorId, asociatieId: id },
-        update: {},
+    await db.$transaction(async (tx) => {
+      // Șterge facturile (restanțe) generate anterior de wizard pentru această asociație
+      await tx.factura.deleteMany({
+        where: { asociatieId: id, notes: "wizard-init-restante-furnizori" },
       });
+      // Anulează avansurile de preluare anterioare → pasul 8 e re-rulabil fără dublare.
+      await resetWizardInitAvans(tx, id);
 
-      const dataDate = dataRestante ? new Date(dataRestante) : new Date();
-      await db.factura.create({
-        data: {
+      for (const item of restante ?? []) {
+        const val = parseFloat(item.restanta);
+        if ((!item.furnizorNume?.trim() && !item.furnizorCui?.trim()) || isNaN(val) || val === 0) continue;
+
+        // Potrivire după CUI (identitate sigură), apoi după nume — fără a dubla.
+        const furnizorId = await resolveFurnizorId(tx, orgId, { nume: item.furnizorNume, cui: item.furnizorCui });
+        if (!furnizorId) continue;
+
+        await tx.furnizorAsociatie.upsert({
+          where:  { furnizorId_asociatieId: { furnizorId, asociatieId: id } },
+          create: { furnizorId, asociatieId: id },
+          update: {},
+        });
+
+        if (val > 0) {
+          // Valoare pozitivă = restanță (datorie la preluare) → factură neplătită.
+          const dataDate = dataRestante ? new Date(dataRestante) : new Date();
+          await tx.factura.create({
+            data: {
+              organizationId: orgId,
+              asociatieId:    id,
+              furnizorId,
+              valoare:        val,
+              dataEmiterii:   dataDate,
+              status:         "neplatita",
+              notes:          "wizard-init-restante-furnizori",
+            },
+          });
+        } else {
+          // Valoare negativă = avans (asociația a plătit înainte de factură) → sold de avans
+          // la furnizor, consumat automat pe facturile deja introduse și pe cele viitoare.
+          await depuneAvans(tx, { organizationId: orgId, asociatieId: id, furnizorId }, -val, null, "wizard-init", null, WIZARD_AVANS_NOTE);
+          await consumaAvansPeFacturileFurnizorului(tx, { organizationId: orgId, asociatieId: id, furnizorId });
+        }
+      }
+
+      // Curățenie: dezactivează furnizorii legați de această asociație rămași complet goi
+      // (fără facturi și fără avansuri nicăieri) — orfani din rulări anterioare ale pasului 8
+      // cu nume schimbat (ex: "APA NOVA" redenumit în "APA NOVA BUCURESTI").
+      const orfani = await tx.furnizor.findMany({
+        where: {
           organizationId: orgId,
-          asociatieId:    id,
-          furnizorId,
-          valoare:        val,
-          dataEmiterii:   dataDate,
-          status:         "neplatita",
-          notes:          "wizard-init-restante-furnizori",
+          isActive:       true,
+          asociatii:      { some: { asociatieId: id } },
+          facturi:        { none: {} },
+          avansuri:       { none: {} },
+        },
+        select: { id: true },
+      });
+      if (orfani.length) {
+        const ids = orfani.map(o => o.id);
+        await tx.furnizor.updateMany({ where: { id: { in: ids } }, data: { isActive: false } });
+        await tx.furnizorAsociatie.deleteMany({ where: { asociatieId: id, furnizorId: { in: ids } } });
+      }
+
+      let wd: Record<string, unknown> = {};
+      try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
+      wd.dataRestanteFurnizori = dataRestante;
+      // salvăm cu câmpul "nome" ca să corespundă formatului de reîncărcare în wizard
+      wd.furnizoriRestante = restante.map(r => ({ nume: r.furnizorNume, cui: r.furnizorCui ?? "", restanta: r.restanta }));
+
+      await tx.asociatie.update({
+        where: { id },
+        data: {
+          wizardData: JSON.stringify(wd),
+          wizardStep: Math.max(asoc.wizardStep, 8),
         },
       });
-    }
-
-    // Curățenie: dezactivează furnizorii legați de această asociație rămași complet goi
-    // (fără facturi și fără avansuri nicăieri) — orfani din rulări anterioare ale pasului 8
-    // cu nume schimbat (ex: "APA NOVA" redenumit în "APA NOVA BUCURESTI").
-    const orfani = await db.furnizor.findMany({
-      where: {
-        organizationId: orgId,
-        isActive:       true,
-        asociatii:      { some: { asociatieId: id } },
-        facturi:        { none: {} },
-        avansuri:       { none: {} },
-      },
-      select: { id: true },
-    });
-    if (orfani.length) {
-      const ids = orfani.map(o => o.id);
-      await db.furnizor.updateMany({ where: { id: { in: ids } }, data: { isActive: false } });
-      await db.furnizorAsociatie.deleteMany({ where: { asociatieId: id, furnizorId: { in: ids } } });
-    }
-
-    let wd: Record<string, unknown> = {};
-    try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
-    wd.dataRestanteFurnizori = dataRestante;
-    // salvăm cu câmpul "nome" ca să corespundă formatului de reîncărcare în wizard
-    wd.furnizoriRestante = restante.map(r => ({ nume: r.furnizorNume, cui: r.furnizorCui ?? "", restanta: r.restanta }));
-
-    await db.asociatie.update({
-      where: { id },
-      data: {
-        wizardData: JSON.stringify(wd),
-        wizardStep: Math.max(asoc.wizardStep, 8),
-      },
-    });
+    }, { timeout: 20000 });
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

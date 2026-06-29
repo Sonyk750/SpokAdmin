@@ -1908,26 +1908,37 @@ export default function WizardClient({
                 </div>
               ) : (
                 <div className="dash-panel" style={{ padding: "1.25rem 1.5rem" }}>
-                  <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.75rem", fontSize: "0.9rem" }}>Sume datorate</div>
+                  <div style={{ fontWeight: 700, color: "#a78bfa", marginBottom: "0.35rem", fontSize: "0.9rem" }}>Sume la preluare</div>
+                  <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginBottom: "0.75rem" }}>
+                    Valoare <strong>pozitivă</strong> = restanță (datorezi furnizorului). Valoare <strong>negativă</strong> (ex. <code>-100</code>) = avans (ai plătit înainte) — se va stinge automat din facturile viitoare ale furnizorului.
+                  </p>
                   <table className="data-table" style={{ fontSize: "0.8125rem" }}>
                     <thead>
                       <tr>
                         <th>Furnizor</th>
-                        <th style={{ textAlign: "right", width: "180px" }}>Restanță (lei)</th>
+                        <th style={{ textAlign: "right", width: "200px" }}>Sumă (lei)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {furnizoriRestante.map((f, i) => (
+                      {furnizoriRestante.map((f, i) => {
+                        const v = parseFloat(f.restanta);
+                        return (
                         <tr key={f.id}>
                           <td style={{ color: f.nume ? "#e2e8f0" : "#475569" }}>{f.nume || <em>fără nume</em>}</td>
                           <td style={{ textAlign: "right" }}>
-                            <input type="number" className="input input--sm" step="0.01" min="0" placeholder="0.00"
-                              value={f.restanta}
-                              onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, restanta: e.target.value } : r))}
-                              style={{ width: "160px", textAlign: "right" }} />
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.5rem" }}>
+                              {!isNaN(v) && v < 0 && (
+                                <span style={{ fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase", color: "#38bdf8" }}>avans</span>
+                              )}
+                              <input type="number" className="input input--sm" step="0.01" placeholder="0.00"
+                                value={f.restanta}
+                                onChange={e => setFurnizoriRestante(prev => prev.map((r, j) => j === i ? { ...r, restanta: e.target.value } : r))}
+                                style={{ width: "140px", textAlign: "right" }} />
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
