@@ -533,6 +533,14 @@ export default function WizardClient({
             return ex ? { ...row, sold: ex.sold } : row;
           });
         });
+        // Sync soldFondAsoc with updated active fonduri
+        setSoldFondAsoc(prev => {
+          const prevMap = new Map(prev.map(sf => [sf.fondId, sf]));
+          return (data.fonduri as FondRow[]).filter(f => f.isEnabled).map(f => {
+            const ex = prevMap.get(f.id ?? "");
+            return { fondId: f.id ?? "", fondName: f.name, sold: ex?.sold ?? "" };
+          });
+        });
       }
       setMaxStep(p => Math.max(p, 6)); setStep(6);
     } catch (e: any) { setError(e.message); }
