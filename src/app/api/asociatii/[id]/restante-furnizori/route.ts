@@ -66,6 +66,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       });
     }
 
+    // Curățenie: dezactivează furnizorii legați de această asociație rămași complet goi
+    // (fără facturi și fără avansuri nicăieri) — orfani din rulări anterioare ale pasului 8
+    // cu nume schimbat (ex: "APA NOVA" redenumit în "APA NOVA BUCURESTI").
+    const orfani = await db.furnizor.findMany({
+      where: {
+        organizationId: orgId,
+        isActive:       true,
+        asociatii:      { some: { asociatieId: id } },
+        facturi:        { none: {} },
+        avansuri:       { none: {} },
+      },
+      select: { id: true },
+    });
+    if (orfani.length) {
+      const ids = orfani.map(o => o.id);
+      await db.furnizor.updateMany({ where: { id: { in: ids } }, data: { isActive: false } });
+      await db.furnizorAsociatie.deleteMany({ where: { asociatieId: id, furnizorId: { in: ids } } });
+    }
+
     let wd: Record<string, unknown> = {};
     try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
     wd.dataRestanteFurnizori = dataRestante;

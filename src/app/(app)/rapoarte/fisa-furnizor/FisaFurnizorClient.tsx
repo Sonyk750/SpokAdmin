@@ -87,12 +87,13 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
   }, [asociatieId]);
 
   useEffect(() => {
-    fetch(`/api/furnizori`).then(r => r.json()).then((d: Furnizor[]) => {
+    if (!asociatieId) { setFurnizori([]); setFurnizorId(""); return; }
+    fetch(`/api/furnizori?asociatieId=${asociatieId}`).then(r => r.json()).then((d: Furnizor[]) => {
       const list = Array.isArray(d) ? d : [];
       setFurnizori(list);
       setFurnizorId(prev => (prev && list.some(x => x.id === prev)) ? prev : (list[0]?.id ?? ""));
     }).catch(() => setFurnizori([]));
-  }, []);
+  }, [asociatieId]);
 
   const fetchData = useCallback(async () => {
     if (!asociatieId || !furnizorId) { setFisa(null); return; }
