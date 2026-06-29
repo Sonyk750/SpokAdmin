@@ -2015,6 +2015,7 @@ export default function WizardClient({
                         <th style={{ textAlign: "right", width: "120px" }}>Index vechi</th>
                         <th style={{ textAlign: "right", width: "120px" }}>Index nou</th>
                         <th style={{ textAlign: "right", width: "90px" }}>Consum</th>
+                        <th style={{ width: "36px" }} />
                       </tr>
                     </thead>
                     <tbody>
@@ -2045,6 +2046,14 @@ export default function WizardClient({
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 600, color: isNeg ? "#f87171" : isNeutral ? "#475569" : "#4ade80" }}>
                               {consum}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="fond-row__del"
+                                title="Dezactivează contorul"
+                                onClick={() => setIndexRows(prev => prev.filter(ir => ir.contorId !== r.contorId))}
+                              >×</button>
                             </td>
                           </tr>
                         );
