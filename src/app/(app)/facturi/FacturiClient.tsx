@@ -454,7 +454,12 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       const grpJson = await grpRes.json();
       if (!apRes.ok) throw new Error(apJson.error ?? "Eroare");
 
-      const aps: ApRow[]    = apJson.apartamente;
+      const aps: ApRow[]    = (apJson.apartamente as ApRow[]).sort((a, b) => {
+        const na = parseInt(a.numar, 10);
+        const nb = parseInt(b.numar, 10);
+        if (!isNaN(na) && !isNaN(nb)) return na - nb;
+        return a.numar.localeCompare(b.numar);
+      });
       const grps: GrupDist[] = Array.isArray(grpJson) ? grpJson : [];
       setDistAps(aps);
       setGrupuri(grps);
