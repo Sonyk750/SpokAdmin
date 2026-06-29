@@ -222,13 +222,22 @@ export default function FacturiPrimitePage() {
                         {STATUS_LABEL[inv.status] || inv.status}
                       </span>
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <a
+                        href={`/spv/facturi-primite/factura/${inv.downloadId || inv.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn-action"
+                        style={{ marginRight: "0.4rem" }}
+                      >
+                        PDF
+                      </a>
                       <a
                         href={`/api/spv/download?id=${inv.downloadId || inv.id}`}
                         download
                         className="btn-action"
                       >
-                        ⬇ ZIP
+                        ZIP
                       </a>
                     </td>
                   </tr>
