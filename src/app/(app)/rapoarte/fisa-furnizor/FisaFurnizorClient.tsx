@@ -87,6 +87,13 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [merging, setMerging]             = useState(false);
 
+  // ── Curățare în bloc a duplicatelor (după nume de bază + CUI) ──────────────
+  const [dupOpen, setDupOpen]         = useState(false);
+  const [dupPairs, setDupPairs]       = useState<{ base: string; target: Furnizor; dupes: Furnizor[] }[]>([]);
+  const [dupLoading, setDupLoading]   = useState(false);
+  const [dupRunning, setDupRunning]   = useState(false);
+  const [dupSkip, setDupSkip]         = useState<Set<string>>(new Set());
+
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
@@ -122,6 +129,40 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
       await loadFurnizori(target); // sursa dispare, selectăm furnizorul păstrat
     } catch (e: any) { setError(e.message); }
     finally { setMerging(false); }
+  }
+
+  async function openDuplicates() {
+    setDupLoading(true); setError(null);
+    try {
+      const res  = await fetch("/api/furnizori/duplicates");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare la detectare");
+      setDupPairs(json.pairs ?? []);
+      setDupSkip(new Set());
+      setDupOpen(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setDupLoading(false); }
+  }
+
+  async function runDedup() {
+    setDupRunning(true); setError(null);
+    try {
+      for (const p of dupPairs) {
+        for (const d of p.dupes) {
+          if (dupSkip.has(d.id)) continue;
+          const res = await fetch("/api/furnizori/merge", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ sourceId: d.id, targetId: p.target.id }),
+          });
+          if (!res.ok) { const j = await res.json().catch(() => ({})); throw new Error(j.error ?? "Eroare la unificare"); }
+        }
+      }
+      setDupOpen(false);
+      await loadFurnizori();
+      await fetchData();
+    } catch (e: any) { setError(e.message); }
+    finally { setDupRunning(false); }
   }
 
   const fetchData = useCallback(async () => {
@@ -201,6 +242,10 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
               ⇄ Unifică
             </button>
           )}
+          <button className="btn btn--ghost" onClick={openDuplicates} disabled={dupLoading}
+            style={{ alignSelf: "flex-end" }} title="Detectează și unifică automat furnizorii duplicați (același nume, unul cu CUI)">
+            {dupLoading ? "..." : "🧹 Curăță duplicate"}
+          </button>
         </div>
 
         {error && <div className="wizard__error">{error}</div>}
@@ -233,6 +278,52 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
           </div>
         </div>
       )}
+
+      {dupOpen && (() => {
+        const totalDeMerge = dupPairs.reduce((s, p) => s + p.dupes.filter(d => !dupSkip.has(d.id)).length, 0);
+        return (
+        <div className="modal-overlay" onClick={() => !dupRunning && setDupOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "640px", maxHeight: "80vh", display: "flex", flexDirection: "column" }}>
+            <div className="modal__header"><h2 className="modal__title">Curăță duplicate furnizori</h2></div>
+            <div className="modal__body" style={{ overflowY: "auto" }}>
+              {dupPairs.length === 0 ? (
+                <p style={{ fontSize: "0.9rem", color: "#4ade80" }}>✓ Nicio dublură detectată. Toți furnizorii par unici.</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: "0.82rem", color: "#cbd5e1", lineHeight: 1.5, marginBottom: "1rem" }}>
+                    Furnizori cu același nume de bază, unde unul are CUI. Varianta <strong>fără CUI</strong> se comasează în cea <strong>cu CUI</strong> (care primește toate facturile/plățile/avansurile). Debifează ce nu vrei să unifici.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+                    {dupPairs.map(p => (
+                      <div key={p.base} className="dash-panel" style={{ padding: "0.85rem 1rem" }}>
+                        <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "#475569", fontWeight: 700, marginBottom: "0.35rem" }}>Se păstrează (cu CUI)</div>
+                        <div style={{ fontWeight: 700, color: "#4ade80", fontSize: "0.85rem" }}>{p.target.nume}{p.target.cui ? ` (${p.target.cui})` : ""}</div>
+                        <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "#475569", fontWeight: 700, margin: "0.6rem 0 0.35rem" }}>Se comasează în el</div>
+                        {p.dupes.map(d => (
+                          <label key={d.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", color: "#f87171", cursor: "pointer", padding: "0.15rem 0" }}>
+                            <input type="checkbox" checked={!dupSkip.has(d.id)}
+                              onChange={e => setDupSkip(prev => { const n = new Set(prev); if (e.target.checked) n.delete(d.id); else n.add(d.id); return n; })} />
+                            <span>{d.nume}{d.cui ? ` (${d.cui})` : " — fără CUI"}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button className="btn btn--secondary" onClick={() => setDupOpen(false)} disabled={dupRunning}>Închide</button>
+              {dupPairs.length > 0 && (
+                <button className="btn btn--primary" onClick={runDedup} disabled={dupRunning || totalDeMerge === 0}>
+                  {dupRunning ? "Se unifică..." : `Unifică ${totalDeMerge} duplicate`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        );
+      })()}
 
       {fisa && (
         <>

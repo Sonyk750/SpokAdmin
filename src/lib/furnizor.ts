@@ -17,6 +17,29 @@ export function normalizeCui(cui?: string | null): string | null {
   return digits.length >= 2 ? digits : null;
 }
 
+// Forme juridice eliminate la calcularea „cheii de bază" (ordonate cu cele lungi întâi).
+const FORME_JURIDICE = [
+  "PERSOANAFIZICAAUTORIZATA", "INTREPRINDEREINDIVIDUALA", "INTREPRINDEREFAMILIALA",
+  "SOCIETATECOMERCIALA", "SRLD", "SRL", "PFA", "SC", "SA",
+];
+
+/**
+ * Cheie de bază a numelui: fără diacritice, doar litere/cifre, fără forma juridică
+ * (SC/SA/SRL/PFA/Persoană Fizică Autorizată...). Folosită ca să recunoaștem că
+ * „STAREXPERT CONCEPT SRL" și „STAREXPERT CONCEPT S.R.L." sunt același furnizor.
+ */
+export function furnizorBaseKey(nume: string): string {
+  let s = (nume || "")
+    .normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "") // scoate diacriticele
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");                       // compactează (fără spații/punctuație)
+  for (const t of FORME_JURIDICE) {
+    if (s.startsWith(t)) s = s.slice(t.length);
+    if (s.endsWith(t))   s = s.slice(0, -t.length);
+  }
+  return s;
+}
+
 type DbLike = {
   furnizor: {
     findFirst: (args: any) => Promise<any>;
