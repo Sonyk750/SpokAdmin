@@ -38,10 +38,11 @@ export async function resolveFurnizorId(
   const cui  = normalizeCui(input.cui);
   const nume = input.nume?.trim() ? canonicalFurnizorNume(input.nume) : null;
 
-  // 1) Identitate puternică: CUI
+  // 1) Identitate puternică: CUI. Doar furnizori activi — cei dezactivați (unificați)
+  // nu trebuie reînviați, altfel reapar duplicatele.
   if (cui) {
     const byCui = await db.furnizor.findFirst({
-      where:  { organizationId, cui },
+      where:  { organizationId, cui, isActive: true },
       select: { id: true },
     });
     if (byCui) return byCui.id;
@@ -50,7 +51,7 @@ export async function resolveFurnizorId(
   // 2) Nume (case-insensitive). Dacă avem CUI nou, îl completăm pe furnizorul găsit.
   if (nume) {
     const byName = await db.furnizor.findFirst({
-      where:  { organizationId, nume: { equals: nume, mode: "insensitive" } },
+      where:  { organizationId, nume: { equals: nume, mode: "insensitive" }, isActive: true },
       select: { id: true, cui: true },
     });
     if (byName) {
