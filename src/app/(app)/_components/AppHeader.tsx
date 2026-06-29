@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAsociatie } from "@/lib/AsociatieContext";
 import { useSidebar } from "@/lib/SidebarContext";
 
@@ -24,6 +24,7 @@ export default function AppHeader({ userName, orgName }: { userName?: string | n
 
   const { asociatii, activeId, setActiveId } = useAsociatie();
   const { toggle } = useSidebar();
+  const router = useRouter();
 
   return (
     <header className="app-header">
@@ -43,7 +44,7 @@ export default function AppHeader({ userName, orgName }: { userName?: string | n
             <select
               className="app-header__asoc-select"
               value={activeId}
-              onChange={e => setActiveId(e.target.value)}
+              onChange={e => { setActiveId(e.target.value); router.refresh(); }}
             >
               {asociatii.map(a => (
                 <option key={a.id} value={a.id}>{a.name}</option>
