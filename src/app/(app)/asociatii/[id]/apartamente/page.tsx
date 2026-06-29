@@ -31,8 +31,9 @@ export default async function ApartamentePage({ params }: { params: Promise<{ id
 
   const fmt = (v: number) => v.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const totalRestante = a.apartamente.reduce((s, ap) => s + (ap.solduri[0]?.restantaIntretinere ?? 0), 0);
-  const cuRestante    = a.apartamente.filter(ap => (ap.solduri[0]?.restantaIntretinere ?? 0) > 0).length;
+  let totalRestante = 0;
+  for (const ap of a.apartamente) totalRestante += ap.solduri[0]?.restantaIntretinere ?? 0;
+  const cuRestante = a.apartamente.filter(ap => (ap.solduri[0]?.restantaIntretinere ?? 0) > 0).length;
 
   return (
     <div className="page-shell">
@@ -97,7 +98,7 @@ export default async function ApartamentePage({ params }: { params: Promise<{ id
               <tr>
                 <td colSpan={4} />
                 <td style={{ textAlign: "right", fontWeight: 700, borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
-                  {fmt(a.apartamente.reduce((s, ap) => s + (ap.solduri[0]?.intretinereCurenta ?? 0), 0))} lei
+                  {fmt(a.apartamente.reduce((s: number, ap) => s + (ap.solduri[0]?.intretinereCurenta ?? 0), 0))} lei
                 </td>
                 <td style={{ textAlign: "right", fontWeight: 700, color: totalRestante > 0 ? "#f87171" : "#475569", borderTop: "1px solid #1e293b", paddingTop: "0.5rem" }}>
                   {totalRestante > 0 ? `${fmt(totalRestante)} lei` : "—"}
