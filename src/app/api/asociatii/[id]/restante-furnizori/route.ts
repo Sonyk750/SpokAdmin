@@ -56,7 +56,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     let wd: Record<string, unknown> = {};
     try { if (asoc.wizardData) wd = JSON.parse(asoc.wizardData); } catch {}
     wd.dataRestanteFurnizori = dataRestante;
-    wd.furnizoriRestante     = restante;
+    // salvăm cu câmpul "nome" ca să corespundă formatului de reîncărcare în wizard
+    wd.furnizoriRestante = restante.map(r => ({ nome: r.furnizorNume, restanta: r.restanta }));
 
     await db.asociatie.update({
       where: { id },
