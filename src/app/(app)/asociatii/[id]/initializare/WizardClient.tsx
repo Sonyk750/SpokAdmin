@@ -2029,6 +2029,8 @@ export default function WizardClient({
                         const consum   = (!disabled && row) ? getConsum(row) : "—";
                         const isNeg     = consum.startsWith("⚠");
                         const isNeutral = consum === "—";
+                        const consumNum = (!isNeg && !isNeutral) ? parseFloat(consum) : NaN;
+                        const isHigh    = !isNaN(consumNum) && consumNum > 10;
                         return (
                           <tr key={r.contorId} style={{ opacity: disabled ? 0.4 : 1 }}>
                             <td>{TIP_LABEL[r.tip] ?? r.tip}</td>
@@ -2051,8 +2053,10 @@ export default function WizardClient({
                                 style={{ width: "108px", textAlign: "right" }} step="0.001" placeholder=""
                                 disabled={disabled} />
                             </td>
-                            <td style={{ textAlign: "right", fontWeight: 600, color: isNeg ? "#f87171" : isNeutral ? "#475569" : "#4ade80" }}>
-                              {consum}
+                            <td style={{ textAlign: "right", fontWeight: 600, color: isNeg ? "#f87171" : isNeutral ? "#475569" : isHigh ? "#f59e0b" : "#4ade80" }}>
+                              {isHigh ? (
+                                <span title="Consum ridicat (>10 mc)">⚠ {consum}</span>
+                              ) : consum}
                             </td>
                             <td>
                               <button
