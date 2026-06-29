@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { canonicalFurnizorNume, normalizeCui } from "@/lib/furnizor";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
@@ -79,7 +80,37 @@ export async function POST(req: NextRequest) {
       if (!target.banca   && source.banca)   patch.banca   = source.banca;
       if (Object.keys(patch).length) await tx.furnizor.update({ where: { id: targetId }, data: patch });
 
-      // 6) Dezactivează sursa (n-o ștergem — istoricul rămâne).
+      // 6) Actualizează referințele din pasul 8 al inițializării (wizardData) către
+      // furnizorul păstrat, ca re-salvarea pasului 8 să cadă pe furnizorul corect
+      // (altfel numele vechi s-ar potrivi cu sursa dezactivată).
+      const srcNameCanon = canonicalFurnizorNume(source.nume);
+      const srcCui       = normalizeCui(source.cui);
+      const asocs = await tx.asociatie.findMany({
+        where:  { organizationId: orgId, wizardData: { not: null } },
+        select: { id: true, wizardData: true },
+      });
+      for (const a of asocs) {
+        let wd: any;
+        try { wd = JSON.parse(a.wizardData!); } catch { continue; }
+        const list = wd?.furnizoriRestante;
+        if (!Array.isArray(list)) continue;
+        let changed = false;
+        for (const item of list) {
+          const itemNume = item?.nume ?? item?.nome;
+          const itemCui  = normalizeCui(item?.cui);
+          const matchCui  = srcCui && itemCui && itemCui === srcCui;
+          const matchNume = itemNume && canonicalFurnizorNume(String(itemNume)) === srcNameCanon;
+          if (matchCui || matchNume) {
+            item.nume = target.nume;
+            if ("nome" in item) item.nome = target.nume;
+            item.cui = target.cui ?? "";
+            changed = true;
+          }
+        }
+        if (changed) await tx.asociatie.update({ where: { id: a.id }, data: { wizardData: JSON.stringify(wd) } });
+      }
+
+      // 7) Dezactivează sursa (n-o ștergem — istoricul rămâne).
       await tx.furnizor.update({ where: { id: sourceId }, data: { isActive: false } });
     }, { timeout: 20000 });
 

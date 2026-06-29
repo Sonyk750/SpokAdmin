@@ -87,12 +87,6 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
   const [mergeTargetId, setMergeTargetId] = useState("");
   const [merging, setMerging]             = useState(false);
 
-  // ── Înregistrare avans la furnizor ────────────────────────────────────────
-  const [avansOpen, setAvansOpen]     = useState(false);
-  const [avansSuma, setAvansSuma]     = useState("");
-  const [avansNotes, setAvansNotes]   = useState("");
-  const [savingAvans, setSavingAvans] = useState(false);
-
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
@@ -128,24 +122,6 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
       await loadFurnizori(target); // sursa dispare, selectăm furnizorul păstrat
     } catch (e: any) { setError(e.message); }
     finally { setMerging(false); }
-  }
-
-  async function handleAvans() {
-    const suma = parseFloat(avansSuma);
-    if (!asociatieId || !furnizorId || !suma || suma <= 0) return;
-    setSavingAvans(true); setError(null);
-    try {
-      const res = await fetch("/api/avans-furnizor", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ asociatieId, furnizorId, suma, notes: avansNotes.trim() || undefined }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Eroare la înregistrarea avansului");
-      setAvansOpen(false); setAvansSuma(""); setAvansNotes("");
-      await fetchData(); // reîncarcă fișa: avans + statusurile facturilor
-    } catch (e: any) { setError(e.message); }
-    finally { setSavingAvans(false); }
   }
 
   const fetchData = useCallback(async () => {
@@ -219,10 +195,6 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
             <RoDate className="input" value={dataEnd} onChange={v => setDataEnd(v)} />
           </div>
           <button className="btn btn--secondary" onClick={fetchData} disabled={loading} style={{ alignSelf: "flex-end" }}>{loading ? "..." : "Actualizează"}</button>
-          <button className="btn btn--ghost" onClick={() => { setAvansSuma(""); setAvansNotes(""); setAvansOpen(true); }} disabled={!furnizorId}
-            style={{ alignSelf: "flex-end" }} title="Înregistrează un avans plătit furnizorului — se aplică automat pe facturile deschise">
-            + Avans
-          </button>
           {furnizori.length > 1 && (
             <button className="btn btn--ghost" onClick={() => { setMergeTargetId(""); setMergeOpen(true); }} disabled={!furnizorId}
               style={{ alignSelf: "flex-end" }} title="Unifică acest furnizor cu altul (elimină duplicatul)">
@@ -257,34 +229,6 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
             <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
               <button className="btn btn--secondary" onClick={() => setMergeOpen(false)} disabled={merging}>Anulează</button>
               <button className="btn btn--primary" onClick={handleMerge} disabled={merging || !mergeTargetId}>{merging ? "Se unifică..." : "Unifică"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {avansOpen && (
-        <div className="modal-overlay" onClick={() => !savingAvans && setAvansOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "480px" }}>
-            <div className="modal__header"><h2 className="modal__title">Înregistrează avans</h2></div>
-            <div className="modal__body" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <p style={{ fontSize: "0.85rem", color: "#cbd5e1", lineHeight: 1.5 }}>
-                Avans plătit către <strong style={{ color: "#38bdf8" }}>{furnizori.find(f => f.id === furnizorId)?.nume}</strong>.
-                Se adaugă la soldul de avans și se aplică automat pe facturile deschise ale furnizorului (le stinge în ordinea datei).
-              </p>
-              <div className="form-field" style={{ marginBottom: 0 }}>
-                <label className="form-field__label">Sumă avans (lei)</label>
-                <input type="number" className="input" step="0.01" min="0" placeholder="0.00"
-                  value={avansSuma} onChange={e => setAvansSuma(e.target.value)} autoFocus />
-              </div>
-              <div className="form-field" style={{ marginBottom: 0 }}>
-                <label className="form-field__label">Notă (opțional)</label>
-                <input type="text" className="input" placeholder="ex. avans la preluare"
-                  value={avansNotes} onChange={e => setAvansNotes(e.target.value)} />
-              </div>
-            </div>
-            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
-              <button className="btn btn--secondary" onClick={() => setAvansOpen(false)} disabled={savingAvans}>Anulează</button>
-              <button className="btn btn--primary" onClick={handleAvans} disabled={savingAvans || !(parseFloat(avansSuma) > 0)}>{savingAvans ? "Se salvează..." : "Înregistrează"}</button>
             </div>
           </div>
         </div>
