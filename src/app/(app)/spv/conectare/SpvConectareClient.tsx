@@ -28,8 +28,15 @@ export default function SpvConectareClient() {
   useEffect(() => {
     const ok  = searchParams.get("spv_success")
     const err = searchParams.get("spv_error")
-    if (ok)  setMessage({ type: "success", text: "SPV conectat cu succes!" })
-    if (err) setMessage({ type: "error",   text: `Eroare conectare SPV: ${err}` })
+    if (ok) setMessage({ type: "success", text: "SPV conectat cu succes!" })
+    if (err) {
+      const errMsg = err === "access_denied"
+        ? "Acces refuzat de ANAF. Verifică: (1) ai certificat digital DigiSign/CertSign instalat în browser, (2) redirect_uri din Vercel este exact https://spokadmin.ro/api/spv/callback"
+        : err === "config_missing"
+        ? "Configurație lipsă — verifică variabilele SPV_* în Vercel."
+        : `Eroare ANAF: ${err}`
+      setMessage({ type: "error", text: errMsg })
+    }
 
     async function load() {
       setLoading(true)
