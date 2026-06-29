@@ -413,6 +413,7 @@ export default function WizardClient({
   const [indexRows, setIndexRows] = useState<IndexRow[]>(
     existingContoare?.length ? buildIndexRows(existingContoare) : []
   );
+  const [disabledContorIds, setDisabledContorIds] = useState<Set<string>>(new Set());
 
   // ─── API helper ──────────────────────────────────────────────────────────
 
@@ -610,7 +611,9 @@ export default function WizardClient({
     setSaving(true); setError(null);
     try {
       await api("index-contoare", {
-        indecsi: indexRows.map(r => ({ contorId: r.contorId, numarSerie: r.numarSerie, indexVechi: r.indexVechi, indexNou: r.indexNou })),
+        indecsi: indexRows
+          .filter(r => !disabledContorIds.has(r.contorId))
+          .map(r => ({ contorId: r.contorId, numarSerie: r.numarSerie, indexVechi: r.indexVechi, indexNou: r.indexNou })),
       });
       setMaxStep(p => Math.max(p, 11)); setStep(11);
     } catch (e: any) { setError(e.message); }
@@ -2020,29 +2023,33 @@ export default function WizardClient({
                     </thead>
                     <tbody>
                       {rows.map(r => {
-                        const gi   = indexRows.findIndex(ir => ir.contorId === r.contorId);
-                        const row  = indexRows[gi];
-                        const consum    = row ? getConsum(row) : "—";
+                        const gi       = indexRows.findIndex(ir => ir.contorId === r.contorId);
+                        const row      = indexRows[gi];
+                        const disabled = disabledContorIds.has(r.contorId);
+                        const consum   = (!disabled && row) ? getConsum(row) : "—";
                         const isNeg     = consum.startsWith("⚠");
                         const isNeutral = consum === "—";
                         return (
-                          <tr key={r.contorId}>
+                          <tr key={r.contorId} style={{ opacity: disabled ? 0.4 : 1 }}>
                             <td>{TIP_LABEL[r.tip] ?? r.tip}</td>
                             <td style={{ color: "#94a3b8" }}>{r.denumire || r.locatie}</td>
                             <td>
                               <input type="text" className="input input--sm" value={row?.numarSerie ?? ""}
                                 onChange={e => gi >= 0 && updateIndex(gi, "numarSerie", e.target.value)}
-                                style={{ width: "120px" }} placeholder="ex: 12345678" />
+                                style={{ width: "120px" }} placeholder="ex: 12345678"
+                                disabled={disabled} />
                             </td>
                             <td style={{ textAlign: "right" }}>
                               <input type="number" className="input input--sm" value={row?.indexVechi ?? ""}
                                 onChange={e => gi >= 0 && updateIndex(gi, "indexVechi", e.target.value)}
-                                style={{ width: "108px", textAlign: "right" }} step="0.001" placeholder="" />
+                                style={{ width: "108px", textAlign: "right" }} step="0.001" placeholder=""
+                                disabled={disabled} />
                             </td>
                             <td style={{ textAlign: "right" }}>
                               <input type="number" className="input input--sm" value={row?.indexNou ?? ""}
                                 onChange={e => gi >= 0 && updateIndex(gi, "indexNou", e.target.value)}
-                                style={{ width: "108px", textAlign: "right" }} step="0.001" placeholder="" />
+                                style={{ width: "108px", textAlign: "right" }} step="0.001" placeholder=""
+                                disabled={disabled} />
                             </td>
                             <td style={{ textAlign: "right", fontWeight: 600, color: isNeg ? "#f87171" : isNeutral ? "#475569" : "#4ade80" }}>
                               {consum}
@@ -2050,10 +2057,16 @@ export default function WizardClient({
                             <td>
                               <button
                                 type="button"
-                                className="fond-row__del"
-                                title="Dezactivează contorul"
-                                onClick={() => setIndexRows(prev => prev.filter(ir => ir.contorId !== r.contorId))}
-                              >×</button>
+                                className={disabled ? "btn btn--secondary" : "fond-row__del"}
+                                title={disabled ? "Reactivează contorul" : "Dezactivează contorul"}
+                                style={disabled ? { padding: "0.15rem 0.5rem", fontSize: "0.75rem" } : undefined}
+                                onClick={() => setDisabledContorIds(prev => {
+                                  const next = new Set(prev);
+                                  if (next.has(r.contorId)) next.delete(r.contorId);
+                                  else next.add(r.contorId);
+                                  return next;
+                                })}
+                              >{disabled ? "+" : "×"}</button>
                             </td>
                           </tr>
                         );
