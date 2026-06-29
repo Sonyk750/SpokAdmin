@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createHmac } from "crypto"
 import { db } from "@/lib/db"
 
 export async function GET(req: NextRequest) {
@@ -9,12 +10,15 @@ export async function GET(req: NextRequest) {
 
   const redirectBase = `${origin}/spv/conectare`
 
-  if (error) return NextResponse.redirect(`${redirectBase}?spv_error=${error}`)
+  if (error) return NextResponse.redirect(`${redirectBase}?spv_error=${encodeURIComponent(error)}`)
   if (!code || !state) return NextResponse.redirect(`${redirectBase}?spv_error=invalid_callback`)
 
   let userId = ""
   try {
-    const decoded = JSON.parse(Buffer.from(state, "base64").toString())
+    const { payload, sig } = JSON.parse(Buffer.from(state, "base64").toString())
+    const expected = createHmac("sha256", process.env.AUTH_SECRET!).update(payload).digest("hex")
+    if (sig !== expected) return NextResponse.redirect(`${redirectBase}?spv_error=invalid_state`)
+    const decoded = JSON.parse(payload)
     userId = decoded.userId
   } catch {
     return NextResponse.redirect(`${redirectBase}?spv_error=invalid_state`)
@@ -38,7 +42,8 @@ export async function GET(req: NextRequest) {
     const tok = await tokenRes.json()
     if (!tok.access_token && !tok.refresh_token) {
       console.error("SPV token error:", tok)
-      return NextResponse.redirect(`${redirectBase}?spv_error=token_failed`)
+      const desc = tok.error_description || tok.error || "token_failed"
+      return NextResponse.redirect(`${redirectBase}?spv_error=${encodeURIComponent(desc)}`)
     }
 
     const expiresAt = tok.expires_in

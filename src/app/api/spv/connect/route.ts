@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createHmac } from "crypto"
 import { auth } from "@/lib/auth"
 
 export async function GET(req: NextRequest) {
@@ -20,21 +21,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(`${origin}/spv/conectare?spv_error=config_missing`)
     }
 
-    const state = Buffer.from(JSON.stringify({
-      userId:         session.user.id,
-      organizationId: session.user.organizationId,
-    })).toString("base64")
+    const payload = JSON.stringify({ userId: session.user.id, organizationId: session.user.organizationId, ts: Date.now() })
+    const sig     = createHmac("sha256", process.env.AUTH_SECRET!).update(payload).digest("hex")
+    const state   = Buffer.from(JSON.stringify({ payload, sig })).toString("base64")
 
     const params = new URLSearchParams({
-      response_type: "code",
-      client_id:     clientId,
-      redirect_uri:  redirectUri,
+      response_type:      "code",
+      client_id:          clientId,
+      redirect_uri:       redirectUri,
       scope,
       state,
+      token_content_type: "jwt",
     })
 
     const finalUrl = `${authUrl}?${params.toString()}`
-    console.log("SPV connect → redirecting to:", finalUrl)
+    console.log("SPV connect → redirect_uri:", redirectUri, "auth_url:", authUrl)
     return NextResponse.redirect(finalUrl)
   } catch (e) {
     console.error("SPV connect error:", e)
