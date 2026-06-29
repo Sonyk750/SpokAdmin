@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import Sidebar from "./_components/Sidebar";
 import AppHeader from "./_components/AppHeader";
+import AsociatieScope from "./_components/AsociatieScope";
 import { AsociatieProvider } from "@/lib/AsociatieContext";
 import { SidebarProvider } from "@/lib/SidebarContext";
 import { isSuperAdmin, canManageOrg } from "@/lib/roles";
@@ -31,9 +33,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const canManageUsers = isSuperAdmin(session.user.role) ||
     canManageOrg(session.user.role, session.user.orgRole);
 
+  // Asociația activă din cookie (setată la schimbarea din header) — ca să avem
+  // contextul corect deja la primul render pe server.
+  const cookieStore = await cookies();
+  const storedAsoc  = cookieStore.get("spokadmin-asoc")?.value;
+  const initialAsocId = storedAsoc && asociatii.some(a => a.id === storedAsoc)
+    ? storedAsoc
+    : (asociatii[0]?.id ?? "");
+
   return (
     <SidebarProvider>
-      <AsociatieProvider asociatii={asociatii}>
+      <AsociatieProvider asociatii={asociatii} initialId={initialAsocId}>
         <div className="app-layout">
           <Sidebar
             userRole={session.user.role}
@@ -45,7 +55,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               orgName={membership?.organization.name}
             />
             <main className="app-main">
-              {children}
+              <AsociatieScope>
+                {children}
+              </AsociatieScope>
             </main>
           </div>
         </div>
