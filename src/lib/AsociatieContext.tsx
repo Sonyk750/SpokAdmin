@@ -45,8 +45,10 @@ export function AsociatieProvider({
 
   useEffect(() => {
     const stored = localStorage.getItem("spokadmin-asoc");
-    if (stored && asociatii.some(a => a.id === stored)) {
-      setActiveIdState(stored);
+    const id = stored && asociatii.some(a => a.id === stored) ? stored : (asociatii[0]?.id ?? "");
+    if (stored && asociatii.some(a => a.id === stored)) setActiveIdState(stored);
+    if (id) {
+      try { document.cookie = `spokadmin-asoc=${id}; path=/; max-age=31536000; SameSite=Lax`; } catch {}
     }
   }, [asociatii]);
 
@@ -72,6 +74,7 @@ export function AsociatieProvider({
   function setActiveId(id: string) {
     setActiveIdState(id);
     try { localStorage.setItem("spokadmin-asoc", id); } catch {}
+    try { document.cookie = `spokadmin-asoc=${id}; path=/; max-age=31536000; SameSite=Lax`; } catch {}
   }
 
   const refreshPerioada = useCallback(() => loadMeta(activeId), [activeId, loadMeta]);

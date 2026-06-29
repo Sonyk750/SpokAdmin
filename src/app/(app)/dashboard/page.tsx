@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import DashboardCharts from "./DashboardCharts";
 import { isSuperAdmin } from "@/lib/roles";
 
@@ -18,27 +19,35 @@ export default async function DashboardPage() {
 
   const orgId = session.user.organizationId;
 
+  const cookieStore = await cookies();
+  const cookieAsocId = cookieStore.get("spokadmin-asoc")?.value;
+
   const asociatiiActive = await db.asociatie.findMany({
     where: { organizationId: orgId, isActive: true }, select: { id: true, wizardData: true },
   });
-  const asociatiiIds = asociatiiActive.map(a => a.id);
+
+  // Determină asociația activă din cookie; validează că aparține org-ului curent
+  const activeAsocId = (cookieAsocId && asociatiiActive.some(a => a.id === cookieAsocId))
+    ? cookieAsocId
+    : (asociatiiActive[0]?.id ?? null);
+
+  const asociatiiIds = activeAsocId ? [activeAsocId] : asociatiiActive.map(a => a.id);
 
   const [nrAsociatii, nrApartamente, nrProprietari, nrFacturiNeplatite] = await Promise.all([
     db.asociatie.count({ where: { organizationId: orgId, isActive: true } }),
-    db.apartament.count({ where: { organizationId: orgId, isActive: true } }),
-    // Numără doar proprietarii legați de cel puțin un apartament activ
+    db.apartament.count({ where: { asociatieId: { in: asociatiiIds }, isActive: true } }),
     db.proprietar.count({
       where: {
         organizationId: orgId,
-        apartamente: { some: { apartament: { isActive: true, organizationId: orgId } } },
+        apartamente: { some: { apartament: { isActive: true, asociatieId: { in: asociatiiIds } } } },
       },
     }),
-    db.factura.count({ where: { organizationId: orgId, status: "neplatita" } }),
+    db.factura.count({ where: { asociatieId: { in: asociatiiIds }, status: "neplatita" } }),
   ]);
 
   // Solduri / restanțe proprietari
   const soldAgg = await db.soldApartament.aggregate({
-    where: { apartament: { organizationId: orgId } },
+    where: { apartament: { asociatieId: { in: asociatiiIds } } },
     _sum:  { restantaIntretinere: true, intretinereCurenta: true },
   });
   const totalRestanteProp  = soldAgg._sum.restantaIntretinere ?? 0;
@@ -59,10 +68,10 @@ export default async function DashboardPage() {
       _sum:  { totalDePlata: true, achitat: true, rest: true, restantaVeche: true, totalLuna: true },
     }),
     db.listaLuna.aggregate({ where: { id: { in: ultimeleListe } }, _sum: { totalCheltuieli: true } }),
-    db.factura.aggregate({ where: { organizationId: orgId }, _sum: { valoare: true } }),
-    db.plata.aggregate({ where: { factura: { organizationId: orgId } }, _sum: { suma: true } }),
-    db.plata.groupBy({ by: ["metoda"], where: { factura: { organizationId: orgId } }, _sum: { suma: true } }),
-    db.incasare.groupBy({ by: ["tipPlata"], where: { organizationId: orgId }, _sum: { sumaIncasata: true } }),
+    db.factura.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { valoare: true } }),
+    db.plata.aggregate({ where: { factura: { asociatieId: { in: asociatiiIds } } }, _sum: { suma: true } }),
+    db.plata.groupBy({ by: ["metoda"], where: { factura: { asociatieId: { in: asociatiiIds } } }, _sum: { suma: true } }),
+    db.incasare.groupBy({ by: ["tipPlata"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sumaIncasata: true } }),
     db.fondApartament.aggregate({ where: { asociatieId: { in: asociatiiIds } }, _sum: { restanta: true } }),
     db.fondApartament.groupBy({ by: ["fondId"], where: { asociatieId: { in: asociatiiIds } }, _sum: { sold: true } }),
     db.fondAsociatie.findMany({ where: { asociatieId: { in: asociatiiIds }, isEnabled: true }, select: { id: true, name: true } }),
@@ -91,8 +100,9 @@ export default async function DashboardPage() {
   }
 
   // Valori la nivel de asociație (soldFondAsoc din wizardData) — sursă alternativă
+  const asociatiiForWizard = asociatiiActive.filter(a => asociatiiIds.includes(a.id));
   const soldAsocByFondId = new Map<string, number>();
-  for (const asoc of asociatiiActive) {
+  for (const asoc of asociatiiForWizard) {
     try {
       const wd = asoc.wizardData ? JSON.parse(asoc.wizardData) : {};
       if (!Array.isArray(wd.soldFondAsoc)) continue;
@@ -129,11 +139,11 @@ export default async function DashboardPage() {
   // Ultimele asociații / facturi pentru panourile de jos
   const [ultimeleAsociatii, ultimeleFacturi] = await Promise.all([
     db.asociatie.findMany({
-      where: { organizationId: orgId, isActive: true }, orderBy: { updatedAt: "desc" }, take: 5,
+      where: { id: { in: asociatiiIds }, isActive: true }, orderBy: { updatedAt: "desc" }, take: 5,
       include: { apartamente: { where: { isActive: true }, select: { id: true } } },
     }),
     db.factura.findMany({
-      where: { organizationId: orgId }, orderBy: { createdAt: "desc" }, take: 5,
+      where: { asociatieId: { in: asociatiiIds } }, orderBy: { createdAt: "desc" }, take: 5,
       include: { furnizor: { select: { nume: true } } },
     }),
   ]);
