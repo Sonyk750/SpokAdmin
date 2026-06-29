@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { canonicalFurnizorNume } from "@/lib/furnizor";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +25,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
 
     for (const item of restante ?? []) {
-      const numeT = item.furnizorNume?.trim();
+      const numeT = item.furnizorNume?.trim() ? canonicalFurnizorNume(item.furnizorNume) : "";
       const val   = parseFloat(item.restanta);
       if (!numeT || isNaN(val) || val === 0) continue;
 
