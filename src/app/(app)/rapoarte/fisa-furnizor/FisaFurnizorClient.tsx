@@ -82,19 +82,47 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Unificare furnizori (elimină duplicate) ───────────────────────────────
+  const [mergeOpen, setMergeOpen]         = useState(false);
+  const [mergeTargetId, setMergeTargetId] = useState("");
+  const [merging, setMerging]             = useState(false);
+
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
   }, [asociatieId]);
 
-  useEffect(() => {
+  const loadFurnizori = useCallback((keepId?: string) => {
     if (!asociatieId) { setFurnizori([]); setFurnizorId(""); return; }
-    fetch(`/api/furnizori?asociatieId=${asociatieId}`).then(r => r.json()).then((d: Furnizor[]) => {
+    return fetch(`/api/furnizori?asociatieId=${asociatieId}`).then(r => r.json()).then((d: Furnizor[]) => {
       const list = Array.isArray(d) ? d : [];
       setFurnizori(list);
-      setFurnizorId(prev => (prev && list.some(x => x.id === prev)) ? prev : (list[0]?.id ?? ""));
+      setFurnizorId(prev => {
+        const want = keepId ?? prev;
+        return (want && list.some(x => x.id === want)) ? want : (list[0]?.id ?? "");
+      });
     }).catch(() => setFurnizori([]));
   }, [asociatieId]);
+
+  useEffect(() => { void loadFurnizori(); }, [loadFurnizori]);
+
+  async function handleMerge() {
+    if (!furnizorId || !mergeTargetId || furnizorId === mergeTargetId) return;
+    setMerging(true); setError(null);
+    try {
+      const res  = await fetch("/api/furnizori/merge", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ sourceId: furnizorId, targetId: mergeTargetId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare la unificare");
+      const target = mergeTargetId;
+      setMergeOpen(false); setMergeTargetId("");
+      await loadFurnizori(target); // sursa dispare, selectăm furnizorul păstrat
+    } catch (e: any) { setError(e.message); }
+    finally { setMerging(false); }
+  }
 
   const fetchData = useCallback(async () => {
     if (!asociatieId || !furnizorId) { setFisa(null); return; }
@@ -167,10 +195,44 @@ export default function FisaFurnizorClient({ defaultStart, defaultEnd }: { defau
             <RoDate className="input" value={dataEnd} onChange={v => setDataEnd(v)} />
           </div>
           <button className="btn btn--secondary" onClick={fetchData} disabled={loading} style={{ alignSelf: "flex-end" }}>{loading ? "..." : "Actualizează"}</button>
+          {furnizori.length > 1 && (
+            <button className="btn btn--ghost" onClick={() => { setMergeTargetId(""); setMergeOpen(true); }} disabled={!furnizorId}
+              style={{ alignSelf: "flex-end" }} title="Unifică acest furnizor cu altul (elimină duplicatul)">
+              ⇄ Unifică
+            </button>
+          )}
         </div>
 
         {error && <div className="wizard__error">{error}</div>}
       </div>
+
+      {mergeOpen && (
+        <div className="modal-overlay" onClick={() => !merging && setMergeOpen(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "520px" }}>
+            <div className="modal__header"><h2 className="modal__title">Unifică furnizori</h2></div>
+            <div className="modal__body" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "#cbd5e1", lineHeight: 1.5 }}>
+                Muți furnizorul <strong style={{ color: "#f87171" }}>{furnizori.find(f => f.id === furnizorId)?.nume}</strong> în
+                furnizorul ales mai jos. Toate facturile, plățile și avansurile trec la el, iar duplicatul se dezactivează.
+                <br />Operația nu poate fi anulată automat.
+              </p>
+              <div className="form-field" style={{ marginBottom: 0 }}>
+                <label className="form-field__label">Păstrează (furnizorul corect)</label>
+                <select className="input" value={mergeTargetId} onChange={e => setMergeTargetId(e.target.value)}>
+                  <option value="">— alege furnizorul de păstrat —</option>
+                  {furnizori.filter(f => f.id !== furnizorId).map(f => (
+                    <option key={f.id} value={f.id}>{f.nume}{f.cui ? ` (${f.cui})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button className="btn btn--secondary" onClick={() => setMergeOpen(false)} disabled={merging}>Anulează</button>
+              <button className="btn btn--primary" onClick={handleMerge} disabled={merging || !mergeTargetId}>{merging ? "Se unifică..." : "Unifică"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {fisa && (
         <>
