@@ -1091,7 +1091,8 @@ export default function WizardClient({
           const clickable = n !== step && n <= maxStep;
           const handleStepClick = () => {
             if (!clickable) return;
-            silentSaveStep(step).catch(() => null).then(() => setStep(n));
+            setStep(n);
+            void silentSaveStep(step).catch(() => null);
           };
           return (
             <div
@@ -1347,7 +1348,7 @@ export default function WizardClient({
             </table>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(2).then(() => setStep(1)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(1); void silentSaveStep(2).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveApartamente} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1468,7 +1469,7 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(3).then(() => setStep(2)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(2); void silentSaveStep(3).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveProprietari} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1554,7 +1555,7 @@ export default function WizardClient({
             </table>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(4).then(() => setStep(3)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(3); void silentSaveStep(4).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSolduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1591,7 +1592,7 @@ export default function WizardClient({
             </button>
           </div>
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(5).then(() => setStep(4)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(4); void silentSaveStep(5).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1667,7 +1668,7 @@ export default function WizardClient({
             </div>
           )}
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(6).then(() => setStep(5)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(5); void silentSaveStep(6).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1819,7 +1820,7 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(7).then(() => setStep(6)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(6); void silentSaveStep(7).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSolduriContribFonduri} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -1924,7 +1925,7 @@ export default function WizardClient({
           )}
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(8).then(() => setStep(7)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(7); void silentSaveStep(8).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveRestanteFurnizori} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
@@ -2006,7 +2007,7 @@ export default function WizardClient({
           </div>
 
           <div className="wizard__footer">
-            <button className="btn btn--secondary" onClick={() => { silentSaveStep(9).then(() => setStep(8)); }}>← Înapoi</button>
+            <button className="btn btn--secondary" onClick={() => { setStep(8); void silentSaveStep(9).catch(() => null); }}>← Înapoi</button>
             <button className="btn btn--primary" onClick={saveSoldInitial} disabled={saving}>{saving ? "Se salvează..." : "Continuă →"}</button>
           </div>
         </div>
