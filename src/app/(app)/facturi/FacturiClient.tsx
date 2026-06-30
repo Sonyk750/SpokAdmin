@@ -38,7 +38,7 @@ interface FacturaRow {
   spvId?:         string | null;   // factură importată din SPV → legătură la documentul ANAF
 }
 
-interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; }
+interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; idTranzactie: string | null; serieCh: string | null; nrCh: number | null; }
 interface AvansMiscareRow { id: string; suma: number; tip: string; data: string; notes: string | null; plataId: string | null; }
 interface PlataData {
   valoare: number; acoperit: number; rest: number; status: string; avansSold: number;
@@ -285,7 +285,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
   // ── Plată state ─────────────────────────────────────────────────────────────
   const [plataData,   setPlataData]   = useState<PlataData | null>(null);
-  const [plataForm,   setPlataForm]   = useState({ suma: "", metoda: "banca", fondId: "", data: todayISO(), notes: "" });
+  const [plataForm,   setPlataForm]   = useState({ suma: "", metoda: "banca", fondId: "", data: todayISO(), notes: "", idTranzactie: "", serieCh: "", nrCh: "" });
   const [fonduriList, setFonduriList] = useState<{ id: string; name: string; sold: number }[]>([]);
   const [plataLoading,setPlataLoading]= useState(false);
   const [plataSaving, setPlataSaving] = useState(false);
@@ -514,7 +514,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       .catch(() => setFonduriList([]));
     const data = await loadPlataData(f.id);
     const totalDatorat = data?.totalDatoratFurnizor ?? data?.rest ?? 0;
-    setPlataForm({ suma: totalDatorat > 0 ? String(totalDatorat) : "", metoda: "banca", fondId: "", data: todayISO(), notes: "" });
+    setPlataForm({ suma: totalDatorat > 0 ? String(totalDatorat) : "", metoda: "banca", fondId: "", data: todayISO(), notes: "", idTranzactie: "", serieCh: "", nrCh: "" });
   }
 
   async function submitPlata() {
@@ -527,12 +527,21 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     try {
       const res = await fetch(`/api/facturi/${selected.id}/plati`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ suma, metoda: plataForm.metoda, fondId: plataForm.fondId || undefined, data: plataForm.data || undefined, notes: plataForm.notes.trim() || undefined }),
+        body: JSON.stringify({
+          suma,
+          metoda:       plataForm.metoda,
+          fondId:       plataForm.fondId || undefined,
+          data:         plataForm.data || undefined,
+          notes:        plataForm.notes.trim() || undefined,
+          idTranzactie: plataForm.metoda === "banca" ? (plataForm.idTranzactie.trim() || undefined) : undefined,
+          serieCh:      plataForm.metoda === "casa"  ? (plataForm.serieCh.trim() || undefined) : undefined,
+          nrCh:         plataForm.metoda === "casa"  ? (parseInt(plataForm.nrCh) || undefined) : undefined,
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
       await loadPlataData(selected.id);
-      setPlataForm(prev => ({ ...prev, suma: "", notes: "" }));
+      setPlataForm(prev => ({ ...prev, suma: "", notes: "", idTranzactie: "", serieCh: "", nrCh: "" }));
       fetchFacturi();
     } catch (e: any) {
       setPlataErr(e.message);
@@ -1191,29 +1200,41 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                       {METODE.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                     </select>
                   </div>
-                  <div className="form-field">
-                    <label className="form-field__label">Fond</label>
-                    <select className="input" value={plataForm.fondId} onChange={e => setPlataForm(p => ({ ...p, fondId: e.target.value }))}>
-                      <option value="">— fără fond —</option>
-                      {fonduriList.map(f => {
-                        const insuf = f.sold <= 0;
-                        return (
-                          <option key={f.id} value={f.id} style={insuf ? { color: "#f87171" } : undefined}>
-                            {insuf ? "⚠ " : ""}{f.name} ({f.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} lei)
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {(() => {
-                      const sel = fonduriList.find(f => f.id === plataForm.fondId);
-                      if (!sel || sel.sold > 0) return null;
-                      return (
-                        <p style={{ color: "#f87171", fontSize: "0.78rem", marginTop: "0.3rem" }}>
-                          Fondul &quot;{sel.name}&quot; nu are sold disponibil ({sel.sold.toLocaleString("ro-RO", { minimumFractionDigits: 2 })} lei) — plata nu este posibilă.
-                        </p>
-                      );
-                    })()}
-                  </div>
+
+                  {/* Câmp specific metodei */}
+                  {plataForm.metoda === "banca" && (
+                    <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                      <label className="form-field__label">ID Tranzacție</label>
+                      <input type="text" className="input" placeholder="ex: OP-2025-0042"
+                        value={plataForm.idTranzactie}
+                        onChange={e => setPlataForm(p => ({ ...p, idTranzactie: e.target.value }))} />
+                    </div>
+                  )}
+                  {plataForm.metoda === "casa" && (<>
+                    <div className="form-field">
+                      <label className="form-field__label">Serie chitanță</label>
+                      <input type="text" className="input" placeholder="ex: CH"
+                        value={plataForm.serieCh}
+                        onChange={e => setPlataForm(p => ({ ...p, serieCh: e.target.value }))} />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-field__label">Nr chitanță</label>
+                      <input type="number" className="input" min="1" step="1" placeholder="ex: 5"
+                        value={plataForm.nrCh}
+                        onChange={e => setPlataForm(p => ({ ...p, nrCh: e.target.value }))} />
+                    </div>
+                  </>)}
+
+                  {/* Fond — doar dacă factura a fost alocată pe un fond */}
+                  {selected.fondId && (
+                    <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                      <label className="form-field__label">Fond alocat</label>
+                      <input type="text" className="input" readOnly
+                        value={selected.fondName ?? selected.fondId}
+                        style={{ color: "#94a3b8", cursor: "default" }} />
+                    </div>
+                  )}
+
                   <div className="form-field">
                     <label className="form-field__label">Data</label>
                     <RoDate value={plataForm.data} onChange={v => setPlataForm(p => ({ ...p, data: v }))} />
@@ -1252,7 +1273,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                           {plataData.plati.map(p => (
                             <tr key={p.id}>
                               <td style={{ color: "#94a3b8", whiteSpace: "nowrap" }}>{new Date(p.data).toLocaleDateString("ro-RO")}</td>
-                              <td>Plată · {metodaLabel(p.metoda)}{p.fondName ? ` · ${p.fondName}` : ""}{p.notes ? ` — ${p.notes}` : ""}</td>
+                              <td>Plată · {metodaLabel(p.metoda)}{p.fondName ? ` · ${p.fondName}` : ""}{p.idTranzactie ? ` · ${p.idTranzactie}` : ""}{p.serieCh && p.nrCh != null ? ` · ${p.serieCh} ${p.nrCh}` : ""}{p.notes ? ` — ${p.notes}` : ""}</td>
                               <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80" }}>{fmt2(p.suma)}</td>
                               <td style={{ textAlign: "right" }}>
                                 <button className="btn-action btn-action--danger" title="Anulează plata" onClick={() => deletePlata(p.id)}>×</button>

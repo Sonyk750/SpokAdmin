@@ -450,15 +450,18 @@ model FacturaPdf {
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PlÃ„Æ’Ãˆâ€ºi facturi Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 model Plata {
-  id        String   @id @default(cuid())
-  facturaId String
-  suma      Float
-  data      DateTime @default(now())
-  metoda    String   @default("banca") // casa / banca / online (sursa banilor)
-  fondId    String? // fondul din care se plătește (reparații / rulment / penalități ...)
-  fondName  String? // snapshot nume fond
-  notes     String?
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  facturaId     String
+  suma          Float
+  data          DateTime @default(now())
+  metoda        String   @default("banca") // casa / banca / online (sursa banilor)
+  fondId        String?  // fondul din care se plătește
+  fondName      String?  // snapshot nume fond
+  notes         String?
+  idTranzactie  String?  // pentru plăți prin bancă
+  serieCh       String?  // pentru plăți prin casă (serie chitanță)
+  nrCh          Int?     // pentru plăți prin casă (număr chitanță)
+  createdAt     DateTime @default(now())
 
   factura      Factura                @relation(fields: [facturaId], references: [id], onDelete: Cascade)
   fond         FondAsociatie?         @relation(fields: [fondId], references: [id], onDelete: SetNull)

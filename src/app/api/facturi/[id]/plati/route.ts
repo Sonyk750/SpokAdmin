@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     where:  { id, organizationId: orgId },
     select: {
       id: true, valoare: true, status: true, furnizorId: true, asociatieId: true,
-      plati:        { select: { id: true, suma: true, data: true, metoda: true, fondName: true, notes: true }, orderBy: { data: "asc" } },
+      plati:        { select: { id: true, suma: true, data: true, metoda: true, fondName: true, notes: true, idTranzactie: true, serieCh: true, nrCh: true }, orderBy: { data: "asc" } },
       avansMiscari: { select: { id: true, suma: true, tip: true, data: true, notes: true, plataId: true }, orderBy: { data: "asc" } },
     },
   });
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { id } = await params;
-  const body = await req.json() as { suma?: number; metoda?: string; fondId?: string | null; data?: string | null; notes?: string | null };
+  const body = await req.json() as { suma?: number; metoda?: string; fondId?: string | null; data?: string | null; notes?: string | null; idTranzactie?: string | null; serieCh?: string | null; nrCh?: number | null };
 
   const suma = Number(body.suma);
   if (!suma || isNaN(suma) || suma <= 0)
@@ -117,13 +117,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const result = await db.$transaction(async (tx) => {
     const plata = await tx.plata.create({
       data: {
-        facturaId: factura.id,
-        suma:      r2(suma),
+        facturaId:    factura.id,
+        suma:         r2(suma),
         metoda,
         fondId,
         fondName,
-        data:      body.data ? new Date(body.data) : new Date(),
-        notes:     body.notes?.trim() || null,
+        data:         body.data ? new Date(body.data) : new Date(),
+        notes:        body.notes?.trim() || null,
+        idTranzactie: metoda === "banca" ? (body.idTranzactie?.trim() || null) : null,
+        serieCh:      metoda === "casa"  ? (body.serieCh?.trim() || null) : null,
+        nrCh:         metoda === "casa"  ? (body.nrCh ?? null) : null,
       },
       select: { id: true },
     });
