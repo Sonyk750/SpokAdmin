@@ -25,7 +25,7 @@ interface Data {
 interface Banca { name: string; iban?: string; }
 interface AsocInfo {
   name: string; address: string | null; city: string | null; sector: string | null;
-  cui: string | null; banci: Banca[];
+  cui: string | null; phone: string | null; email: string | null; banci: Banca[];
   adminName: string | null; presedinteName: string | null; cenzorName: string | null;
 }
 
@@ -69,89 +69,114 @@ function buildDocDef(data: Data, asoc: AsocInfo | null) {
   const adresa = [asoc?.address, asoc?.sector ? `Sector ${asoc.sector}` : null, asoc?.city]
     .filter(Boolean).join(", ");
   const banca = asoc?.banci?.[0];
+  const contact = [
+    asoc?.cui   ? `CUI: ${asoc.cui}`     : null,
+    asoc?.phone ? `Tel: ${asoc.phone}`   : null,
+    asoc?.email ? `Email: ${asoc.email}` : null,
+  ].filter(Boolean).join("   |   ");
   const bancaLine = banca ? [banca.name, banca.iban].filter(Boolean).join(": ") : "";
 
   const head = [
-    { text: "Cheltuiala", bold: true },
-    { text: "Numărul facturii", bold: true, alignment: "center" },
-    { text: "Data facturii", bold: true, alignment: "center" },
-    { text: "Suma", bold: true, alignment: "right" },
-    { text: "Împărțită la", bold: true, alignment: "right" },
-    { text: "Valoare pe unitate", bold: true, alignment: "right" },
+    { text: "Cheltuiala",         style: "th" },
+    { text: "Numărul\nfacturii",  style: "th", alignment: "center" },
+    { text: "Data\nfacturii",     style: "th", alignment: "center" },
+    { text: "Suma\n(lei)",        style: "th", alignment: "right" },
+    { text: "Împărțită\nla",      style: "th", alignment: "right" },
+    { text: "Valoare pe\nunitate", style: "th", alignment: "right" },
   ];
 
-  const body: any[] = [head];
+  const body: any[][] = [head];
 
   for (const sect of data.sectiuni) {
     body.push([
-      { text: sect.titlu, bold: true, colSpan: 3, fillColor: "#E4E4E4" }, {}, {},
-      { text: fmtNr(sect.subtotal), bold: true, alignment: "right", fillColor: "#E4E4E4" },
+      { text: sect.titlu, bold: true, fontSize: 8, colSpan: 3, fillColor: "#E4E4E4" }, {}, {},
+      { text: fmtNr(sect.subtotal), bold: true, fontSize: 8, alignment: "right", fillColor: "#E4E4E4" },
       { text: "", fillColor: "#E4E4E4" },
       { text: "", fillColor: "#E4E4E4" },
     ]);
     for (const l of sect.linii) {
       body.push([
-        { text: l.label, margin: [8, 0, 0, 0] },
-        { text: l.facturaNumar, alignment: "center", color: "#444" },
-        { text: fmtDateIso(l.facturaData), alignment: "center", color: "#444" },
-        { text: fmtNr(l.suma), alignment: "right" },
-        { text: fmtDiv(l), alignment: "right", color: "#444" },
-        { text: l.perUnit != null ? `${fmtNr(l.perUnit)} ${l.unitate}` : "", alignment: "right" },
+        { text: l.label, fontSize: 8, margin: [8, 0, 0, 0] },
+        { text: l.facturaNumar, fontSize: 8, alignment: "center", color: "#444" },
+        { text: fmtDateIso(l.facturaData), fontSize: 8, alignment: "center", color: "#444" },
+        { text: fmtNr(l.suma), fontSize: 8, alignment: "right" },
+        { text: fmtDiv(l), fontSize: 8, alignment: "right", color: "#444" },
+        { text: l.perUnit != null ? `${fmtNr(l.perUnit)} ${l.unitate}` : "", fontSize: 8, alignment: "right" },
       ]);
     }
   }
 
   body.push([
-    { text: "TOTAL CHELTUIELI", bold: true, colSpan: 3, fillColor: "#CFCFCF" }, {}, {},
-    { text: fmtNr(data.total), bold: true, alignment: "right", fillColor: "#CFCFCF" },
-    { text: "", fillColor: "#CFCFCF" },
-    { text: "", fillColor: "#CFCFCF" },
+    { text: "TOTAL CHELTUIELI", bold: true, fontSize: 9, colSpan: 3, alignment: "right",
+      border: [true, true, false, true] }, {}, {},
+    { text: fmtNr(data.total), bold: true, fontSize: 9, alignment: "right" },
+    { text: "", border: [false, true, false, true] },
+    { text: "", border: [false, true, true, true] },
   ]);
 
   return {
     pageSize: "A4",
-    pageMargins: [32, 36, 32, 70],
+    pageOrientation: "portrait",
+    pageMargins: [30, 40, 30, 70],
     content: [
-      { text: asoc?.name ?? data.asociatie.name, bold: true, fontSize: 12 },
-      adresa ? { text: adresa, fontSize: 9, margin: [0, 1, 0, 0] } : {},
-      asoc?.cui ? { text: `Cod fiscal: ${asoc.cui}`, fontSize: 9, margin: [0, 1, 0, 0] } : {},
-      bancaLine ? { text: bancaLine, fontSize: 9, margin: [0, 1, 0, 0] } : {},
       {
-        text: `Explicațiile cheltuielilor pe luna ${LUNI[data.luna - 1]} ${data.an}`,
-        bold: true, fontSize: 12, alignment: "center", margin: [0, 12, 0, 8],
+        columns: [
+          {
+            stack: [
+              { text: asoc?.name ?? data.asociatie.name, bold: true, fontSize: 13 },
+              adresa    ? { text: adresa,    fontSize: 9, color: "#333", margin: [0, 2, 0, 0] } : {},
+              contact   ? { text: contact,   fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
+              bancaLine ? { text: bancaLine, fontSize: 8, color: "#555", margin: [0, 2, 0, 0] } : {},
+            ],
+            width: "*",
+          },
+          {
+            stack: [
+              { text: "Perioada", fontSize: 9, color: "#666" },
+              { text: `${LUNI[data.luna - 1]} ${data.an}`, bold: true, fontSize: 10 },
+            ],
+            width: "auto",
+            alignment: "right",
+          },
+        ],
       },
+      { canvas: [{ type: "line", x1: 0, y1: 6, x2: 535, y2: 6, lineWidth: 1.5, lineColor: "#222" }], margin: [0, 4, 0, 0] },
+      { text: "EXPLICAȚIILE CHELTUIELILOR", style: "title", alignment: "center", margin: [0, 14, 0, 14] },
       {
-        table: { headerRows: 1, widths: ["*", 72, 56, 60, 64, 80], body },
+        table: { headerRows: 1, widths: ["*", 58, 52, 56, 60, 78], body },
         layout: {
-          hLineWidth: () => 0.4,
-          vLineWidth: () => 0.4,
+          fillColor: (rowIndex: number) =>
+            rowIndex === 0 ? "#DDDDDD" : rowIndex % 2 === 1 ? "#F5F5F5" : null,
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
           hLineColor: () => "#999",
           vLineColor: () => "#999",
-          paddingTop: () => 2,
-          paddingBottom: () => 2,
-          paddingLeft: () => 4,
-          paddingRight: () => 4,
+          paddingTop:    () => 3,
+          paddingBottom: () => 3,
+          paddingLeft:   () => 4,
+          paddingRight:  () => 4,
         },
       },
     ],
     footer: () => ({
-      margin: [32, 8, 32, 0],
-      columns: [
-        { stack: [
-          { text: "PREȘEDINTE", bold: true, fontSize: 8, alignment: "center" },
-          { text: asoc?.presedinteName ?? "", fontSize: 8, alignment: "center", margin: [0, 10, 0, 0] },
-        ], width: "*" },
-        { stack: [
-          { text: "ADMINISTRATOR", bold: true, fontSize: 8, alignment: "center" },
-          { text: asoc?.adminName ?? "", fontSize: 8, alignment: "center", margin: [0, 10, 0, 0] },
-        ], width: "*" },
-        { stack: [
-          { text: "CENZOR", bold: true, fontSize: 8, alignment: "center" },
-          { text: asoc?.cenzorName ?? "", fontSize: 8, alignment: "center", margin: [0, 10, 0, 0] },
-        ], width: "*" },
+      margin: [30, 10, 30, 0],
+      stack: [
+        { canvas: [{ type: "line", x1: 0, y1: 0, x2: 535, y2: 0, lineWidth: 0.5, lineColor: "#aaa" }] },
+        {
+          margin: [0, 8, 0, 0],
+          columns: [
+            { stack: [{ text: "ADMINISTRATOR", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.adminName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+            { stack: [{ text: "CENZOR", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.cenzorName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+            { stack: [{ text: "PREȘEDINTE", bold: true, fontSize: 8, alignment: "center" }, { canvas: [{ type: "line", x1: 10, y1: 20, x2: 130, y2: 20, lineWidth: 0.5 }] }, { text: asoc?.presedinteName ?? "", fontSize: 8, alignment: "center", margin: [0, 4, 0, 0] }], width: "*", alignment: "center" },
+          ],
+        },
       ],
     }),
-    defaultStyle: { fontSize: 9 },
+    styles: {
+      title: { fontSize: 15, bold: true, characterSpacing: 1 },
+      th:    { bold: true, fontSize: 9 },
+    },
+    defaultStyle: { font: "Roboto", fontSize: 8 },
   };
 }
 
