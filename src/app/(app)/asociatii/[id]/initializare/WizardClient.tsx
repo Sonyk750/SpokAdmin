@@ -587,6 +587,13 @@ export default function WizardClient({
   }, [fonduri, apartamente]);
 
   const saveSoldFonduri = useCallback(async () => {
+    // Dacă există valori introduse dar fondId / apartamentId lipsesc → stare invalidă
+    const rowsWithData = soldFonduri.filter(sf => sf.restanta && parseFloat(sf.restanta) !== 0);
+    const missingIds   = rowsWithData.some(sf => !sf.fondId || !sf.apartamentId);
+    if (missingIds) {
+      setError("Eroare internă: IDs fonduri lipsă. Revino la pasul 5 și salvează fondurile din nou.");
+      return;
+    }
     setSaving(true); setError(null);
     try {
       await api("sold-fonduri", { soldFonduri });
@@ -1680,11 +1687,20 @@ export default function WizardClient({
                       <td style={{ color: "#a78bfa", fontWeight: 700 }}>{ap.numar}</td>
                       <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{prop?.numeComplet || "—"}</td>
                       {fondActive.map(f => {
-                        const gi = soldFonduri.findIndex(sf => sf.numar===ap.numar && sf.fondName===f.name);
+                        const sfMatch = (sf: SoldFondRow) =>
+                          (ap.id && f.id) ? sf.apartamentId === ap.id && sf.fondId === f.id
+                                          : sf.numar === ap.numar && sf.fondName === f.name;
+                        const sfRow = soldFonduri.find(sfMatch);
                         return (
                           <td key={f.id??f.name} style={{ textAlign: "right" }}>
-                            <input type="number" className="input input--sm" value={soldFonduri[gi]?.restanta ?? ""}
-                              onChange={e => gi>=0 && setSoldFonduri(prev=>prev.map((s,j)=>j===gi?{...s,restanta:e.target.value}:s))}
+                            <input type="number" className="input input--sm" value={sfRow?.restanta ?? ""}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setSoldFonduri(prev => {
+                                  const idx = prev.findIndex(sfMatch);
+                                  return idx < 0 ? prev : prev.map((s, j) => j === idx ? { ...s, restanta: val } : s);
+                                });
+                              }}
                               style={{ width: "110px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
                           </td>
                         );
@@ -1829,11 +1845,20 @@ export default function WizardClient({
                           <td style={{ color: "#a78bfa", fontWeight: 700 }}>{ap.numar}</td>
                           <td style={{ color: "#94a3b8", fontSize: "0.8125rem" }}>{prop?.numeComplet || "—"}</td>
                           {fondActive.map(f => {
-                            const gi = soldContribFonduri.findIndex(sf => sf.numar === ap.numar && sf.fondName === f.name);
+                            const scMatch = (sf: SoldContribFondRow) =>
+                              (ap.id && f.id) ? sf.apartamentId === ap.id && sf.fondId === f.id
+                                              : sf.numar === ap.numar && sf.fondName === f.name;
+                            const scRow = soldContribFonduri.find(scMatch);
                             return (
                               <td key={f.id ?? f.name} style={{ textAlign: "right" }}>
-                                <input type="number" className="input input--sm" value={soldContribFonduri[gi]?.sold ?? ""}
-                                  onChange={e => gi >= 0 && setSoldContribFonduri(prev => prev.map((s, j) => j === gi ? { ...s, sold: e.target.value } : s))}
+                                <input type="number" className="input input--sm" value={scRow?.sold ?? ""}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setSoldContribFonduri(prev => {
+                                      const idx = prev.findIndex(scMatch);
+                                      return idx < 0 ? prev : prev.map((s, j) => j === idx ? { ...s, sold: val } : s);
+                                    });
+                                  }}
                                   style={{ width: "110px", textAlign: "right" }} step="0.01" min={0} placeholder="" />
                               </td>
                             );
