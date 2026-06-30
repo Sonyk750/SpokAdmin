@@ -102,9 +102,12 @@ export async function GET(req: NextRequest) {
       restantaFonduri[fond.id] = fa?.restanta ?? 0;
     }
 
-    const restantaIntretinere = (sold?.restantaIntretinere ?? 0) + (sold?.intretinereCurenta ?? 0);
+    const restantaRaw = sold?.restantaIntretinere ?? 0;
+    const curentaRaw = sold?.intretinereCurenta ?? 0;
+    const restantaIntretinere = Math.max(0, restantaRaw) + Math.max(0, curentaRaw);
+    const avansIntretinere = Math.max(0, -restantaRaw) + Math.max(0, -curentaRaw);
     const totalFonduri = Object.values(restantaFonduri).reduce((s, v) => s + v, 0);
-    const total = restantaIntretinere + totalFonduri;
+    const total = restantaIntretinere - avansIntretinere + totalFonduri;
 
     return {
       apartamentId: ap.id, numar: ap.numar,
@@ -114,6 +117,7 @@ export async function GET(req: NextRequest) {
       cheltuieli:          {} as Record<string, number>,
       totalLuna:           0,
       restantaIntretinere,
+      avansIntretinere,
       totalFonduri,
       restantaFonduri,
       total,
@@ -193,7 +197,7 @@ export async function GET(req: NextRequest) {
   for (const row of rows) {
     row.cheltuieli = colPerAp[row.apartamentId] ?? {};
     row.totalLuna  = Object.values(row.cheltuieli).reduce((s, v) => s + v, 0);
-    row.total      = row.totalLuna + row.restantaIntretinere + row.totalFonduri;
+    row.total      = row.totalLuna + row.restantaIntretinere - row.avansIntretinere + row.totalFonduri;
   }
 
   const hasTotalLuna = rows.some(r => r.totalLuna > 0);
@@ -218,6 +222,7 @@ export async function GET(req: NextRequest) {
     consumuri,
     cheltuieli,
     hasRestantaIntretinere: rows.some(r => r.restantaIntretinere > 0),
+    hasAvansIntretinere:    rows.some(r => r.avansIntretinere > 0),
     fonduri:                fonduri.filter(f => rows.some(r => (r.restantaFonduri[f.id] ?? 0) > 0)),
     hasTotalLuna,
   };

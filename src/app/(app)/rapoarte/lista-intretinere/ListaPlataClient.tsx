@@ -22,6 +22,7 @@ interface Coloane {
   consumuri:              ConturCol[];
   cheltuieli:             CheltuialaCol[];
   hasRestantaIntretinere: boolean;
+  hasAvansIntretinere:    boolean;
   fonduri:                FondCol[];
   hasTotalLuna:           boolean;
 }
@@ -37,6 +38,7 @@ interface Row {
   cheltuieli:          Record<string, number>;
   totalLuna:           number;
   restantaIntretinere: number;
+  avansIntretinere:    number;
   totalFonduri:        number;
   restantaFonduri:     Record<string, number>;
   total:               number;
@@ -255,6 +257,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
 
   const fixedEndCount = coloane
     ? (coloane.hasRestantaIntretinere ? 1 : 0)
+      + (coloane.hasAvansIntretinere ? 1 : 0)
       + (coloane.fonduri.length > 0 ? (fondMode === "total" ? 1 : coloane.fonduri.length) : 0)
       + 1
     : 1;
@@ -282,6 +285,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   }
 
   const totRestanta     = rows.reduce((s, r) => s + r.restantaIntretinere, 0);
+  const totAvans        = rows.reduce((s, r) => s + r.avansIntretinere, 0);
   const totTotalFonduri = rows.reduce((s, r) => s + r.totalFonduri, 0);
   const totTotal        = rows.reduce((s, r) => s + r.total, 0);
   const totPerFond: Record<string, number> = {};
@@ -341,7 +345,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
 
   const hasFonduri         = (coloane?.fonduri.length ?? 0) > 0;
   const showGroupHeader    = coloane && (consumGroupSpan > 0 || movCols.length > 0 ||
-    coloane.hasRestantaIntretinere || hasFonduri);
+    coloane.hasRestantaIntretinere || coloane.hasAvansIntretinere || hasFonduri);
 
   return (
     <div className="page-shell">
@@ -472,9 +476,10 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                         </th>
                       )}
 
-                      {(coloane.hasRestantaIntretinere || hasFonduri) && (
+                      {(coloane.hasRestantaIntretinere || coloane.hasAvansIntretinere || hasFonduri) && (
                         <th colSpan={
                           (coloane.hasRestantaIntretinere ? 1 : 0) +
+                          (coloane.hasAvansIntretinere ? 1 : 0) +
                           (hasFonduri ? (fondMode === "total" ? 1 : coloane.fonduri.length) : 0)
                         } className="lp-th-group lp-th-group--rest">
                           Restanțe
@@ -537,6 +542,9 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                     {coloane.hasRestantaIntretinere && (
                       <th className="lp-th--num lp-th--rest">Restanță întreținere</th>
                     )}
+                    {coloane.hasAvansIntretinere && (
+                      <th className="lp-th--num lp-th--rest">Avans întreținere</th>
+                    )}
                     {hasFonduri && fondMode === "total" && (
                       <th className="lp-th--num lp-th--rest">Restanță fonduri</th>
                     )}
@@ -593,6 +601,11 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                           {fmt2(row.restantaIntretinere)}
                         </td>
                       )}
+                      {coloane.hasAvansIntretinere && (
+                        <td className="lp-td--num">
+                          {row.avansIntretinere > 0 ? `-${fmt2(row.avansIntretinere)}` : ""}
+                        </td>
+                      )}
                       {hasFonduri && fondMode === "total" && (
                         <td className={`lp-td--num${row.totalFonduri > 0 ? " lp-td--red" : ""}`}>
                           {fmt2(row.totalFonduri)}
@@ -633,6 +646,9 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                     ))}
                     {coloane.hasRestantaIntretinere && (
                       <td className="lp-td--num lp-tfoot__val lp-td--red">{fmt2(totRestanta)}</td>
+                    )}
+                    {coloane.hasAvansIntretinere && (
+                      <td className="lp-td--num lp-tfoot__val">{totAvans > 0 ? `-${fmt2(totAvans)}` : ""}</td>
                     )}
                     {hasFonduri && fondMode === "total" && (
                       <td className="lp-td--num lp-tfoot__val lp-td--red">{fmt2(totTotalFonduri)}</td>

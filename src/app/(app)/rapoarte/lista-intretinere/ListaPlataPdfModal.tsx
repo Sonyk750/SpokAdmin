@@ -12,14 +12,15 @@ interface CheltuialaCol { key: string; label: string; criteriu: string | null; }
 interface Coloane {
   nrPersone: boolean; cotaParte: boolean; suprafata: boolean;
   consumuri: ConturCol[]; cheltuieli: CheltuialaCol[];
-  hasRestantaIntretinere: boolean; fonduri: FondCol[]; hasTotalLuna: boolean;
+  hasRestantaIntretinere: boolean; hasAvansIntretinere: boolean;
+  fonduri: FondCol[]; hasTotalLuna: boolean;
 }
 
 interface Row {
   apartamentId: string; numar: string; proprietar: string;
   nrPersone: number; cotaParte: number | null; suprafata: number | null;
   consumByTip: Record<string, number>; cheltuieli: Record<string, number>;
-  totalLuna: number; restantaIntretinere: number; totalFonduri: number;
+  totalLuna: number; restantaIntretinere: number; avansIntretinere: number; totalFonduri: number;
   restantaFonduri: Record<string, number>; total: number;
 }
 
@@ -158,7 +159,7 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
     consumLeiViz,
     cheltViz,
     showTotalLuna: coloane.hasTotalLuna,
-    showRestanta: coloane.hasRestantaIntretinere,
+    showRestanta: coloane.hasRestantaIntretinere || coloane.hasAvansIntretinere,
     showFonduri: coloane.fonduri.length > 0,
     fondMode,
     fondViz,
@@ -222,6 +223,8 @@ function buildDocDef(
   }
   if (coloane.hasRestantaIntretinere && opts.showRestanta)
     cols.push({ label: "Rest.\nîntrețin.", al: "right", wt: W_NUM });
+  if (coloane.hasAvansIntretinere && opts.showRestanta)
+    cols.push({ label: "Avans\nintretin.", al: "right", wt: W_NUM });
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total")
       cols.push({ label: "Fond.\nrest.", al: "right", wt: W_NUM });
@@ -301,6 +304,11 @@ function buildDocDef(
       cells.push(cell(v ? fmt2(v) : "", "right", false, v > 0 ? "#b91c1c" : undefined));
     }
 
+    if (coloane.hasAvansIntretinere && opts.showRestanta) {
+      const v = row.avansIntretinere;
+      cells.push(cell(v ? `-${fmt2(v)}` : "", "right"));
+    }
+
     if (coloane.fonduri.length > 0 && opts.showFonduri) {
       if (opts.fondMode === "total") {
         const v = row.totalFonduri;
@@ -364,6 +372,10 @@ function buildDocDef(
   if (coloane.hasRestantaIntretinere && opts.showRestanta) {
     const t = rows.reduce((s, r) => s + r.restantaIntretinere, 0);
     totRow.push({ text: fmt2(t), alignment: "right", bold: true, fontSize: fs, color: "#b91c1c" });
+  }
+  if (coloane.hasAvansIntretinere && opts.showRestanta) {
+    const t = rows.reduce((s, r) => s + r.avansIntretinere, 0);
+    totRow.push({ text: t ? `-${fmt2(t)}` : "", alignment: "right", bold: true, fontSize: fs });
   }
 
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
@@ -895,7 +907,7 @@ export default function ListaPlataPdfModal({
               </>
             )}
 
-            {coloane.hasRestantaIntretinere && (
+            {(coloane.hasRestantaIntretinere || coloane.hasAvansIntretinere) && (
               <>
                 <div style={{ fontSize: "0.7rem", color: "#64748b", margin: "0.6rem 0 0.3rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   Restanțe
@@ -910,7 +922,7 @@ export default function ListaPlataPdfModal({
 
             {hasFonduri && (
               <>
-                {!coloane.hasRestantaIntretinere && (
+                {!(coloane.hasRestantaIntretinere || coloane.hasAvansIntretinere) && (
                   <div style={{ fontSize: "0.7rem", color: "#64748b", margin: "0.6rem 0 0.3rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Fonduri
                   </div>
