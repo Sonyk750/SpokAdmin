@@ -548,16 +548,24 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr", gap: "1rem" }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Data încasării</label>
-                  <input type="date" className="input" value={dataDoc} onChange={e => setDataDoc(e.target.value)} />
+                  <input type="date" className="input" value={dataDoc}
+                    onChange={e => setDataDoc(e.target.value)}
+                    onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                  />
                 </div>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Tip document</label>
-                  <select className="input" value={tipDocument} onChange={e => setTipDocument(e.target.value)}>
-                    {whereCollect !== "casa" && <option value="extras_cont">Extras de cont</option>}
-                    <option value="chitanta">Chitanță</option>
-                    <option value="dispozitie_incasare">Dispoziție de încasare</option>
-                    <option value="proces_verbal">Proces verbal</option>
-                  </select>
+                  {whereCollect !== "casa" ? (
+                    <div className="input" style={{ color: "#a78bfa", display: "flex", alignItems: "center", cursor: "default" }}>
+                      Extras de cont
+                    </div>
+                  ) : (
+                    <select className="input" value={tipDocument} onChange={e => setTipDocument(e.target.value)}>
+                      <option value="chitanta">Chitanță</option>
+                      <option value="dispozitie_incasare">Dispoziție de încasare</option>
+                      <option value="proces_verbal">Proces verbal</option>
+                    </select>
+                  )}
                 </div>
                 {whereCollect === "casa" ? (
                   <div className="form-field" style={{ marginBottom: 0 }}>
@@ -1001,7 +1009,10 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Data</label>
-                      <input type="date" className="input" value={editData} onChange={e => setEditData(e.target.value)} />
+                      <input type="date" className="input" value={editData}
+                        onChange={e => setEditData(e.target.value)}
+                        onClick={e => { try { (e.currentTarget as any).showPicker?.(); } catch {} }}
+                      />
                     </div>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Tip document</label>
