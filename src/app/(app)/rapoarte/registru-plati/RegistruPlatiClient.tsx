@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import { useAccess } from "@/lib/AccessContext";
 import RoDate from "@/components/RoDate";
 
 interface PlataRow {
@@ -109,6 +110,7 @@ async function generateAndDownloadPdf(asoc: AsocInfo | null, rows: PlataRow[], d
 
 export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defaultStart: string; defaultEnd: string }) {
   const { activeId: asociatieId } = useAsociatie();
+  const { isAdmin } = useAccess();
 
   const [asoc, setAsoc] = useState<AsocInfo | null>(null);
   const [dataStart, setDataStart] = useState(defaultStart);
@@ -330,10 +332,12 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
                   <td style={{ textAlign: "center", color: "#94a3b8" }}>{metodaLabel(r.metoda)}</td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(r.suma)}</td>
                   <td onClick={e => e.stopPropagation()}>
-                    <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end" }}>
-                      <button className="btn-action" title="Editează" onClick={() => openEdit(r)}>✎</button>
-                      <button className="btn-action btn-action--danger" title="Șterge" onClick={() => { setDelRow(r); setDelErr(null); }}>✕</button>
-                    </div>
+                    {isAdmin && (
+                      <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end" }}>
+                        <button className="btn-action" title="Editează" onClick={() => openEdit(r)}>✎</button>
+                        <button className="btn-action btn-action--danger" title="Șterge" onClick={() => { setDelRow(r); setDelErr(null); }}>✕</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

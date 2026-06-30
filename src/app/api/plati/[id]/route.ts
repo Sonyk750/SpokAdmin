@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { recomputeFacturaStatus, getAvansSold } from "@/lib/avans-furnizor";
+import { resolveAccess } from "@/lib/access";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const EPS = 0.01;
@@ -24,6 +25,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     select: { id: true, facturaId: true, factura: { select: { asociatieId: true, furnizorId: true } } },
   });
   if (!plata) return NextResponse.json({ error: "Plată negăsită." }, { status: 404 });
+
+  const access = await resolveAccess(session!.user as any, plata.factura.asociatieId);
+  if (!access.isAdmin) return NextResponse.json({ error: "Nu ai dreptul să editezi plăți." }, { status: 403 });
 
   const suma = body.suma != null ? Number(body.suma) : undefined;
   if (suma !== undefined && (isNaN(suma) || suma <= 0))
@@ -71,6 +75,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     },
   });
   if (!plata) return NextResponse.json({ error: "Plată negăsită." }, { status: 404 });
+
+  const access = await resolveAccess(session!.user as any, plata.factura.asociatieId);
+  if (!access.isAdmin) return NextResponse.json({ error: "Nu ai dreptul să ștergi plăți." }, { status: 403 });
 
   for (const m of plata.avansMiscari) {
     if (r2(m.avans.sold) < r2(m.suma) - EPS) {
