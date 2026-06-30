@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 // ─── Layer 1: Acces funcții (matricea de rapoarte) ────────────────────────────
 
-type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex";
+type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex" | "casier";
 type RoleKey = "proprietar" | ExtraCalitate;
 type PermMap = Record<string, boolean>;
 type RolePerms = Record<RoleKey, PermMap>;
@@ -30,23 +30,29 @@ const REPORT_GROUPS: { group: string; items: ReportDef[] }[] = [
     { key: "fisa_furnizor", label: "Fișă furnizor" },
     { key: "venituri",      label: "Venituri și cheltuieli" },
   ]},
+  { group: "Operațiuni chitanțe", items: [
+    { key: "chit_add",    label: "Adaugă chitanță" },
+    { key: "chit_edit",   label: "Editează chitanță" },
+    { key: "chit_delete", label: "Șterge chitanță / documente" },
+  ]},
   { group: "Alte funcții", items: [
     { key: "citiri",        label: "Citiri contoare (ap. propriu)", locked: ["proprietar", "presedinte"] },
     { key: "istoric_index", label: "Istoric index contoare (ap. propriu)", locked: ["proprietar"] },
-    { key: "mesaje",        label: "Mesaje în aplicație", locked: ["proprietar", "presedinte", "cenzor", "membru_cex"] },
+    { key: "mesaje",        label: "Mesaje în aplicație", locked: ["proprietar", "presedinte", "cenzor", "membru_cex", "casier"] },
   ]},
 ];
 
 const DEFAULT_PERMS: RolePerms = {
-  proprietar: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, citiri: true, istoric_index: true, mesaje: true },
-  presedinte: { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  citiri: true,  istoric_index: true, mesaje: true },
-  cenzor:     { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  citiri: false, istoric_index: true, mesaje: true },
-  membru_cex: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, citiri: false, istoric_index: false, mesaje: true },
+  proprietar: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, chit_add: false, chit_edit: false, chit_delete: false, citiri: true, istoric_index: true, mesaje: true },
+  presedinte: { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: true,  chit_edit: true,  chit_delete: true,  citiri: true,  istoric_index: true, mesaje: true },
+  cenzor:     { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: false, chit_edit: false, chit_delete: false, citiri: false, istoric_index: true, mesaje: true },
+  membru_cex: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, chit_add: false, chit_edit: false, chit_delete: false, citiri: false, istoric_index: false, mesaje: true },
+  casier:     { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: true,  chit_edit: true,  chit_delete: false, citiri: false, istoric_index: false, mesaje: true },
 };
 
-const ROLE_LABELS: Record<RoleKey, string> = { proprietar: "Proprietar", presedinte: "Președinte", cenzor: "Cenzor", membru_cex: "Mem. CEX" };
-const ROLE_COLORS: Record<RoleKey, string> = { proprietar: "#7c3aed", presedinte: "#fbbf24", cenzor: "#38bdf8", membru_cex: "#4ade80" };
-const FEAT_ROLES: RoleKey[] = ["proprietar", "presedinte", "cenzor", "membru_cex"];
+const ROLE_LABELS: Record<RoleKey, string> = { proprietar: "Proprietar", presedinte: "Președinte", cenzor: "Cenzor", membru_cex: "Mem. CEX", casier: "Casier" };
+const ROLE_COLORS: Record<RoleKey, string> = { proprietar: "#7c3aed", presedinte: "#fbbf24", cenzor: "#38bdf8", membru_cex: "#4ade80", casier: "#fb923c" };
+const FEAT_ROLES: RoleKey[] = ["proprietar", "presedinte", "cenzor", "membru_cex", "casier"];
 
 function mergeWithDefaults(saved: Partial<RolePerms>): RolePerms {
   const result = {} as RolePerms;
@@ -263,7 +269,7 @@ function FeatGroup({ grp, perms, onToggle }: {
   return (
     <>
       <tr>
-        <td colSpan={5} className="drepturi-grouphead">{grp.group}</td>
+        <td colSpan={FEAT_ROLES.length + 1} className="drepturi-grouphead">{grp.group}</td>
       </tr>
       {grp.items.map(item => (
         <tr key={item.key}>

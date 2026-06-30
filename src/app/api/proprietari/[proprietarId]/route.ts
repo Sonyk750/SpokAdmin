@@ -26,7 +26,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
   const emailuriCurate = (emailuri ?? []).map(e => e.trim()).filter(Boolean);
 
   // Validare combinații calitate: proprietar + maxim o calitate extra
-  const EXTRA = ["presedinte", "cenzor", "membru_cex"] as const;
+  const EXTRA = ["presedinte", "cenzor", "membru_cex", "casier"] as const;
   let calitatiSave = ["proprietar"];
   if (Array.isArray(calitati)) {
     const extra = calitati.filter(c => EXTRA.includes(c as typeof EXTRA[number]));

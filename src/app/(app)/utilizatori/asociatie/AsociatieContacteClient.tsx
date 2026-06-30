@@ -18,7 +18,7 @@ interface ProprietarRow {
   isMain:       boolean;
 }
 
-type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex";
+type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex" | "casier";
 
 // ─── Config calitati UI ───────────────────────────────────────────────────────
 
@@ -26,6 +26,7 @@ const CALITATI_CONFIG: { key: ExtraCalitate; label: string; color: string; bg: s
   { key: "presedinte",  label: "Președinte",  color: "#fbbf24", bg: "rgba(251,191,36,0.12)" },
   { key: "cenzor",      label: "Cenzor",      color: "#38bdf8", bg: "rgba(56,189,248,0.12)" },
   { key: "membru_cex",  label: "Membru CEX",  color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
+  { key: "casier",      label: "Casier",      color: "#fb923c", bg: "rgba(251,146,60,0.12)" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -235,6 +236,7 @@ export default function AsociatieContacteClient() {
   const nrPres   = rows.filter(r => r.calitati.includes("presedinte")).length;
   const nrCenz   = rows.filter(r => r.calitati.includes("cenzor")).length;
   const nrCex    = rows.filter(r => r.calitati.includes("membru_cex")).length;
+  const nrCasier = rows.filter(r => r.calitati.includes("casier")).length;
   const nrSimple = rows.filter(r => !CALITATI_CONFIG.some(c => r.calitati.includes(c.key))).length;
 
   if (!asociatieId) return (
@@ -264,6 +266,7 @@ export default function AsociatieContacteClient() {
             { label: "Președinte",  count: nrPres,   color: "#fbbf24" },
             { label: "Cenzor",      count: nrCenz,   color: "#38bdf8" },
             { label: "Mem. CEX",    count: nrCex,    color: "#4ade80" },
+            { label: "Casier",      count: nrCasier, color: "#fb923c" },
           ] as const).filter(s => s.count > 0).map(s => (
             <div key={s.label} style={{ fontSize: "0.75rem", padding: "4px 10px", borderRadius: 99, background: `${s.color}18`, color: s.color, fontWeight: 600 }}>
               {s.count} {s.label}
