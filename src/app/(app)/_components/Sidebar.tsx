@@ -19,7 +19,6 @@ const nav: Item[] = [
   { type: "link",  href: "/asociatii",          label: "Asociații" },
   { type: "link",  href: "/setari-asociatie",   label: "Setări asociație" },
   { type: "link",  href: "/facturi",            label: "Facturi" },
-  { type: "link",  href: "/incasari",           label: "Încasări" },
   { type: "link",  href: "/mesaje",             label: "Mesaje", badge: "mesaje" },
   {
     type: "group", label: "Rapoarte", key: "rapoarte",
