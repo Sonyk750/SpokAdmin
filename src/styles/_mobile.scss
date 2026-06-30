@@ -1,5 +1,16 @@
 @use 'variables' as *;
 
+// ─── Stop „balansul" lateral (senzație de app nativ) ──────────────────────────
+// Pagina nu trebuie să se miște stânga/dreapta. Cauza tipică: un copil flex cu
+// min-width:auto (ex. un tabel lat) împinge layout-ul peste lățimea ecranului.
+html, body {
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+.app-layout { max-width: 100vw; overflow-x: hidden; }
+.app-body   { min-width: 0; max-width: 100vw; overflow-x: hidden; }
+.app-main   { min-width: 0; }
+
 // ─── PWA / Mobile polish ──────────────────────────────────────────────────────
 // Optimizări pentru telefon și pentru rularea ca aplicație instalată (standalone).
 
@@ -9,9 +20,13 @@
 .sidebar    { padding-bottom: env(safe-area-inset-bottom); }
 
 @media (max-width: 768px) {
+  // Fără rubber-band / pull-to-refresh → senzație de aplicație nativă.
+  html, body { overscroll-behavior: none; width: 100%; max-width: 100%; }
+
   // Mai mult spațiu util pe ecran mic.
   .app-main {
     padding: 1rem 0.9rem calc(1.25rem + env(safe-area-inset-bottom));
+    overflow-x: hidden;
   }
   .app-header { padding-left: 1rem; padding-right: 1rem; }
 
