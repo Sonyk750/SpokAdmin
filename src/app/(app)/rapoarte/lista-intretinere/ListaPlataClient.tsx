@@ -87,6 +87,14 @@ function withTotalLast(cols: MovCol[]): MovCol[] {
   return [...rest, ...total];
 }
 
+function isServiciiAscensor(label?: string): boolean {
+  const normalized = (label ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return normalized.includes("servicii") && normalized.includes("ascensor");
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const LUNI = [
@@ -575,7 +583,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                         return (
                           <td key={col.id}
                             className={`lp-td--num${col.kind === "totalLuna" ? " lp-td--subtotal" : ""}`}>
-                            {fmt2(val)}
+                            {col.kind === "chelt" && val === 0 && isServiciiAscensor(col.cheltLabel) ? "(0)" : fmt2(val)}
                           </td>
                         );
                       })}

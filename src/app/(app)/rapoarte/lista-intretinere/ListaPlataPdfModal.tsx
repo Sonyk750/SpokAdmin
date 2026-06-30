@@ -106,6 +106,14 @@ function fmtDate(iso: string): string {
   return `${d}.${m}.${y}`;
 }
 
+function isServiciiAscensor(label?: string): boolean {
+  const normalized = (label ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  return normalized.includes("servicii") && normalized.includes("ascensor");
+}
+
 // Adaugă zile la o dată ISO și returnează rezultatul tot în format ISO
 function addDays(iso: string, days: number): string {
   if (!iso) return "";
@@ -282,7 +290,7 @@ function buildDocDef(
     for (const col of movCols) {
       if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!]) {
         const v = row.cheltuieli[col.cheltKey!] ?? 0;
-        cells.push(cell(v ? fmt2(v) : "", "right"));
+        cells.push(cell(v ? fmt2(v) : (isServiciiAscensor(col.cheltLabel) ? "(0)" : ""), "right"));
       }
       if (col.kind === "totalLuna" && opts.showTotalLuna)
         cells.push(cell(fmt2(row.totalLuna), "right", true));
