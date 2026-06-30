@@ -178,44 +178,42 @@ function buildDocDef(
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
   const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
-  // ── Canvas-based exact text measurement (pt) ─────────────────────────────────
-  // Canvas measures CSS px; convert → pdfmake pt using 72/96 factor.
-  // Using sans-serif fallback gives a close approximation to Roboto metrics.
-  let _canvasCtx: CanvasRenderingContext2D | null = null;
-  function txtPt(text: string, fontPt: number, bold = false): number {
+  // ── Canvas text measurement: data values only (pt) ──────────────────────────
+  // pdfmake wraps header text automatically — headers do NOT constrain column width.
+  // Only the widest DATA value in each column matters for minimum width.
+  // Canvas measures CSS px → convert to pdfmake pt (factor 72/96).
+  // Using Arial (always available) gives consistent, slightly conservative results vs Roboto.
+  let _ctx: CanvasRenderingContext2D | null = null;
+  function dataPt(text: string, fontPt: number): number {
     try {
-      if (!_canvasCtx) _canvasCtx = document.createElement("canvas").getContext("2d")!;
-      _canvasCtx.font = `${bold ? "bold " : ""}${fontPt * (96 / 72)}px ${opts.fontFamily}, sans-serif`;
-      return _canvasCtx.measureText(text).width * (72 / 96);
+      if (!_ctx) _ctx = document.createElement("canvas").getContext("2d")!;
+      _ctx.font = `${fontPt * (96 / 72)}px Arial, sans-serif`;
+      return _ctx.measureText(text).width * (72 / 96);
     } catch {
-      // SSR fallback — should not happen (client component)
-      return text.length * fontPt * (bold ? 0.62 : 0.55);
+      return text.length * fontPt * 0.56; // fallback: SSR or canvas unavailable
     }
   }
 
-  // Widest header line width at given font (headers are bold, fontSize+1)
-  const hdrPt = (label: string, fontPt: number) =>
-    label.split("\n").reduce((m, l) => Math.max(m, txtPt(l, fontPt + 1, true)), 0);
-
-  // ── Column descriptors: label, alignment, widest data sample ─────────────────
+  // ── Column descriptors: label, alignment, widest DATA value (sample) ─────────
+  // sample = the string that will actually appear in the widest data cell
   type CD = { label: string; al: string; sample: string };
   const cols: CD[] = [];
 
   const maxF2 = (vals: number[]) =>
     vals.length ? fmt2(Math.max(0, ...vals.filter(Number.isFinite))) : "0.00";
-  const maxStr = (vals: string[], fallback: string) =>
-    vals.reduce((m, s) => (s ?? "").length > m.length ? s : m, fallback);
+  const longestStr = (vals: string[], fallback: string) =>
+    vals.reduce((m, s) => (s ?? "").length > m.length ? (s ?? "") : m, fallback);
 
   cols.push({ label: "Nr.\nAp.", al: "center",
-    sample: maxStr(rows.map(r => r.numar), "999") });
+    sample: longestStr(rows.map(r => r.numar), "999") });
 
   if (opts.showProprietar)
     cols.push({ label: "Proprietar", al: "left",
-      sample: maxStr(rows.map(r => r.proprietar ?? ""), "MMMMMMMMMMMMMMMMMM") });
+      sample: longestStr(rows.map(r => r.proprietar ?? ""), "Proprietar Exemplu") });
 
   if (coloane.nrPersone && opts.showNrPersone)
     cols.push({ label: "Pers.", al: "center",
-      sample: String(rows.reduce((m, r) => Math.max(m, r.nrPersone ?? 0), 0) || 9) });
+      sample: String(rows.reduce((m, r) => Math.max(m, r.nrPersone ?? 0), 9)) });
 
   if (coloane.cotaParte && opts.showCotaParte)
     cols.push({ label: "CPI", al: "center",
@@ -263,28 +261,26 @@ function buildDocDef(
 
   if (opts.showNrEnd)
     cols.push({ label: "Nr.\nAp.", al: "center",
-      sample: maxStr(rows.map(r => r.numar), "999") });
+      sample: longestStr(rows.map(r => r.numar), "999") });
 
-  // ── Minimum width per column = max(header, data sample) + PAD ───────────────
-  function colMinW(col: CD, fontPt: number): number {
-    const h = hdrPt(col.label, fontPt);
-    const d = txtPt(col.sample, fontPt);
-    return Math.ceil(Math.max(h, d)) + PAD;
-  }
+  // ── Minimum width = data sample width + padding (headers wrap → don't measure) ─
+  const colMinW = (col: CD, fontPt: number) =>
+    Math.ceil(dataPt(col.sample, fontPt)) + PAD;
 
-  // ── Auto-shrink font until total min-widths ≤ availW ────────────────────────
+  // ── Auto-shrink font: reduce until sum of data-driven minimums ≤ availW ──────
   let fs = opts.fontSize;
   while (fs > 5 && cols.reduce((s, c) => s + colMinW(c, fs), 0) > availW) fs--;
 
-  // ── Final widths: min-widths + distribute remaining space proportionally ─────
+  // ── Widths: start from data minimums, distribute remaining space evenly ───────
+  // If at fs=5 sum still exceeds availW (extreme column count), scale proportionally
   const minW   = cols.map(c => colMinW(c, fs));
   const minSum = minW.reduce((s, v) => s + v, 0);
-  const extra  = Math.floor(availW) - minSum;
-  const widths: number[] = minW.map((w, i) =>
-    w + (extra > 0 ? Math.floor(extra * minW[i] / minSum) : 0)
-  );
+  const floor  = Math.floor(availW);
+  const widths: number[] = minSum <= floor
+    ? minW.map((w, i) => w + Math.floor((floor - minSum) * w / minSum))
+    : minW.map(w => Math.floor(w * floor / minSum)); // scale down to fit
   // Absorb rounding remainder in last column
-  widths[widths.length - 1] += Math.floor(availW) - widths.reduce((s, v) => s + v, 0);
+  widths[widths.length - 1] += floor - widths.reduce((s, v) => s + v, 0);
 
   // ── Header row ───────────────────────────────────────────────────────────────
   const th = (text: string, al = "right"): any => ({
