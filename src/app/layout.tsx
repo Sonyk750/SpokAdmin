@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "../styles/globals.scss";
+import SwRegister from "./sw-register";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://spokadmin.ro"),
@@ -67,6 +68,15 @@ export const metadata: Metadata = {
     canonical: "https://spokadmin.ro",
   },
   category: "Business Software",
+  // PWA — instalabil pe iPhone prin „Add to Home Screen" (fără App Store).
+  appleWebApp: {
+    capable: true,
+    title: "SpokAdmin",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 const jsonLd = {
@@ -191,7 +201,10 @@ export default function RootLayout({
         <meta name="theme-color" content="#080A0F" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
-      <body>{children}</body>
+      <body>
+        <SwRegister />
+        {children}
+      </body>
     </html>
   );
 }
