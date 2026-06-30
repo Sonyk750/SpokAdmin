@@ -154,8 +154,6 @@ export async function consumaAvansPeFacturileFurnizorului(
       asociatieId: params.asociatieId,
       furnizorId:  params.furnizorId,
       valoare:     { gt: 0 },
-      // exclude restanțele generate de wizard; `notes` poate fi și null (factură normală)
-      OR: [{ notes: null }, { notes: { not: "wizard-init-restante-furnizori" } }],
     },
     orderBy: [{ dataEmiterii: "asc" }, { createdAt: "asc" }],
     select:  { id: true, organizationId: true, asociatieId: true, furnizorId: true },

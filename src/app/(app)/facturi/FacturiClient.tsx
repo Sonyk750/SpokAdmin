@@ -42,6 +42,7 @@ interface PlataRow { id: string; suma: number; data: string; metoda: string; fon
 interface AvansMiscareRow { id: string; suma: number; tip: string; data: string; notes: string | null; plataId: string | null; }
 interface PlataData {
   valoare: number; acoperit: number; rest: number; status: string; avansSold: number;
+  totalDatoratFurnizor?: number;
   plati: PlataRow[]; avansMiscari: AvansMiscareRow[];
 }
 
@@ -512,8 +513,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
       .then(d => setFonduriList(Array.isArray(d) ? d : []))
       .catch(() => setFonduriList([]));
     const data = await loadPlataData(f.id);
-    const rest = data?.rest ?? 0;
-    setPlataForm({ suma: rest > 0 ? String(rest) : "", metoda: "banca", fondId: "", data: todayISO(), notes: "" });
+    const totalDatorat = data?.totalDatoratFurnizor ?? data?.rest ?? 0;
+    setPlataForm({ suma: totalDatorat > 0 ? String(totalDatorat) : "", metoda: "banca", fondId: "", data: todayISO(), notes: "" });
   }
 
   async function submitPlata() {
@@ -1149,9 +1150,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               {plataData && (<>
                 {/* Sumar */}
                 <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Valoare</div><div style={{ fontWeight: 800, color: "#a78bfa" }}>{fmt2(plataData.valoare)}</div></div>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Valoare factură</div><div style={{ fontWeight: 800, color: "#a78bfa" }}>{fmt2(plataData.valoare)}</div></div>
                   <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Plătit</div><div style={{ fontWeight: 800, color: "#4ade80" }}>{fmt2(plataData.acoperit)}</div></div>
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Rest</div><div style={{ fontWeight: 800, color: plataData.rest > 0.01 ? "#f87171" : "#4ade80" }}>{fmt2(plataData.rest)}</div></div>
+                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Rest factură</div><div style={{ fontWeight: 800, color: plataData.rest > 0.01 ? "#f87171" : "#4ade80" }}>{fmt2(plataData.rest)}</div></div>
+                  {hasFurnizor && (plataData.totalDatoratFurnizor ?? 0) > plataData.rest + 0.01 && (
+                    <div style={{ borderLeft: "2px solid rgba(251,191,36,0.4)", paddingLeft: "0.75rem" }}>
+                      <div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#92400e", fontWeight: 700 }}>Total datorat furnizor</div>
+                      <div style={{ fontWeight: 800, color: "#fbbf24" }}>{fmt2(plataData.totalDatoratFurnizor ?? 0)}</div>
+                    </div>
+                  )}
                   <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Status</div><div><span className={`pill ${STATUS_PILL[plataData.status] ?? "pill--gray"}`}>{STATUS_LABEL[plataData.status] ?? plataData.status}</span></div></div>
                   {hasFurnizor && (
                     <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Avans furnizor</div><div style={{ fontWeight: 800, color: plataData.avansSold > 0.01 ? "#38bdf8" : "#64748b" }}>{fmt2(plataData.avansSold)}</div></div>

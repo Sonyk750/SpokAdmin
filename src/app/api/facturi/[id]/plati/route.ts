@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { computeAcoperit, recomputeFacturaStatus, depuneAvans, getAvansSold } from "@/lib/avans-furnizor";
+import { computeAcoperit, recomputeFacturaStatus, depuneAvans, getAvansSold, consumaAvansPeFacturileFurnizorului } from "@/lib/avans-furnizor";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const EPS = 0.01;
@@ -25,16 +25,42 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
 
   const acoperit = computeAcoperit(factura.plati, factura.avansMiscari);
+  const restCurent = r2(factura.valoare - acoperit);
+
   const avansSold = factura.furnizorId
     ? await getAvansSold(db, factura.asociatieId, factura.furnizorId)
     : 0;
 
+  // Total datorat furnizorului = restul tuturor facturilor neachitate ale aceluiași furnizor
+  let totalDatoratFurnizor = restCurent;
+  if (factura.furnizorId) {
+    const alteFacturi = await db.factura.findMany({
+      where: {
+        furnizorId:  factura.furnizorId,
+        asociatieId: factura.asociatieId,
+        id:          { not: factura.id },
+        organizationId: orgId,
+      },
+      select: {
+        valoare:      true,
+        plati:        { select: { suma: true } },
+        avansMiscari: { select: { suma: true } },
+      },
+    });
+    const alteRest = alteFacturi.reduce((s, f) => {
+      const ac = computeAcoperit(f.plati, f.avansMiscari);
+      return s + Math.max(0, f.valoare - ac);
+    }, 0);
+    totalDatoratFurnizor = r2(restCurent + alteRest);
+  }
+
   return NextResponse.json({
     valoare:  factura.valoare,
     acoperit,
-    rest:     r2(factura.valoare - acoperit),
+    rest:     restCurent,
     status:   factura.status,
     avansSold,
+    totalDatoratFurnizor,
     plati:        factura.plati.map(p => ({ ...p, data: p.data.toISOString() })),
     avansMiscari: factura.avansMiscari.map(m => ({ ...m, data: m.data.toISOString() })),
   });
@@ -112,6 +138,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         plata.id,
         "Supraplată factură",
       );
+      // Consumă automat avansul pe celelalte facturi neachitate ale furnizorului
+      await consumaAvansPeFacturileFurnizorului(tx, {
+        organizationId: factura.organizationId,
+        asociatieId:    factura.asociatieId,
+        furnizorId:     factura.furnizorId,
+      });
     }
 
     const summary   = await recomputeFacturaStatus(tx, factura.id);
