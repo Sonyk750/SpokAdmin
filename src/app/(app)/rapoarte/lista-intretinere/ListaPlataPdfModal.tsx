@@ -178,109 +178,65 @@ function buildDocDef(
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
   const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
-  // ── Canvas text measurement: data values only (pt) ──────────────────────────
-  // pdfmake wraps header text automatically — headers do NOT constrain column width.
-  // Only the widest DATA value in each column matters for minimum width.
-  // Canvas measures CSS px → convert to pdfmake pt (factor 72/96).
-  // Using Arial (always available) gives consistent, slightly conservative results vs Roboto.
-  let _ctx: CanvasRenderingContext2D | null = null;
-  function dataPt(text: string, fontPt: number): number {
-    try {
-      if (!_ctx) _ctx = document.createElement("canvas").getContext("2d")!;
-      _ctx.font = `${fontPt * (96 / 72)}px Arial, sans-serif`;
-      return _ctx.measureText(text).width * (72 / 96);
-    } catch {
-      return text.length * fontPt * 0.56; // fallback: SSR or canvas unavailable
-    }
-  }
+  // ── Column descriptors with proportional weights ──────────────────────────────
+  // Each column gets a fraction of availW proportional to its weight.
+  // sum(widths) = floor(availW) by construction — overflow is impossible.
+  type CW = { label: string; al: string; wt: number };
+  const cols: CW[] = [];
 
-  // ── Column descriptors: label, alignment, widest DATA value (sample) ─────────
-  // sample = the string that will actually appear in the widest data cell
-  type CD = { label: string; al: string; sample: string };
-  const cols: CD[] = [];
+  const W_NR   = 1.0; // Nr.Ap
+  const W_PROP = 3.5; // Proprietar
+  const W_PERS = 0.9; // Pers.
+  const W_SM   = 1.2; // CPI, Suprafată
+  const W_NUM  = 1.8; // numeric data columns
+  const W_TOT  = 2.2; // TOTAL
 
-  const maxF2 = (vals: number[]) =>
-    vals.length ? fmt2(Math.max(0, ...vals.filter(Number.isFinite))) : "0.00";
-  const longestStr = (vals: string[], fallback: string) =>
-    vals.reduce((m, s) => (s ?? "").length > m.length ? (s ?? "") : m, fallback);
-
-  cols.push({ label: "Nr.\nAp.", al: "center",
-    sample: longestStr(rows.map(r => r.numar), "999") });
-
+  cols.push({ label: "Nr.\nAp.", al: "center", wt: W_NR });
   if (opts.showProprietar)
-    cols.push({ label: "Proprietar", al: "left",
-      sample: longestStr(rows.map(r => r.proprietar ?? ""), "Proprietar Exemplu") });
-
+    cols.push({ label: "Proprietar", al: "left", wt: W_PROP });
   if (coloane.nrPersone && opts.showNrPersone)
-    cols.push({ label: "Pers.", al: "center",
-      sample: String(rows.reduce((m, r) => Math.max(m, r.nrPersone ?? 0), 9)) });
-
+    cols.push({ label: "Pers.", al: "center", wt: W_PERS });
   if (coloane.cotaParte && opts.showCotaParte)
-    cols.push({ label: "CPI", al: "center",
-      sample: maxF2(rows.map(r => r.cotaParte ?? 0)) });
-
+    cols.push({ label: "CPI", al: "center", wt: W_SM });
   if (coloane.suprafata && opts.showSuprafata)
-    cols.push({ label: "Supraf.\n(m²)", al: "center",
-      sample: maxF2(rows.map(r => r.suprafata ?? 0)) });
+    cols.push({ label: "Supraf.\n(m²)", al: "center", wt: W_SM });
 
   for (const c of coloane.consumuri) {
     if (opts.consumViz[c.tip])
-      cols.push({ label: `${c.label}\n(${c.unit})`, al: "right",
-        sample: maxF2(rows.map(r => r.consumByTip[c.tip] ?? 0)) });
+      cols.push({ label: `${c.label}\n(${c.unit})`, al: "right", wt: W_NUM });
     if (c.valoareLeiKey && opts.consumLeiViz[c.tip])
-      cols.push({ label: `${c.label}\n(lei)`, al: "right",
-        sample: maxF2(rows.map(r => r.cheltuieli[c.valoareLeiKey!] ?? 0)) });
+      cols.push({ label: `${c.label}\n(lei)`, al: "right", wt: W_NUM });
   }
-
   for (const col of movCols) {
     if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])
-      cols.push({ label: col.cheltLabel ?? "", al: "right",
-        sample: maxF2(rows.map(r => r.cheltuieli[col.cheltKey!] ?? 0)) });
+      cols.push({ label: col.cheltLabel ?? "", al: "right", wt: W_NUM });
     if (col.kind === "totalLuna" && opts.showTotalLuna)
-      cols.push({ label: "Total\nlună", al: "right",
-        sample: maxF2(rows.map(r => r.totalLuna)) });
+      cols.push({ label: "Total\nlună", al: "right", wt: W_NUM });
   }
-
   if (coloane.hasRestantaIntretinere && opts.showRestanta)
-    cols.push({ label: "Rest.\nîntrețin.", al: "right",
-      sample: maxF2(rows.map(r => r.restantaIntretinere)) });
-
+    cols.push({ label: "Rest.\nîntrețin.", al: "right", wt: W_NUM });
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total")
-      cols.push({ label: "Fond.\nrest.", al: "right",
-        sample: maxF2(rows.map(r => r.totalFonduri)) });
+      cols.push({ label: "Fond.\nrest.", al: "right", wt: W_NUM });
     else
       for (const f of coloane.fonduri)
         if (opts.fondViz[f.id] !== false)
-          cols.push({ label: f.name, al: "right",
-            sample: maxF2(rows.map(r => r.restantaFonduri[f.id] ?? 0)) });
+          cols.push({ label: f.name, al: "right", wt: W_NUM });
   }
-
-  cols.push({ label: "TOTAL\n(lei)", al: "right",
-    sample: maxF2(rows.map(r => r.total)) });
-
+  cols.push({ label: "TOTAL\n(lei)", al: "right", wt: W_TOT });
   if (opts.showNrEnd)
-    cols.push({ label: "Nr.\nAp.", al: "center",
-      sample: longestStr(rows.map(r => r.numar), "999") });
+    cols.push({ label: "Nr.\nAp.", al: "center", wt: W_NR });
 
-  // ── Minimum width = data sample width + padding (headers wrap → don't measure) ─
-  const colMinW = (col: CD, fontPt: number) =>
-    Math.ceil(dataPt(col.sample, fontPt)) + PAD;
-
-  // ── Auto-shrink font: reduce until sum of data-driven minimums ≤ availW ──────
-  let fs = opts.fontSize;
-  while (fs > 5 && cols.reduce((s, c) => s + colMinW(c, fs), 0) > availW) fs--;
-
-  // ── Widths: start from data minimums, distribute remaining space evenly ───────
-  // If at fs=5 sum still exceeds availW (extreme column count), scale proportionally
-  const minW   = cols.map(c => colMinW(c, fs));
-  const minSum = minW.reduce((s, v) => s + v, 0);
-  const floor  = Math.floor(availW);
-  const widths: number[] = minSum <= floor
-    ? minW.map((w, i) => w + Math.floor((floor - minSum) * w / minSum))
-    : minW.map(w => Math.floor(w * floor / minSum)); // scale down to fit
-  // Absorb rounding remainder in last column
+  // ── Widths: proportional floor division, remainder absorbed by last column ────
+  const totalWt = cols.reduce((s, c) => s + c.wt, 0);
+  const floor   = Math.floor(availW);
+  const widths: number[] = cols.map(c => Math.floor(c.wt / totalWt * floor));
   widths[widths.length - 1] += floor - widths.reduce((s, v) => s + v, 0);
+
+  // ── Font auto-shrink: numeric column must fit "12345.67" (8 chars) ────────────
+  const numColW = (W_NUM / totalWt) * floor;
+  let fs = opts.fontSize;
+  while (fs > 5 && 8 * fs * 0.56 + PAD > numColW) fs--;
 
   // ── Header row ───────────────────────────────────────────────────────────────
   const th = (text: string, al = "right"): any => ({
