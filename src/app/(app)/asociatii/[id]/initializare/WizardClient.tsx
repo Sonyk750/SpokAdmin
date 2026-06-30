@@ -1123,7 +1123,8 @@ export default function WizardClient({
       <div className="wizard__steps">
         {STEP_LABELS.map((label, i) => {
           const n = i + 1; const done = n < step; const current = n === step;
-          const clickable = n !== step && n <= maxStep;
+          // Odată pornit wizard-ul, toți pașii sunt accesibili liber (tool de inițializare)
+          const clickable = n !== step && (wizardStep > 0 || n <= maxStep);
           const handleStepClick = () => {
             if (!clickable) return;
             setStep(n);
