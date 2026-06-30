@@ -83,11 +83,8 @@ const LUNI = [
 
 // Portrait dimensions (width × height) in pt
 const PAGE_SIZES: Record<string, { w: number; h: number; label: string }> = {
-  A3:     { w: 841.89,  h: 1190.55, label: "A3" },
-  A4:     { w: 595.28,  h: 841.89,  label: "A4" },
-  A5:     { w: 419.53,  h: 595.28,  label: "A5" },
-  LETTER: { w: 612,     h: 792,     label: "Letter" },
-  LEGAL:  { w: 612,     h: 1008,    label: "Legal" },
+  A3: { w: 841.89,  h: 1190.55, label: "A3" },
+  A4: { w: 595.28,  h: 841.89,  label: "A4" },
 };
 
 const FONT_OPTIONS = [
@@ -179,52 +176,52 @@ function buildDocDef(
     text, bold: true, fontSize: fs + 1, alignment: al,
   });
 
-  const widths: (number | string)[] = [];
   const hdr: any[] = [];
+  // Relative weights determine proportional widths — guarantees table fits page exactly
+  const colW: number[] = [];
 
-  // ── Lățimi coloane: fixe pentru Nr/Proprietar/TOTAL, "*" pentru tot restul ─
-  // pdfmake împarte automat spațiul rămas între coloanele cu "*" → nu poate depăși pagina
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
-  const floorW = Math.floor(availW);
 
-  const NR_W   = Math.round(floorW * 0.035); // ~3.5% — Nr.Ap.
-  const SM_W   = Math.round(floorW * 0.046); // ~4.6% — Pers / CPI / Sup
-  const TOT_W  = Math.round(floorW * 0.075); // ~7.5% — TOTAL
-  const PROP_W = Math.round(floorW * 0.20);  // ~20%  — Proprietar (fix)
-
-  // ── Construiește header și widths ──────────────────────────────────────────
-  hdr.push(th("Nr.\nAp.", "center")); widths.push(NR_W);
-  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); widths.push(PROP_W); }
-  if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          widths.push(SM_W); }
-  if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            widths.push(SM_W); }
-  if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); widths.push(SM_W); }
+  // ── Construiește header și weights ──────────────────────────────────────────
+  hdr.push(th("Nr.\nAp.", "center")); colW.push(0.5);
+  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); colW.push(3.0); }
+  if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          colW.push(0.55); }
+  if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            colW.push(0.6);  }
+  if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); colW.push(0.65); }
 
   for (const c of coloane.consumuri) {
-    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); widths.push("*"); }
-    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       widths.push("*"); }
+    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); colW.push(1.0); }
+    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       colW.push(1.0); }
   }
 
   for (const col of movCols) {
-    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); widths.push("*"); }
-    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        widths.push("*"); }
+    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); colW.push(1.0); }
+    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        colW.push(1.1); }
   }
 
-  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); widths.push("*"); }
+  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); colW.push(0.9); }
 
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total") {
-      hdr.push(th("Fond.\nrest.", "right")); widths.push("*");
+      hdr.push(th("Fond.\nrest.", "right")); colW.push(0.9);
     } else {
       for (const f of coloane.fonduri) {
-        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); widths.push("*"); }
+        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); colW.push(0.9); }
       }
     }
   }
 
-  hdr.push(th("TOTAL\n(lei)", "right")); widths.push(TOT_W);
-  if (opts.showNrEnd) { hdr.push(th("Nr.\nAp.", "center")); widths.push(NR_W); }
+  hdr.push(th("TOTAL\n(lei)", "right")); colW.push(1.3);
+  if (opts.showNrEnd) { hdr.push(th("Nr.\nAp.", "center")); colW.push(0.5); }
+
+  // Compute numeric widths proportionally so sum === availW (no overflow)
+  const totalWeight = colW.reduce((s, w) => s + w, 0);
+  const widths: number[] = colW.map(w => Math.floor(availW * w / totalWeight));
+  // Distribute rounding remainder to last column
+  const wSum = widths.reduce((s, v) => s + v, 0);
+  widths[widths.length - 1] += Math.floor(availW) - wSum;
 
   // TOTAL label acoperă doar Nr. Ap. + Proprietar; totalurile Pers/CPI/Supraf apar separat
   const labelSpan = 1 + (opts.showProprietar ? 1 : 0);
