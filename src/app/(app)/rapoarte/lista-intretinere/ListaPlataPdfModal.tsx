@@ -150,7 +150,7 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
     marginTop: 14,
     marginBottom: 24,
     showProprietar: true,
-    showNrEnd: false,
+    showNrEnd: true,
     showNrPersone: coloane.nrPersone,
     showCotaParte: coloane.cotaParte,
     showSuprafata: coloane.suprafata,
