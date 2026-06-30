@@ -116,6 +116,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [fonduri,      setFonduri]      = useState<FondOption[]>([]);
   const [avansItems,   setAvansItems]   = useState<AvansItem[]>([]);
   const [observatii,   setObservatii]   = useState("");
+  const [idTranzactie, setIdTranzactie] = useState("");
 
   // ── Detail modal ──────────────────────────────────────────────────────────
   const [detail,     setDetail]     = useState<IncasareRow | null>(null);
@@ -278,7 +279,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     setSerieDoc("CH"); setNrDocManual("");
     setTipDocument("chitanta");
     setWhereCollect("casa");
-    setObservatii(""); setFormErr(null);
+    setObservatii(""); setIdTranzactie(""); setFormErr(null);
     setModalOpen(true);
   }
 
@@ -310,9 +311,11 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
           tipDocument, tipPlata,
           bancaName: whereCollect !== "casa" ? whereCollect : undefined,
           data: dataDoc,
-          serieOverride: serieDoc || undefined,
-          nrDocManual: nrDocManual ? parseInt(nrDocManual) : undefined,
-          observatii,
+          serieOverride: whereCollect === "casa" ? (serieDoc || undefined) : undefined,
+          nrDocManual: whereCollect === "casa" && nrDocManual ? parseInt(nrDocManual) : undefined,
+          observatii: whereCollect !== "casa" && idTranzactie
+            ? `ID tranzacție: ${idTranzactie}${observatii ? " | " + observatii : ""}`
+            : observatii,
           pozitii: payload.map(d => ({ tip: d.tip, fondId: d.fondId, denumire: d.denumire, suma: Math.round(parseFloat(d.suma) * 100) / 100 })),
           avansRepartizat: avansRepartizat.length > 0 ? avansRepartizat : undefined,
         }),
@@ -556,15 +559,24 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                     <option value="proces_verbal">Proces verbal</option>
                   </select>
                 </div>
-                <div className="form-field" style={{ marginBottom: 0 }}>
-                  <label className="form-field__label">Serie / Nr. document</label>
-                  <div style={{ display: "flex", gap: "0.375rem" }}>
-                    <input type="text" className="input" value={serieDoc} onChange={e => setSerieDoc(e.target.value)}
-                      style={{ width: "54px" }} maxLength={6} placeholder="CH" />
-                    <input type="number" className="input" value={nrDocManual} onChange={e => setNrDocManual(e.target.value)}
-                      style={{ flex: 1 }} placeholder="auto" min={1} />
+                {whereCollect === "casa" ? (
+                  <div className="form-field" style={{ marginBottom: 0 }}>
+                    <label className="form-field__label">Serie / Nr. document</label>
+                    <div style={{ display: "flex", gap: "0.375rem" }}>
+                      <input type="text" className="input" value={serieDoc} onChange={e => setSerieDoc(e.target.value)}
+                        style={{ width: "54px" }} maxLength={6} placeholder="CH" />
+                      <input type="number" className="input" value={nrDocManual} onChange={e => setNrDocManual(e.target.value)}
+                        style={{ flex: 1 }} placeholder="auto" min={1} />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="form-field" style={{ marginBottom: 0 }}>
+                    <label className="form-field__label">ID Tranzacție</label>
+                    <input type="text" className="input" value={idTranzactie}
+                      onChange={e => setIdTranzactie(e.target.value)}
+                      placeholder="ex: TXN-123456..." />
+                  </div>
+                )}
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Se încasează în</label>
                   <select className="input" value={whereCollect} onChange={e => setWhereCollect(e.target.value)}>
