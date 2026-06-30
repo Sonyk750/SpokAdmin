@@ -933,7 +933,15 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               const alocatFond = !!f.fondId; // acoperită din fond — nu se distribuie pe apartamente
               return (
               <tr key={f.id}>
-                <td style={{ fontWeight: 600 }}>{f.furnizor?.nume ?? <span style={{ color: "#475569" }}>—</span>}</td>
+                <td style={{ fontWeight: 600 }}>
+                  {f.furnizor?.nume ?? <span style={{ color: "#475569" }}>—</span>}
+                  {f.notes === "wizard-init-restante-furnizori" && (
+                    <span title="Sold inițial preluat la configurarea asociației"
+                      style={{ marginLeft: "0.4rem", padding: "1px 6px", borderRadius: 99, background: "rgba(234,179,8,0.15)", color: "#fbbf24", fontSize: "0.65rem", fontWeight: 700, verticalAlign: "middle" }}>
+                      sold inițial
+                    </span>
+                  )}
+                </td>
                 <td style={{ color: "#94a3b8", fontFamily: "monospace", fontSize: "0.8rem" }}>
                   {[f.serie, f.numar].filter(Boolean).join("/") || "—"}
                 </td>
@@ -943,7 +951,9 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                 <td style={{ textAlign: "right", fontWeight: 700, color: "#a78bfa" }}>{fmt2(f.valoare)}</td>
                 <td><span className={`pill ${STATUS_PILL[f.status] ?? "pill--gray"}`}>{STATUS_LABEL[f.status] ?? f.status}</span></td>
                 <td style={{ textAlign: "center" }}>
-                  {alocatFond
+                  {f.notes === "wizard-init-restante-furnizori"
+                    ? <span style={{ color: "#64748b", fontSize: "0.75rem" }}>—</span>
+                    : alocatFond
                     ? <span title={`Acoperită din fond${f.fondName ? " (" + f.fondName + ")" : ""} — nu se distribuie pe apartamente. Plata se face separat din casă/bancă.`}
                         style={{ display: "inline-block", padding: "2px 9px", borderRadius: 99, background: "rgba(56,189,248,0.14)", color: "#38bdf8", fontWeight: 700, fontSize: "0.7rem" }}>din fond{f.fondName ? ` · ${f.fondName}` : ""}</span>
                     : !areDist
