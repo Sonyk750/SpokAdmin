@@ -1149,21 +1149,34 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
               {plataData && (<>
                 {/* Sumar */}
-                <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Valoare factură</div><div style={{ fontWeight: 800, color: "#a78bfa" }}>{fmt2(plataData.valoare)}</div></div>
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Plătit</div><div style={{ fontWeight: 800, color: "#4ade80" }}>{fmt2(plataData.acoperit)}</div></div>
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Rest factură</div><div style={{ fontWeight: 800, color: plataData.rest > 0.01 ? "#f87171" : "#4ade80" }}>{fmt2(plataData.rest)}</div></div>
-                  {hasFurnizor && (plataData.totalDatoratFurnizor ?? 0) > plataData.rest + 0.01 && (
-                    <div style={{ borderLeft: "2px solid rgba(251,191,36,0.4)", paddingLeft: "0.75rem" }}>
-                      <div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#92400e", fontWeight: 700 }}>Total datorat furnizor</div>
-                      <div style={{ fontWeight: 800, color: "#fbbf24" }}>{fmt2(plataData.totalDatoratFurnizor ?? 0)}</div>
+                {(() => {
+                  const alteRest = hasFurnizor ? Math.round(((plataData.totalDatoratFurnizor ?? plataData.rest) - plataData.rest) * 100) / 100 : 0;
+                  const total    = hasFurnizor ? (plataData.totalDatoratFurnizor ?? plataData.rest) : plataData.rest;
+                  return (
+                    <div style={{ padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ color: "#94a3b8", fontSize: "0.85rem", paddingBottom: "0.3rem" }}>Factură curentă</td>
+                            <td style={{ textAlign: "right", fontWeight: 700, color: "#c4b5fd", paddingBottom: "0.3rem" }}>{fmt2(plataData.rest)} lei</td>
+                          </tr>
+                          {alteRest > 0.01 && (
+                            <tr>
+                              <td style={{ color: "#94a3b8", fontSize: "0.85rem", paddingBottom: "0.3rem" }}>Restanță</td>
+                              <td style={{ textAlign: "right", fontWeight: 700, color: "#fbbf24", paddingBottom: "0.3rem" }}>{fmt2(alteRest)} lei</td>
+                            </tr>
+                          )}
+                          {alteRest > 0.01 && (
+                            <tr style={{ borderTop: "1px solid #1e293b" }}>
+                              <td style={{ color: "#e2e8f0", fontSize: "0.9rem", fontWeight: 700, paddingTop: "0.4rem" }}>Total de plată</td>
+                              <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", fontSize: "1.05rem", paddingTop: "0.4rem" }}>{fmt2(total)} lei</td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
                     </div>
-                  )}
-                  <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Status</div><div><span className={`pill ${STATUS_PILL[plataData.status] ?? "pill--gray"}`}>{STATUS_LABEL[plataData.status] ?? plataData.status}</span></div></div>
-                  {hasFurnizor && (
-                    <div><div style={{ fontSize: "0.6rem", textTransform: "uppercase", color: "#475569", fontWeight: 700 }}>Avans furnizor</div><div style={{ fontWeight: 800, color: plataData.avansSold > 0.01 ? "#38bdf8" : "#64748b" }}>{fmt2(plataData.avansSold)}</div></div>
-                  )}
-                </div>
+                  );
+                })()}
 
                 {/* Formular plată nouă */}
                 <div className="form-grid form-grid--2">

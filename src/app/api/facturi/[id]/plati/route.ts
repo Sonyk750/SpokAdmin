@@ -138,7 +138,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         plata.id,
         "Supraplată factură",
       );
-      // Consumă automat avansul pe celelalte facturi neachitate ale furnizorului
+      // Aplică surplusul automat pe celelalte facturi neachitate ale furnizorului
       await consumaAvansPeFacturileFurnizorului(tx, {
         organizationId: factura.organizationId,
         asociatieId:    factura.asociatieId,
