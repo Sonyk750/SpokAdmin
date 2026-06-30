@@ -39,9 +39,10 @@ interface IncasareRow {
   avans:          { suma: number } | null;
 }
 
-interface ApOption { id: string; numar: string; proprietar: string; }
+interface ApOption   { id: string; numar: string; proprietar: string; }
 interface BancaOption { name: string; iban?: string; }
 interface FondOption  { id: string; name: string; }
+interface AsocInfo    { name: string; address: string | null; city: string | null; sector: string | null; cui: string | null; adminName: string | null; presedinteName: string | null; }
 
 interface AvansItem {
   tip:      "intretinere" | "fond";
@@ -117,6 +118,9 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
   const [avansItems,   setAvansItems]   = useState<AvansItem[]>([]);
   const [observatii,   setObservatii]   = useState("");
   const [idTranzactie, setIdTranzactie] = useState("");
+
+  // ── Association info (for PDF/print) ─────────────────────────────────────
+  const [asocInfo, setAsocInfo] = useState<AsocInfo | null>(null);
 
   // ── Detail modal ──────────────────────────────────────────────────────────
   const [detail,     setDetail]     = useState<IncasareRow | null>(null);
@@ -197,14 +201,23 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
       ).catch(() => {});
   }, [asociatieId]);
 
-  // ── Fetch association banks ───────────────────────────────────────────────
+  // ── Fetch association info + banks ───────────────────────────────────────
   useEffect(() => {
-    if (!asociatieId) { setBanci([]); return; }
+    if (!asociatieId) { setBanci([]); setAsocInfo(null); return; }
     fetch(`/api/asociatii/${asociatieId}`)
       .then(r => r.json())
-      .then((data: { banci: BancaOption[]; fonduri: FondOption[] }) => {
+      .then((data: any) => {
         setBanci(data.banci ?? []);
         setFonduri(data.fonduri ?? []);
+        setAsocInfo({
+          name:           data.name           ?? "",
+          address:        data.address        ?? null,
+          city:           data.city           ?? null,
+          sector:         data.sector         ?? null,
+          cui:            data.cui            ?? null,
+          adminName:      data.adminName      ?? null,
+          presedinteName: data.presedinteName ?? null,
+        });
       })
       .catch(() => {});
   }, [asociatieId]);
@@ -327,6 +340,71 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     } catch (e: any) { setFormErr(e.message); }
     finally { setSaving(false); }
   }, [asociatieId, selectedApId, rightDebts, avansItems, avans, tipDocument, whereCollect, dataDoc, serieDoc, nrDocManual, observatii, fetchIncasari]);
+
+  // ── Print / PDF ───────────────────────────────────────────────────────────
+  function buildChitantaDoc(inc: IncasareRow): any {
+    const roDate = (iso: string) => new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const adresa = [asocInfo?.address, asocInfo?.sector ? `Sector ${asocInfo.sector}` : null, asocInfo?.city].filter(Boolean).join(", ");
+    const docLabel = TIP_DOC_LABEL[inc.tipDocument] ?? inc.tipDocument;
+    const docNr = inc.serie && inc.numarDocument != null ? ` ${inc.serie} ${inc.numarDocument}` : "";
+    const pozitiiLines: any[] = inc.pozitii.map(p => ({
+      columns: [{ text: p.denumire, width: "*", fontSize: 10, color: "#333" }, { text: `${fmt2(p.suma)} lei`, width: "auto", fontSize: 10, alignment: "right" }],
+      margin: [0, 2, 0, 0],
+    }));
+    const avansArr: any[] = Array.isArray(inc.avans)
+      ? (inc.avans as any[]).map(a => ({ columns: [{ text: a.denumire ?? "Avans", width: "*", fontSize: 10, color: "#555", italics: true }, { text: `− ${fmt2(a.suma)} lei`, width: "auto", fontSize: 10, alignment: "right", color: "#555", italics: true }], margin: [0, 2, 0, 0] }))
+      : (!Array.isArray(inc.avans) && (inc.avans as any)?.suma > 0
+          ? [{ columns: [{ text: "Avans", width: "*", fontSize: 10, color: "#555", italics: true }, { text: `− ${fmt2((inc.avans as any).suma)} lei`, width: "auto", fontSize: 10, alignment: "right", color: "#555", italics: true }], margin: [0, 2, 0, 0] }]
+          : []);
+
+    return {
+      pageSize: "A5",
+      pageOrientation: "landscape",
+      pageMargins: [30, 28, 30, 28],
+      content: [
+        // Antet
+        { text: asocInfo?.name ?? "", bold: true, fontSize: 13, margin: [0, 0, 0, 2] },
+        adresa ? { text: adresa, fontSize: 8.5, color: "#444", margin: [0, 0, 0, 1] } : {},
+        asocInfo?.cui ? { text: `CUI: ${asocInfo.cui}`, fontSize: 8, color: "#666" } : {},
+        { canvas: [{ type: "line", x1: 0, y1: 4, x2: 530, y2: 4, lineWidth: 1, lineColor: "#aaa" }], margin: [0, 6, 0, 10] },
+        // Titlu document
+        { text: `${docLabel}${docNr}`, fontSize: 16, bold: true, alignment: "center", margin: [0, 0, 0, 4] },
+        { text: `Data: ${roDate(inc.data)}`, fontSize: 10, alignment: "center", color: "#555", margin: [0, 0, 0, 14] },
+        // Detalii
+        { text: `Am primit de la: ${inc.proprietarNume ?? "—"}`, fontSize: 10, margin: [0, 0, 0, 4] },
+        { text: `Apartament nr.: ${inc.nrApartament}`, fontSize: 10, margin: [0, 0, 0, 10] },
+        { text: "Detaliu plată:", fontSize: 9, bold: true, color: "#555", margin: [0, 0, 0, 4] },
+        ...pozitiiLines,
+        ...avansArr,
+        { canvas: [{ type: "line", x1: 0, y1: 4, x2: 530, y2: 4, lineWidth: 0.5, lineColor: "#ccc" }], margin: [0, 8, 0, 6] },
+        { columns: [{ text: "TOTAL ÎNCASAT:", bold: true, fontSize: 11 }, { text: `${fmt2(inc.sumaIncasata)} lei`, bold: true, fontSize: 13, alignment: "right" }] },
+        // Semnături
+        { columns: [
+            { text: `Administrator,\n\n\n${asocInfo?.adminName ?? ""}`, fontSize: 9, color: "#555", alignment: "center" },
+            { text: "Casier,\n\n\n", fontSize: 9, color: "#555", alignment: "center" },
+            { text: "Am primit,\n\n\n", fontSize: 9, color: "#555", alignment: "center" },
+          ], margin: [0, 20, 0, 0] },
+      ],
+      styles: {},
+      defaultStyle: { font: "Roboto" },
+    };
+  }
+
+  async function handlePrint(inc: IncasareRow) {
+    const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
+    const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
+    (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
+    (pdfMake.default ?? pdfMake).createPdf(buildChitantaDoc(inc)).print();
+  }
+
+  async function handlePdf(inc: IncasareRow) {
+    const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
+    const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
+    (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
+    const docLabel = inc.serie && inc.numarDocument != null ? `${inc.serie}${inc.numarDocument}` : "incasare";
+    const filename = `chitanta_ap${inc.nrApartament}_${docLabel}.pdf`;
+    (pdfMake.default ?? pdfMake).createPdf(buildChitantaDoc(inc)).download(filename);
+  }
 
   // ── Delete ────────────────────────────────────────────────────────────────
   const handleDelete = useCallback(async (id: string, noReverse = false) => {
@@ -455,7 +533,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 <th>Proprietar</th>
                 <th>Plată</th>
                 <th style={{ textAlign: "right" }}>Sumă</th>
-                <th style={{ width: "48px" }} />
+                <th style={{ width: "160px" }} />
               </tr>
             </thead>
             <tbody>
@@ -484,7 +562,26 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80" }}>
                     {fmt2(inc.sumaIncasata)} lei
                   </td>
-                  <td />
+                  <td onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end", flexWrap: "nowrap" }}>
+                      <button className="btn-action" title="Editează"
+                        onClick={() => { setDetail(inc); openEditMode(inc); setConfirmDel(null); }}>
+                        ✎
+                      </button>
+                      <button className="btn-action" title="Printează"
+                        onClick={() => handlePrint(inc)}>
+                        🖨
+                      </button>
+                      <button className="btn-action" title="Descarcă PDF"
+                        onClick={() => handlePdf(inc)}>
+                        PDF
+                      </button>
+                      <button className="btn-action btn-action--danger" title="Șterge"
+                        onClick={() => { setDetail(inc); setConfirmDel("sterge"); setEditMode(false); }}>
+                        ✕
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
