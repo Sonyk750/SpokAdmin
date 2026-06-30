@@ -26,6 +26,8 @@ interface AsocInfo {
   adminName: string | null; cenzorName: string | null; presedinteName: string | null;
 }
 
+const sortApartamente = (items: ApItem[]) =>
+  [...items].sort((a, b) => a.numar.localeCompare(b.numar, "ro-RO", { numeric: true, sensitivity: "base" }));
 const fmt2 = (v: number) => v.toFixed(2);
 const LUNI = ["", "Ian", "Feb", "Mar", "Apr", "Mai", "Iun", "Iul", "Aug", "Sep", "Oct", "Noi", "Dec"];
 const metodaLabel = (m: string) => m === "casa" ? "Casă" : m === "banca" ? "Bancă" : m === "online" ? "Online" : m;
@@ -140,7 +142,7 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
     if (!asociatieId) { setAsoc(null); setAps([]); setApId(""); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
     fetch(`/api/asociatii/${asociatieId}/apartamente`).then(r => r.json()).then((d: { apartamente: any[] }) => {
-      const list = (d.apartamente ?? []).map(a => ({ id: a.id, numar: a.numar, proprietar: a.proprietar || "" }));
+      const list = sortApartamente((d.apartamente ?? []).map(a => ({ id: a.id, numar: a.numar, proprietar: a.proprietar || "" })));
       setAps(list);
       setApId(prev => (prev && list.some((x: ApItem) => x.id === prev)) ? prev : (list[0]?.id ?? ""));
     }).catch(() => setAps([]));
