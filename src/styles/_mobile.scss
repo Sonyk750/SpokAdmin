@@ -7,8 +7,8 @@ html, body {
   overflow-x: hidden;
   overscroll-behavior-x: none;
 }
-.app-layout { max-width: 100vw; overflow-x: hidden; }
-.app-body   { min-width: 0; max-width: 100vw; overflow-x: hidden; }
+.app-layout { max-width: 100%; overflow-x: hidden; }
+.app-body   { min-width: 0; max-width: 100%; overflow-x: hidden; }
 .app-main   { min-width: 0; }
 
 // ─── PWA / Mobile polish ──────────────────────────────────────────────────────
@@ -22,6 +22,27 @@ html, body {
 @media (max-width: 768px) {
   // Fără rubber-band / pull-to-refresh → senzație de aplicație nativă.
   html, body { overscroll-behavior: none; width: 100%; max-width: 100%; }
+
+  // Shell-ul aplicației = container fix pe tot ecranul (DOAR paginile din app au
+  // .app-layout → marketing/login NU sunt afectate). Scroll-ul vertical se face
+  // intern, iar orizontalul e tăiat complet → pagina NU se mai mișcă lateral.
+  .app-layout {
+    position: fixed;
+    inset: 0;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-body {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
 
   // Mai mult spațiu util pe ecran mic.
   .app-main {
