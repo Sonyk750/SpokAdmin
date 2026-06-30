@@ -59,10 +59,23 @@ export async function GET(req: NextRequest) {
   const sold = ap.solduri[0];
   const restInt = (sold?.restantaIntretinere ?? 0) + (sold?.intretinereCurenta ?? 0);
   const restFond = ap.fonduri.reduce((s, f) => s + (f.restanta ?? 0), 0);
+  const totalRestanta = restInt + restFond;
 
   const liste = listeAp
     .map(l => ({ id: l.id, luna: l.lista?.luna ?? 0, an: l.lista?.an ?? 0, totalLuna: l.totalLuna, totalDePlata: l.totalDePlata, achitat: l.achitat, rest: l.rest }))
     .sort((a, b) => a.an - b.an || a.luna - b.luna);
+
+  const incasariRows = incasari.map(i => ({
+    id: i.id, data: i.data.toISOString(), document: `${i.serie} ${i.numarDocument}`,
+    tipPlata: i.tipPlata, suma: i.sumaIncasata, detalii: detaliiIncasare(i.pozitiiJson, i.avansJson),
+    soldInainte: 0,
+  }));
+  let soldDupa = totalRestanta;
+  for (let i = incasariRows.length - 1; i >= 0; i--) {
+    const soldInainte = soldDupa + incasariRows[i].suma;
+    incasariRows[i].soldInainte = soldInainte;
+    soldDupa = soldInainte;
+  }
 
   return NextResponse.json({
     proprietar: {
@@ -73,11 +86,8 @@ export async function GET(req: NextRequest) {
     },
     restantaIntretinere: restInt,
     restantaFonduri:     restFond,
-    totalRestanta:       restInt + restFond,
-    incasari: incasari.map(i => ({
-      id: i.id, data: i.data.toISOString(), document: `${i.serie} ${i.numarDocument}`,
-      tipPlata: i.tipPlata, suma: i.sumaIncasata, detalii: detaliiIncasare(i.pozitiiJson, i.avansJson),
-    })),
+    totalRestanta,
+    incasari: incasariRows,
     liste,
   });
 }

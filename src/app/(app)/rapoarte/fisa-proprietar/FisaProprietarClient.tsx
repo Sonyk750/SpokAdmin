@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 import RoDate from "@/components/RoDate";
 
-interface IncRow { id: string; data: string; document: string; tipPlata: string; suma: number; detalii: string; }
+interface IncRow { id: string; data: string; document: string; tipPlata: string; suma: number; detalii: string; soldInainte: number; }
 interface ListaRow { id: string; luna: number; an: number; totalLuna: number; totalDePlata: number; achitat: number; rest: number; }
 interface Fisa {
   proprietar: { nume: string; telefon: string | null; email: string | null; numarAp: string };
@@ -30,12 +30,12 @@ async function downloadPdf(asoc: AsocInfo | null, fisa: Fisa, dataStart: string,
 
   const totalIncasat = fisa.incasari.reduce((s, r) => s + r.suma, 0);
   const incBody: any[][] = [
-    [ { text: "Data", style: "th", alignment: "center" }, { text: "Document", style: "th", alignment: "center" }, { text: "Detalii", style: "th" }, { text: "Metodă", style: "th", alignment: "center" }, { text: "Sumă", style: "th", alignment: "right" } ],
+    [ { text: "Data", style: "th", alignment: "center" }, { text: "Document", style: "th", alignment: "center" }, { text: "Detalii", style: "th" }, { text: "Metodă", style: "th", alignment: "center" }, { text: "Sold înainte", style: "th", alignment: "right" }, { text: "Sumă", style: "th", alignment: "right" } ],
     ...fisa.incasari.map(r => [
       { text: roDate(r.data), alignment: "center", fontSize: 8 }, { text: r.document, alignment: "center", fontSize: 8 },
-      { text: r.detalii || "—", fontSize: 8 }, { text: metodaLabel(r.tipPlata), alignment: "center", fontSize: 8 }, { text: fmt2(r.suma), alignment: "right", fontSize: 8 },
+      { text: r.detalii || "—", fontSize: 8 }, { text: metodaLabel(r.tipPlata), alignment: "center", fontSize: 8 }, { text: fmt2(r.soldInainte), alignment: "right", fontSize: 8 }, { text: fmt2(r.suma), alignment: "right", fontSize: 8 },
     ]),
-    [ { text: `TOTAL încasat`, colSpan: 4, alignment: "right", bold: true, fontSize: 9 }, {}, {}, {}, { text: fmt2(totalIncasat), alignment: "right", bold: true, fontSize: 9 } ],
+    [ { text: `TOTAL încasat`, colSpan: 5, alignment: "right", bold: true, fontSize: 9 }, {}, {}, {}, {}, { text: fmt2(totalIncasat), alignment: "right", bold: true, fontSize: 9 } ],
   ];
 
   const listeBody: any[][] = [
@@ -64,7 +64,7 @@ async function downloadPdf(asoc: AsocInfo | null, fisa: Fisa, dataStart: string,
         { text: `TOTAL restanță: ${fmt2(fisa.totalRestanta)} lei`, fontSize: 9, bold: true, alignment: "right" },
       ], margin: [0, 0, 0, 12] },
       { text: "Încasări", bold: true, fontSize: 10, margin: [0, 4, 0, 4] },
-      { table: { headerRows: 1, widths: [50, 55, "*", 50, 55], body: incBody }, layout: tableLayout() },
+      { table: { headerRows: 1, widths: [45, 50, "*", 45, 58, 50], body: incBody }, layout: tableLayout() },
       { text: "Liste de plată", bold: true, fontSize: 10, margin: [0, 14, 0, 4] },
       fisa.liste.length ? { table: { headerRows: 1, widths: ["*", "*", "*", "*", "*"], body: listeBody }, layout: tableLayout() } : { text: "Nicio listă de plată.", italics: true, fontSize: 8, color: "#777" },
     ],
@@ -192,7 +192,7 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
             <div style={{ fontWeight: 700, color: "#cbd5e1", margin: "0 0 0.5rem", fontSize: "0.9rem" }}>Încasări</div>
             {fisa.incasari.length === 0 ? <div className="dash-panel__empty">Nicio încasare în perioadă.</div> : (
               <table className="data-table" style={{ fontSize: "0.8125rem" }}>
-                <thead><tr><th>Data</th><th>Document</th><th>Detalii</th><th style={{ textAlign: "center" }}>Metodă</th><th style={{ textAlign: "right" }}>Sumă (lei)</th></tr></thead>
+                <thead><tr><th>Data</th><th>Document</th><th>Detalii</th><th style={{ textAlign: "center" }}>Metodă</th><th style={{ textAlign: "right" }}>Sold înainte (lei)</th><th style={{ textAlign: "right" }}>Sumă (lei)</th></tr></thead>
                 <tbody>
                   {fisa.incasari.map(r => (
                     <tr key={r.id}>
@@ -200,11 +200,12 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
                       <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{r.document}</td>
                       <td style={{ color: "#94a3b8" }}>{r.detalii || "—"}</td>
                       <td style={{ textAlign: "center", color: "#94a3b8" }}>{metodaLabel(r.tipPlata)}</td>
+                      <td style={{ textAlign: "right", color: "#cbd5e1", whiteSpace: "nowrap" }}>{fmt2(r.soldInainte)}</td>
                       <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(r.suma)}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr><td colSpan={4} style={{ textAlign: "right", fontWeight: 700, color: "#94a3b8" }}>Total încasat</td><td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</td></tr></tfoot>
+                <tfoot><tr><td colSpan={5} style={{ textAlign: "right", fontWeight: 700, color: "#94a3b8" }}>Total încasat</td><td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</td></tr></tfoot>
               </table>
             )}
           </div>
@@ -248,7 +249,7 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
           </div>
           <div style={{ fontWeight: "bold", fontSize: "10pt", margin: "6pt 0 4pt" }}>Încasări</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
-            <thead><tr>{["Data", "Document", "Detalii", "Metodă", "Sumă"].map((h, i) => <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "3pt 4pt", textAlign: i === 4 ? "right" : i === 2 ? "left" : "center", fontWeight: "bold" }}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Data", "Document", "Detalii", "Metodă", "Sold înainte", "Sumă"].map((h, i) => <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "3pt 4pt", textAlign: i >= 4 ? "right" : i === 2 ? "left" : "center", fontWeight: "bold" }}>{h}</th>)}</tr></thead>
             <tbody>
               {fisa.incasari.map((r, idx) => (
                 <tr key={r.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
@@ -256,10 +257,11 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
                   <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center" }}>{r.document}</td>
                   <td style={{ border: "1px solid #999", padding: "3pt 4pt" }}>{r.detalii || "—"}</td>
                   <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center" }}>{metodaLabel(r.tipPlata)}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{fmt2(r.soldInainte)}</td>
                   <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{fmt2(r.suma)}</td>
                 </tr>
               ))}
-              <tr><td colSpan={4} style={{ borderTop: "2px solid #000", padding: "3pt 6pt", textAlign: "right", fontWeight: "bold" }}>TOTAL încasat</td><td style={{ borderTop: "2px solid #000", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIncasat)}</td></tr>
+              <tr><td colSpan={5} style={{ borderTop: "2px solid #000", padding: "3pt 6pt", textAlign: "right", fontWeight: "bold" }}>TOTAL încasat</td><td style={{ borderTop: "2px solid #000", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIncasat)}</td></tr>
             </tbody>
           </table>
           {fisa.liste.length > 0 && (
