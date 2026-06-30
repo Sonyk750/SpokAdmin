@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
-import RoDate from "@/components/RoDate";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +61,7 @@ const TIP_DOC_LABEL: Record<string, string> = {
   chitanta:            "Chitanță",
   dispozitie_incasare: "Dispoziție de încasare",
   proces_verbal:       "Proces verbal",
+  extras_cont:         "Extras de cont",
 };
 
 const TIP_PLATA_LABEL: Record<string, string> = {
@@ -149,6 +149,15 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     const q = apSearch.toLowerCase();
     return !q || ap.numar.includes(q) || ap.proprietar.toLowerCase().includes(q);
   });
+
+  // ── Auto-switch tipDocument when whereCollect changes ────────────────────
+  useEffect(() => {
+    if (whereCollect !== "casa") {
+      setTipDocument("extras_cont");
+    } else {
+      setTipDocument(prev => prev === "extras_cont" ? "chitanta" : prev);
+    }
+  }, [whereCollect]);
 
   // ── Close dropdown on outside click ──────────────────────────────────────
   useEffect(() => {
@@ -536,18 +545,19 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1.4fr", gap: "1rem" }}>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Data încasării</label>
-                  <RoDate className="input" value={dataDoc} onChange={v => setDataDoc(v)} />
+                  <input type="date" className="input" value={dataDoc} onChange={e => setDataDoc(e.target.value)} />
                 </div>
                 <div className="form-field" style={{ marginBottom: 0 }}>
                   <label className="form-field__label">Tip document</label>
                   <select className="input" value={tipDocument} onChange={e => setTipDocument(e.target.value)}>
+                    {whereCollect !== "casa" && <option value="extras_cont">Extras de cont</option>}
                     <option value="chitanta">Chitanță</option>
                     <option value="dispozitie_incasare">Dispoziție de încasare</option>
                     <option value="proces_verbal">Proces verbal</option>
                   </select>
                 </div>
                 <div className="form-field" style={{ marginBottom: 0 }}>
-                  <label className="form-field__label">Serie / Nr. chitanță</label>
+                  <label className="form-field__label">Serie / Nr. document</label>
                   <div style={{ display: "flex", gap: "0.375rem" }}>
                     <input type="text" className="input" value={serieDoc} onChange={e => setSerieDoc(e.target.value)}
                       style={{ width: "54px" }} maxLength={6} placeholder="CH" />
@@ -979,11 +989,12 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Data</label>
-                      <RoDate className="input" value={editData} onChange={v => setEditData(v)} />
+                      <input type="date" className="input" value={editData} onChange={e => setEditData(e.target.value)} />
                     </div>
                     <div className="form-field" style={{ marginBottom: 0 }}>
                       <label className="form-field__label">Tip document</label>
                       <select className="input" value={editTipDoc} onChange={e => setEditTipDoc(e.target.value)}>
+                        <option value="extras_cont">Extras de cont</option>
                         <option value="chitanta">Chitanță</option>
                         <option value="dispozitie_incasare">Dispoziție de încasare</option>
                         <option value="proces_verbal">Proces verbal</option>
