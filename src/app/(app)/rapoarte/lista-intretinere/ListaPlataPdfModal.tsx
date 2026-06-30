@@ -171,57 +171,78 @@ function buildDocDef(
   luna: number,
   an: number,
 ) {
-  const fs = opts.fontSize;
-  const th = (text: string, al = "right"): any => ({
-    text, bold: true, fontSize: fs + 1, alignment: al,
-  });
-
-  const hdr: any[] = [];
-  // Relative weights determine proportional widths — guarantees table fits page exactly
-  const colW: number[] = [];
-
+  // ── Page geometry ───────────────────────────────────────────────────────────
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
 
-  // ── Construiește header și weights ──────────────────────────────────────────
-  hdr.push(th("Nr.\nAp.", "center")); colW.push(0.5);
-  if (opts.showProprietar) { hdr.push(th("Proprietar", "left")); colW.push(3.0); }
-  if (coloane.nrPersone && opts.showNrPersone)  { hdr.push(th("Pers.", "center"));          colW.push(0.55); }
-  if (coloane.cotaParte && opts.showCotaParte)   { hdr.push(th("CPI", "center"));            colW.push(0.6);  }
-  if (coloane.suprafata && opts.showSuprafata)   { hdr.push(th("Supraf.\n(m²)", "center")); colW.push(0.65); }
+  // ── Column descriptors ───────────────────────────────────────────────────────
+  // chars = estimated widest data value in characters (drives font auto-shrink + width)
+  // CHAR_W = pt per character per 1pt of font size (Roboto/sans-serif approximation)
+  const CHAR_W = 0.52;
+  const PAD    = 6; // total horizontal cell padding (3pt each side)
+
+  type CD = { label: string; al: string; chars: number };
+  const cols: CD[] = [];
+
+  cols.push({ label: "Nr.\nAp.",        al: "center", chars: 4  });
+  if (opts.showProprietar)
+    cols.push({ label: "Proprietar",    al: "left",   chars: 18 });
+  if (coloane.nrPersone && opts.showNrPersone)
+    cols.push({ label: "Pers.",         al: "center", chars: 3  });
+  if (coloane.cotaParte && opts.showCotaParte)
+    cols.push({ label: "CPI",           al: "center", chars: 7  });
+  if (coloane.suprafata && opts.showSuprafata)
+    cols.push({ label: "Supraf.\n(m²)", al: "center", chars: 7  });
 
   for (const c of coloane.consumuri) {
-    if (opts.consumViz[c.tip])                        { hdr.push(th(`${c.label}\n(${c.unit})`, "right")); colW.push(1.0); }
-    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])  { hdr.push(th(`${c.label}\n(lei)`, "right"));       colW.push(1.0); }
+    if (opts.consumViz[c.tip])
+      cols.push({ label: `${c.label}\n(${c.unit})`, al: "right", chars: 8 });
+    if (c.valoareLeiKey && opts.consumLeiViz[c.tip])
+      cols.push({ label: `${c.label}\n(lei)`,       al: "right", chars: 8 });
   }
-
   for (const col of movCols) {
-    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])  { hdr.push(th(col.cheltLabel ?? "", "right")); colW.push(1.0); }
-    if (col.kind === "totalLuna" && opts.showTotalLuna)         { hdr.push(th("Total\nlună", "right"));        colW.push(1.1); }
+    if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])
+      cols.push({ label: col.cheltLabel ?? "", al: "right", chars: 8 });
+    if (col.kind === "totalLuna" && opts.showTotalLuna)
+      cols.push({ label: "Total\nlună",       al: "right", chars: 8 });
   }
-
-  if (coloane.hasRestantaIntretinere && opts.showRestanta) { hdr.push(th("Rest.\nîntrețin.", "right")); colW.push(0.9); }
-
+  if (coloane.hasRestantaIntretinere && opts.showRestanta)
+    cols.push({ label: "Rest.\nîntrețin.", al: "right", chars: 8 });
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
-    if (opts.fondMode === "total") {
-      hdr.push(th("Fond.\nrest.", "right")); colW.push(0.9);
-    } else {
-      for (const f of coloane.fonduri) {
-        if (opts.fondViz[f.id] !== false) { hdr.push(th(f.name, "right")); colW.push(0.9); }
-      }
-    }
+    if (opts.fondMode === "total")
+      cols.push({ label: "Fond.\nrest.", al: "right", chars: 8 });
+    else
+      for (const f of coloane.fonduri)
+        if (opts.fondViz[f.id] !== false)
+          cols.push({ label: f.name, al: "right", chars: 8 });
   }
+  cols.push({ label: "TOTAL\n(lei)", al: "right", chars: 9 });
+  if (opts.showNrEnd)
+    cols.push({ label: "Nr.\nAp.", al: "center", chars: 4 });
 
-  hdr.push(th("TOTAL\n(lei)", "right")); colW.push(1.3);
-  if (opts.showNrEnd) { hdr.push(th("Nr.\nAp.", "center")); colW.push(0.5); }
+  // ── Auto-shrink font until all columns fit on page ───────────────────────────
+  const neededW = (fontSize: number) =>
+    cols.reduce((s, c) => s + Math.ceil(c.chars * fontSize * CHAR_W) + PAD, 0);
+  let fs = opts.fontSize;
+  while (fs > 5 && neededW(fs) > availW) fs--;
 
-  // Compute numeric widths proportionally so sum === availW (no overflow)
-  const totalWeight = colW.reduce((s, w) => s + w, 0);
-  const widths: number[] = colW.map(w => Math.floor(availW * w / totalWeight));
-  // Distribute rounding remainder to last column
-  const wSum = widths.reduce((s, v) => s + v, 0);
-  widths[widths.length - 1] += Math.floor(availW) - wSum;
+  // ── Proportional widths that sum exactly to availW (no overflow) ─────────────
+  const base     = cols.map(c => Math.ceil(c.chars * fs * CHAR_W) + PAD);
+  const baseSum  = base.reduce((s, v) => s + v, 0);
+  const extra    = Math.floor(availW) - baseSum;
+  const totChars = cols.reduce((s, c) => s + c.chars, 0);
+  const widths: number[] = base.map((w, i) =>
+    w + Math.floor(extra * cols[i].chars / totChars)
+  );
+  // absorb rounding remainder into last column
+  widths[widths.length - 1] += Math.floor(availW) - widths.reduce((s, v) => s + v, 0);
+
+  // ── Header row ───────────────────────────────────────────────────────────────
+  const th = (text: string, al = "right"): any => ({
+    text, bold: true, fontSize: fs + 1, alignment: al,
+  });
+  const hdr: any[] = cols.map(c => th(c.label, c.al));
 
   // TOTAL label acoperă doar Nr. Ap. + Proprietar; totalurile Pers/CPI/Supraf apar separat
   const labelSpan = 1 + (opts.showProprietar ? 1 : 0);
