@@ -176,7 +176,6 @@ function buildDocDef(
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
   const pageH  = opts.orientation === "landscape" ? size.w : size.h;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
-  const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
   // ── Column descriptors with proportional weights ──────────────────────────────
   // Each column gets a fraction of availW proportional to its weight.
@@ -233,14 +232,17 @@ function buildDocDef(
   // decât cota lor, împingând ultimele coloane în afara paginii.
   // Cu valori numerice, pdfmake folosește exact valorile specificate, indiferent de conținut.
   const totalWt   = cols.reduce((s, c) => s + c.wt, 0);
-  const safeFloor = Math.floor(availW) - 2; // -2pt marjă față de rotunjirile interne pdfmake
-  const widths: number[] = cols.map(c => Math.floor(c.wt / totalWt * safeFloor));
+  const vLineW    = cols.length > 24 ? 0.2 : 0.3;
+  const cellPadX  = cols.length > 24 ? 0.8 : cols.length > 18 ? 1.1 : 1.6;
+  const tableChromeW = (cols.length * cellPadX * 2) + ((cols.length + 1) * vLineW);
+  const safeFloor = Math.max(cols.length * 4, Math.floor(availW - tableChromeW) - 2);
+  const widths: number[] = cols.map(c => Math.max(4, Math.floor(c.wt / totalWt * safeFloor)));
   widths[widths.length - 1] += safeFloor - widths.reduce((s, v) => s + v, 0);
 
   // ── Font auto-shrink: numeric column must fit "12345.67" (8 chars) ────────────
   const numColW = (W_NUM / totalWt) * safeFloor;
   let fs = opts.fontSize;
-  while (fs > 5 && 8 * fs * 0.56 + PAD > numColW) fs--;
+  while (fs > 4 && 8 * fs * 0.56 > numColW) fs--;
 
   // ── Header row ───────────────────────────────────────────────────────────────
   const th = (text: string, al = "right"): any => ({
@@ -437,14 +439,14 @@ function buildDocDef(
             if (rowIdx === body.length - 1) return "#EEEEEE";
             return rowIdx % 2 === 1 ? "#F5F5F5" : null;
           },
-          hLineWidth: () => 0.4,
-          vLineWidth: () => 0.4,
+          hLineWidth: () => 0.3,
+          vLineWidth: () => vLineW,
           hLineColor: () => "#999",
           vLineColor: () => "#999",
-          paddingTop: () => 2,
-          paddingBottom: () => 2,
-          paddingLeft: () => 3,
-          paddingRight: () => 3,
+          paddingTop: () => 1.5,
+          paddingBottom: () => 1.5,
+          paddingLeft: () => cellPadX,
+          paddingRight: () => cellPadX,
         },
       },
     ],
