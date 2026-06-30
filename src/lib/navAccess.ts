@@ -4,6 +4,7 @@
 type Req = string | "ADMIN" | null;
 
 const PATH_PERM: [string, Req][] = [
+  ["/dashboard",                    null], // doar afișare, permis oricui logat
   ["/rapoarte/lista-intretinere",   "lista_plata"],
   ["/rapoarte/explicatii-lista",    "explicatii"],
   ["/rapoarte/incasari",            "reg_incasari"],
@@ -41,8 +42,9 @@ export function pathAllowed(pathname: string, isAdmin: boolean, can: (k: string)
   return isAdmin || can(req);
 }
 
-// Prima pagină permisă pentru un user restricționat (pt. redirect din pagini interzise).
+// Prima pagină permisă (pt. redirect din pagini interzise). Dashboard e permis oricui.
 const LANDING_CANDIDATES = [
+  "/dashboard",
   "/rapoarte/lista-intretinere",
   "/rapoarte/incasari",
   "/incasari",
@@ -50,7 +52,6 @@ const LANDING_CANDIDATES = [
   "/mesaje",
 ];
 export function firstAllowedPath(isAdmin: boolean, can: (k: string) => boolean): string {
-  if (isAdmin) return "/dashboard";
   for (const p of LANDING_CANDIDATES) if (pathAllowed(p, isAdmin, can)) return p;
   return "/acces-interzis";
 }
