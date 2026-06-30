@@ -6,6 +6,8 @@ import { signOut } from "next-auth/react";
 import { useState, useEffect } from "react";
 import { useSidebar } from "@/lib/SidebarContext";
 import { useAsociatie } from "@/lib/AsociatieContext";
+import { useAccess } from "@/lib/AccessContext";
+import { pathAllowed } from "@/lib/navAccess";
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 
@@ -115,7 +117,34 @@ export default function Sidebar({
   const pathname  = usePathname();
   const { isOpen, close } = useSidebar();
   const { activeId } = useAsociatie();
+  const { isAdmin, can } = useAccess();
   const [furnizorCitiri, setFurnizorCitiri] = useState<string>("");
+
+  // Filtrează nav-ul după drepturi (adminii văd tot).
+  const leafVisible = (href: string) => pathAllowed(href, isAdmin, can);
+  function cleanChildren(children: (Leaf | Label)[]): (Leaf | Label)[] {
+    const out: (Leaf | Label)[] = [];
+    for (let i = 0; i < children.length; i++) {
+      const c = children[i];
+      if (c.type === "link") { if (leafVisible(c.href)) out.push(c); }
+      else {
+        let keep = false;
+        for (let j = i + 1; j < children.length && children[j].type !== "label"; j++) {
+          const cj = children[j];
+          if (cj.type === "link" && leafVisible(cj.href)) { keep = true; break; }
+        }
+        if (keep) out.push(c);
+      }
+    }
+    return out;
+  }
+  const visibleNav: Item[] = nav
+    .map((item): Item | null => {
+      if (item.type === "link") return leafVisible(item.href) ? item : null;
+      const kids = cleanChildren(item.children);
+      return kids.some(c => c.type === "link") ? { ...item, children: kids } : null;
+    })
+    .filter((x): x is Item => x !== null);
 
   useEffect(() => {
     if (!activeId) return;
@@ -125,7 +154,7 @@ export default function Sidebar({
     } catch { setFurnizorCitiri(""); }
   }, [activeId]);
 
-  const defaultOpen = nav
+  const defaultOpen = visibleNav
     .filter((i): i is Group => i.type === "group")
     .filter(g => g.children.some(c => c.type === "link" && pathname.startsWith((c as Leaf).href)))
     .map(g => g.key);
@@ -154,7 +183,7 @@ export default function Sidebar({
         </div>
 
         <nav className="sidebar__nav">
-          {nav.map((item) => {
+          {visibleNav.map((item) => {
             if (item.type === "link") {
               return (
                 <Link

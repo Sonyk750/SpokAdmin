@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DEFAULT_PERMS, type RoleKey, type PermMap } from "@/lib/permissions";
 
 // ─── Layer 1: Acces funcții (matricea de rapoarte) ────────────────────────────
 
-type ExtraCalitate = "presedinte" | "cenzor" | "membru_cex" | "casier";
-type RoleKey = "proprietar" | ExtraCalitate;
-type PermMap = Record<string, boolean>;
 type RolePerms = Record<RoleKey, PermMap>;
 
 interface ReportDef { key: string; label: string; locked?: RoleKey[] }
@@ -41,14 +39,6 @@ const REPORT_GROUPS: { group: string; items: ReportDef[] }[] = [
     { key: "mesaje",        label: "Mesaje în aplicație", locked: ["proprietar", "presedinte", "cenzor", "membru_cex", "casier"] },
   ]},
 ];
-
-const DEFAULT_PERMS: RolePerms = {
-  proprietar: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, chit_add: false, chit_edit: false, chit_delete: false, citiri: true, istoric_index: true, mesaje: true },
-  presedinte: { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: true,  chit_edit: true,  chit_delete: true,  citiri: true,  istoric_index: true, mesaje: true },
-  cenzor:     { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: false, chit_edit: false, chit_delete: false, citiri: false, istoric_index: true, mesaje: true },
-  membru_cex: { lista_plata: true, explicatii: false, reg_incasari: false, reg_plati: false, reg_casa: false, reg_banca: false, jurnal: false, reg_fonduri: false, restantieri: false, fisa_proprie: true, fisa_furnizor: false, venituri: false, chit_add: false, chit_edit: false, chit_delete: false, citiri: false, istoric_index: false, mesaje: true },
-  casier:     { lista_plata: true, explicatii: true,  reg_incasari: true,  reg_plati: true,  reg_casa: true,  reg_banca: true,  jurnal: true,  reg_fonduri: true,  restantieri: true,  fisa_proprie: true, fisa_furnizor: true,  venituri: true,  chit_add: true,  chit_edit: true,  chit_delete: false, citiri: false, istoric_index: false, mesaje: true },
-};
 
 const ROLE_LABELS: Record<RoleKey, string> = { proprietar: "Proprietar", presedinte: "Președinte", cenzor: "Cenzor", membru_cex: "Mem. CEX", casier: "Casier" };
 const ROLE_COLORS: Record<RoleKey, string> = { proprietar: "#7c3aed", presedinte: "#fbbf24", cenzor: "#38bdf8", membru_cex: "#4ade80", casier: "#fb923c" };

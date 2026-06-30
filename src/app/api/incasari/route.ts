@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { resolveAccess } from "@/lib/access";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -14,10 +15,14 @@ export async function GET(req: NextRequest) {
 
   if (!asociatieId) return NextResponse.json({ error: "Parametri lipsă" }, { status: 400 });
 
+  const access = await resolveAccess(session!.user as any, asociatieId);
+
   const dataStart = searchParams.get("dataStart");
   const dataEnd   = searchParams.get("dataEnd");
 
   const where: Record<string, unknown> = { asociatieId, organizationId: orgId };
+  // Userii restricționați (ex. casier) văd doar chitanțele emise de ei.
+  if (!access.isAdmin) where.createdById = session!.user!.id;
   if (dataStart || dataEnd) {
     where.data = {
       ...(dataStart ? { gte: new Date(dataStart) } : {}),
@@ -54,6 +59,12 @@ export async function POST(req: NextRequest) {
   if (!asociatieId || !apartamentId || !Array.isArray(pozitii) || pozitii.length === 0)
     return NextResponse.json({ error: "Date incomplete" }, { status: 400 });
 
+  const access = await resolveAccess(session!.user as any, asociatieId);
+  if (!access.isAdmin && !access.perms.chit_add)
+    return NextResponse.json({ error: "Nu ai dreptul să emiți chitanțe" }, { status: 403 });
+  // Userii restricționați pot emite doar prin casă.
+  const tipPlataEff = access.isAdmin ? (tipPlata || "casa") : "casa";
+
   const asoc = await db.asociatie.findFirst({ where: { id: asociatieId, organizationId: orgId } });
   if (!asoc) return NextResponse.json({ error: "Asociație negăsită" }, { status: 404 });
 
@@ -75,7 +86,7 @@ export async function POST(req: NextRequest) {
   let serie: string | null = null;
   let numarDocument: number | null = null;
 
-  if (!tipPlata || tipPlata === "casa") {
+  if (tipPlataEff === "casa") {
     let serieRec = await db.incasareSerie.findUnique({ where: { asociatieId } });
     if (!serieRec) {
       serieRec = await db.incasareSerie.create({
@@ -148,12 +159,13 @@ export async function POST(req: NextRequest) {
       numarDocument,
       tipDocument:    tipDocument || "chitanta",
       data:           data ? new Date(data) : new Date(),
-      tipPlata:       tipPlata || "casa",
+      tipPlata:       tipPlataEff,
       sumaIncasata,
       totalSelectat,
       avansJson:      avansItems.length > 0 ? JSON.stringify(avansItems) : null,
       pozitiiJson:    JSON.stringify(pozitii),
       observatii:     observatii || null,
+      createdById:    session!.user!.id,
     },
   });
 

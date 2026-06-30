@@ -544,6 +544,7 @@ model Incasare {
   avansJson      String?  // JSON avans { suma, destinatie }
   pozitiiJson    String?  // JSON pozitii platite [{ tip, denumire, suma }]
   observatii     String?
+  createdById    String?  // userul care a emis chitanța (pt. casier: vede doar ale lui)
   createdAt      DateTime @default(now())
 
   asociatie  Asociatie  @relation(fields: [asociatieId], references: [id], onDelete: Cascade)

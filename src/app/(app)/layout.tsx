@@ -5,17 +5,20 @@ import { db } from "@/lib/db";
 import Sidebar from "./_components/Sidebar";
 import AppHeader from "./_components/AppHeader";
 import AsociatieScope from "./_components/AsociatieScope";
+import AccessGuard from "./_components/AccessGuard";
 import { AsociatieProvider } from "@/lib/AsociatieContext";
+import { AccessProvider } from "@/lib/AccessContext";
 import { SidebarProvider } from "@/lib/SidebarContext";
-import { isSuperAdmin, canManageOrg } from "@/lib/roles";
+import { isSuperAdmin, canManageOrg, isOwner } from "@/lib/roles";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session?.user) redirect("/login");
 
   const orgId = session.user.organizationId;
+  const isAdmin = isSuperAdmin(session.user.role) || isOwner(session.user.orgRole);
 
-  const [membership, asociatii] = await Promise.all([
+  const [membership, allAsociatii, myAsocUsers] = await Promise.all([
     db.organizationMember.findFirst({
       where:   { userId: session.user.id },
       include: { organization: true },
@@ -28,7 +31,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           orderBy: { name: "asc" },
         })
       : [],
+    // Asociațiile la care userul restricționat are explicit un rol.
+    isAdmin
+      ? Promise.resolve([] as { asociatieId: string }[])
+      : db.asociatieUser.findMany({
+          where:  { userId: session.user.id, isSuspended: false },
+          select: { asociatieId: true },
+        }),
   ]);
+
+  // Userii restricționați văd doar asociațiile la care au rol atribuit.
+  const allowedAsocIds = new Set(myAsocUsers.map(a => a.asociatieId));
+  const asociatii = isAdmin ? allAsociatii : allAsociatii.filter(a => allowedAsocIds.has(a.id));
 
   const canManageUsers = isSuperAdmin(session.user.role) ||
     canManageOrg(session.user.role, session.user.orgRole);
@@ -44,23 +58,27 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <SidebarProvider>
       <AsociatieProvider asociatii={asociatii} initialId={initialAsocId}>
-        <div className="app-layout">
-          <Sidebar
-            userRole={session.user.role}
-            canManageUsers={canManageUsers}
-          />
-          <div className="app-body">
-            <AppHeader
-              userName={session.user.name}
-              orgName={membership?.organization.name}
+        <AccessProvider initialIsAdmin={isAdmin}>
+          <div className="app-layout">
+            <Sidebar
+              userRole={session.user.role}
+              canManageUsers={canManageUsers}
             />
-            <main className="app-main">
-              <AsociatieScope>
-                {children}
-              </AsociatieScope>
-            </main>
+            <div className="app-body">
+              <AppHeader
+                userName={session.user.name}
+                orgName={membership?.organization.name}
+              />
+              <main className="app-main">
+                <AsociatieScope>
+                  <AccessGuard>
+                    {children}
+                  </AccessGuard>
+                </AsociatieScope>
+              </main>
+            </div>
           </div>
-        </div>
+        </AccessProvider>
       </AsociatieProvider>
     </SidebarProvider>
   );

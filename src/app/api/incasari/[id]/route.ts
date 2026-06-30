@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { resolveAccess } from "@/lib/access";
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -14,6 +15,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     where: { id, organizationId: orgId },
   });
   if (!incasare) return NextResponse.json({ error: "Încasare negăsită" }, { status: 404 });
+
+  const access = await resolveAccess(session!.user as any, incasare.asociatieId);
+  if (!access.isAdmin && !access.perms.chit_delete)
+    return NextResponse.json({ error: "Nu ai dreptul să ștergi chitanțe" }, { status: 403 });
 
   if (!noReverse) {
     const pozitii: { tip: string; suma: number; fondId?: string }[] =
@@ -77,6 +82,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     where: { id, organizationId: orgId },
   });
   if (!incasare) return NextResponse.json({ error: "Încasare negăsită" }, { status: 404 });
+
+  const access = await resolveAccess(session!.user as any, incasare.asociatieId);
+  if (!access.isAdmin) {
+    if (!access.perms.chit_edit)
+      return NextResponse.json({ error: "Nu ai dreptul să editezi chitanțe" }, { status: 403 });
+    if (incasare.createdById !== session!.user!.id)
+      return NextResponse.json({ error: "Poți edita doar chitanțele emise de tine" }, { status: 403 });
+  }
 
   const { data, serie, numarDocument, tipDocument, tipPlata, observatii } = await req.json();
 
