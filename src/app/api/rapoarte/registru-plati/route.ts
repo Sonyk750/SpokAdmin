@@ -26,18 +26,22 @@ export async function GET(req: NextRequest) {
     orderBy: [{ data: "asc" }, { createdAt: "asc" }],
     select: {
       id: true, data: true, suma: true, metoda: true, notes: true,
+      idTranzactie: true, serieCh: true, nrCh: true,
       factura: { select: { serie: true, numar: true, categorie: true, furnizor: { select: { nume: true } } } },
     },
   });
 
   return NextResponse.json(plati.map(p => ({
-    id:       p.id,
-    data:     p.data.toISOString(),
-    document: [p.factura?.serie, p.factura?.numar].filter(Boolean).join(" ") || "—",
-    furnizor: p.factura?.furnizor?.nume ?? "—",
-    categorie: p.factura?.categorie ?? null,
-    metoda:   p.metoda,
-    suma:     p.suma,
-    notes:    p.notes,
+    id:           p.id,
+    data:         p.data.toISOString(),
+    document:     [p.factura?.serie, p.factura?.numar].filter(Boolean).join(" ") || "—",
+    furnizor:     p.factura?.furnizor?.nume ?? "—",
+    categorie:    p.factura?.categorie ?? null,
+    metoda:       p.metoda,
+    suma:         p.suma,
+    notes:        p.notes,
+    idTranzactie: p.idTranzactie ?? null,
+    serieCh:      p.serieCh ?? null,
+    nrCh:         p.nrCh ?? null,
   })));
 }

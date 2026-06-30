@@ -5,14 +5,17 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 import RoDate from "@/components/RoDate";
 
 interface PlataRow {
-  id:        string;
-  data:      string;
-  document:  string;
-  furnizor:  string;
-  categorie: string | null;
-  metoda:    string;
-  suma:      number;
-  notes:     string | null;
+  id:           string;
+  data:         string;
+  document:     string;
+  furnizor:     string;
+  categorie:    string | null;
+  metoda:       string;
+  suma:         number;
+  notes:        string | null;
+  idTranzactie: string | null;
+  serieCh:      string | null;
+  nrCh:         number | null;
 }
 
 interface AsocInfo {
@@ -116,6 +119,23 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit
+  const [editRow,      setEditRow]      = useState<PlataRow | null>(null);
+  const [editData,     setEditData]     = useState("");
+  const [editSuma,     setEditSuma]     = useState("");
+  const [editMetoda,   setEditMetoda]   = useState("casa");
+  const [editNotes,    setEditNotes]    = useState("");
+  const [editTranz,    setEditTranz]    = useState("");
+  const [editSerieCh,  setEditSerieCh]  = useState("");
+  const [editNrCh,     setEditNrCh]     = useState("");
+  const [editSaving,   setEditSaving]   = useState(false);
+  const [editErr,      setEditErr]      = useState<string | null>(null);
+
+  // Delete
+  const [delRow,   setDelRow]   = useState<PlataRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [delErr,   setDelErr]   = useState<string | null>(null);
+
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
@@ -153,6 +173,52 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
   }
 
   function handlePrint() { window.print(); }
+
+  function openEdit(row: PlataRow) {
+    setEditRow(row);
+    setEditData(new Date(row.data).toISOString().slice(0, 10));
+    setEditSuma(row.suma.toFixed(2));
+    setEditMetoda(row.metoda);
+    setEditNotes(row.notes ?? "");
+    setEditTranz(row.idTranzactie ?? "");
+    setEditSerieCh(row.serieCh ?? "");
+    setEditNrCh(row.nrCh != null ? String(row.nrCh) : "");
+    setEditErr(null);
+  }
+
+  async function saveEdit() {
+    if (!editRow) return;
+    setEditSaving(true); setEditErr(null);
+    try {
+      const body: Record<string, any> = {
+        data:   editData,
+        suma:   parseFloat(editSuma),
+        metoda: editMetoda,
+        notes:  editNotes || null,
+      };
+      if (editMetoda === "banca") body.idTranzactie = editTranz || null;
+      if (editMetoda === "casa")  { body.serieCh = editSerieCh || null; body.nrCh = editNrCh ? parseInt(editNrCh) : null; }
+      const res  = await fetch(`/api/plati/${editRow.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      setEditRow(null);
+      fetchData();
+    } catch (e: any) { setEditErr(e.message); }
+    finally { setEditSaving(false); }
+  }
+
+  async function confirmDelete() {
+    if (!delRow) return;
+    setDeleting(true); setDelErr(null);
+    try {
+      const res  = await fetch(`/api/plati/${delRow.id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      setDelRow(null);
+      fetchData();
+    } catch (e: any) { setDelErr(e.message); }
+    finally { setDeleting(false); }
+  }
 
   if (!asociatieId) {
     return <div className="page-shell"><div className="wizard__error">Selectează o asociație din antetul paginii.</div></div>;
@@ -246,6 +312,7 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
                 <th>Furnizor / explicație</th>
                 <th style={{ textAlign: "center" }}>Metodă</th>
                 <th style={{ textAlign: "right" }}>Sumă (lei)</th>
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -262,6 +329,12 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
                   </td>
                   <td style={{ textAlign: "center", color: "#94a3b8" }}>{metodaLabel(r.metoda)}</td>
                   <td style={{ textAlign: "right", fontWeight: 700, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(r.suma)}</td>
+                  <td onClick={e => e.stopPropagation()}>
+                    <div style={{ display: "flex", gap: "0.25rem", justifyContent: "flex-end" }}>
+                      <button className="btn-action" title="Editează" onClick={() => openEdit(r)}>✎</button>
+                      <button className="btn-action btn-action--danger" title="Șterge" onClick={() => { setDelRow(r); setDelErr(null); }}>✕</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -271,9 +344,99 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
                   Total {roDate(dataStart)} — {roDate(dataEnd)}{metoda ? ` · ${metodaLabel(metoda)}` : ""}
                 </td>
                 <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(total)} lei</td>
+                <td />
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* ── Modal Editează ─────────────────────────────────────────────── */}
+      {editRow && (
+        <div className="modal-overlay" onClick={() => !editSaving && setEditRow(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+            <div className="modal__header">
+              <h2 className="modal__title">Editează plată</h2>
+              <button className="modal__close" onClick={() => setEditRow(null)}>×</button>
+            </div>
+            <div className="modal__body">
+              <div style={{ marginBottom: "0.75rem", fontSize: "0.82rem", color: "#64748b" }}>
+                <strong style={{ color: "#e2e8f0" }}>{editRow.furnizor}</strong>
+                {" · "}{editRow.document}
+              </div>
+              {editErr && <div className="wizard__error" style={{ marginBottom: "0.75rem" }}>{editErr}</div>}
+              <div className="form-grid form-grid--2">
+                <div className="form-field">
+                  <label className="form-field__label">Data</label>
+                  <RoDate value={editData} onChange={v => setEditData(v)} />
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Suma (lei)</label>
+                  <input type="number" className="input" step="0.01" min="0.01" value={editSuma} onChange={e => setEditSuma(e.target.value)} />
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Metodă plată</label>
+                  <select className="input" value={editMetoda} onChange={e => setEditMetoda(e.target.value)}>
+                    <option value="casa">Casă</option>
+                    <option value="banca">Bancă</option>
+                    <option value="online">Online</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Observații</label>
+                  <input type="text" className="input" value={editNotes} onChange={e => setEditNotes(e.target.value)} />
+                </div>
+                {editMetoda === "banca" && (
+                  <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <label className="form-field__label">ID Tranzacție</label>
+                    <input type="text" className="input" value={editTranz} onChange={e => setEditTranz(e.target.value)} />
+                  </div>
+                )}
+                {editMetoda === "casa" && (<>
+                  <div className="form-field">
+                    <label className="form-field__label">Serie chitanță</label>
+                    <input type="text" className="input" value={editSerieCh} onChange={e => setEditSerieCh(e.target.value)} />
+                  </div>
+                  <div className="form-field">
+                    <label className="form-field__label">Nr. chitanță</label>
+                    <input type="number" className="input" min="1" step="1" value={editNrCh} onChange={e => setEditNrCh(e.target.value)} />
+                  </div>
+                </>)}
+              </div>
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button className="btn btn--secondary" onClick={() => setEditRow(null)} disabled={editSaving}>Anulează</button>
+              <button className="btn btn--primary" onClick={saveEdit} disabled={editSaving}>{editSaving ? "Se salvează..." : "Salvează"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Confirmare ștergere ────────────────────────────────────── */}
+      {delRow && (
+        <div className="modal-overlay" onClick={() => !deleting && setDelRow(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "420px" }}>
+            <div className="modal__header">
+              <h2 className="modal__title">Șterge plată</h2>
+              <button className="modal__close" onClick={() => setDelRow(null)}>×</button>
+            </div>
+            <div className="modal__body">
+              <p style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
+                Ștergi plata de <strong style={{ color: "#f87171" }}>{fmt2(delRow.suma)} lei</strong> către{" "}
+                <strong style={{ color: "#e2e8f0" }}>{delRow.furnizor}</strong> din <strong>{roDate(delRow.data)}</strong>?
+              </p>
+              <p style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.5rem" }}>
+                Dacă plata a generat un avans care nu a fost utilizat, acesta va fi anulat automat.
+              </p>
+              {delErr && <div className="wizard__error" style={{ marginTop: "0.75rem" }}>{delErr}</div>}
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button className="btn btn--secondary" onClick={() => setDelRow(null)} disabled={deleting}>Anulează</button>
+              <button className="btn btn--primary"
+                style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", borderColor: "rgba(239,68,68,0.3)" }}
+                onClick={confirmDelete} disabled={deleting}>{deleting ? "Se șterge..." : "Șterge"}</button>
+            </div>
+          </div>
         </div>
       )}
 
