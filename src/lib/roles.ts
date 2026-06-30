@@ -16,6 +16,8 @@ export const ASOC_ROLES = {
   PRESEDINTE: "PRESEDINTE",
   CENZOR:     "CENZOR",
   PROPRIETAR: "PROPRIETAR",
+  MEMBRU_CEX: "MEMBRU_CEX",
+  CASIER:     "CASIER",
 } as const
 export type AsocRole = typeof ASOC_ROLES[keyof typeof ASOC_ROLES]
 
@@ -23,6 +25,8 @@ export const ASOC_ROLE_LABELS: Record<AsocRole, string> = {
   PRESEDINTE: "Președinte",
   CENZOR:     "Cenzor",
   PROPRIETAR: "Proprietar",
+  MEMBRU_CEX: "Membru CEX",
+  CASIER:     "Casier",
 }
 
 // ─── Guards ───────────────────────────────────────────────────────────────────

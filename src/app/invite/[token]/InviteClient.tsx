@@ -7,6 +7,8 @@ const ROLE_LABELS: Record<string, string> = {
   PRESEDINTE: "Președinte",
   CENZOR:     "Cenzor",
   PROPRIETAR: "Proprietar",
+  MEMBRU_CEX: "Membru CEX",
+  CASIER:     "Casier",
 }
 
 interface InviteInfo {

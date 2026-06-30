@@ -4,6 +4,16 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 
+// ─── Roluri pentru invitație (AsociatieUser.role) ─────────────────────────────
+
+const INVITE_ROLES: { key: string; label: string; color: string; bg: string }[] = [
+  { key: "PROPRIETAR", label: "Proprietar", color: "#7c3aed", bg: "rgba(124,58,237,0.12)" },
+  { key: "PRESEDINTE", label: "Președinte", color: "#fbbf24", bg: "rgba(251,191,36,0.12)" },
+  { key: "CENZOR",     label: "Cenzor",     color: "#38bdf8", bg: "rgba(56,189,248,0.12)" },
+  { key: "MEMBRU_CEX", label: "Membru CEX", color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
+  { key: "CASIER",     label: "Casier",     color: "#fb923c", bg: "rgba(251,146,60,0.12)" },
+];
+
 // ─── Tipuri ───────────────────────────────────────────────────────────────────
 
 interface ProprietarRow {
@@ -202,15 +212,157 @@ function ProprietarModal({
   );
 }
 
+// ─── Modal: adaugă utilizator (invitație) ─────────────────────────────────────
+
+function AddUserModal({
+  asociatieId, asociatieName, onClose,
+}: { asociatieId: string; asociatieName: string; onClose: () => void }) {
+  const [tab,    setTab]    = useState<"date" | "calitate">("date");
+  const [email,  setEmail]  = useState("");
+  const [name,   setName]   = useState("");
+  const [role,   setRole]   = useState("PROPRIETAR");
+  const [saving, setSaving] = useState(false);
+  const [err,    setErr]    = useState<string | null>(null);
+  const [result, setResult] = useState<{ email: string; emailSent: boolean; inviteUrl: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleSubmit() {
+    if (!email.trim()) { setErr("Adresa de email este obligatorie."); setTab("date"); return; }
+    setSaving(true); setErr(null);
+    try {
+      const res = await fetch("/api/utilizatori/invite", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), name: name.trim() || undefined, role, asociatieId }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "Eroare la trimiterea invitației");
+      setResult({ email: email.trim(), emailSent: !!d.emailSent, inviteUrl: d.inviteUrl });
+    } catch (e: any) { setErr(e.message); }
+    finally { setSaving(false); }
+  }
+
+  const roleCfg = INVITE_ROLES.find(r => r.key === role)!;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+        <div className="modal__header">
+          <h2 className="modal__title">Adaugă utilizator</h2>
+          <button className="modal__close" onClick={onClose}>✕</button>
+        </div>
+
+        {result ? (
+          <div className="modal__body">
+            <div style={{ textAlign: "center", padding: "0.5rem 0 1rem" }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%", margin: "0 auto 0.75rem", background: result.emailSent ? "#10b981" : "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem", color: "#fff" }}>
+                {result.emailSent ? "✓" : "!"}
+              </div>
+              <div style={{ fontWeight: 700, color: "#e2e8f0", marginBottom: "0.25rem" }}>
+                {result.emailSent ? "Invitație trimisă" : "Invitație creată"}
+              </div>
+              <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+                {result.emailSent
+                  ? <>Emailul de invitație a fost trimis la <strong style={{ color: "#cbd5e1" }}>{result.email}</strong>.</>
+                  : <>Emailul nu a putut fi trimis automat. Trimite manual linkul de mai jos.</>}
+              </div>
+            </div>
+            {!result.emailSent && (
+              <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "0.6rem 0.8rem", fontFamily: "monospace", fontSize: "0.75rem", wordBreak: "break-all", color: "#e2e8f0", marginBottom: "0.75rem" }}>
+                {result.inviteUrl}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+              {!result.emailSent && (
+                <button className="btn btn--secondary" onClick={() => { navigator.clipboard.writeText(result.inviteUrl); setCopied(true); setTimeout(() => setCopied(false), 2000); }}>
+                  {copied ? "✓ Copiat" : "Copiază link"}
+                </button>
+              )}
+              <button className="btn btn--primary" onClick={onClose}>Gata</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: "0.25rem", padding: "1rem 1.5rem 0" }}>
+              {(["date", "calitate"] as const).map(t => (
+                <button key={t} type="button" onClick={() => setTab(t)}
+                  className={`contur-tab${tab === t ? " contur-tab--active" : ""}`} style={{ fontSize: "0.8rem" }}>
+                  {t === "date" ? "👤 Date utilizator" : "🏷 Calitate"}
+                </button>
+              ))}
+            </div>
+
+            <div className="modal__body" style={{ paddingTop: "1.25rem" }}>
+              {tab === "date" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+                  <div className="form-field" style={{ marginBottom: 0 }}>
+                    <label className="form-field__label">Adresă email *</label>
+                    <input className="input" type="email" value={email} placeholder="email@exemplu.ro"
+                      onChange={e => setEmail(e.target.value)} />
+                  </div>
+                  <div className="form-field" style={{ marginBottom: 0 }}>
+                    <label className="form-field__label">Nume (opțional)</label>
+                    <input className="input" value={name} placeholder="Ion Popescu"
+                      onChange={e => setName(e.target.value)} />
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
+                    Calitate selectată: <strong style={{ color: roleCfg.color }}>{roleCfg.label}</strong> · pentru asociația <strong style={{ color: "#cbd5e1" }}>{asociatieName}</strong>
+                  </div>
+                </div>
+              )}
+
+              {tab === "calitate" && (
+                <div>
+                  <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
+                    Calitatea în asociație
+                  </div>
+                  {INVITE_ROLES.map(r => (
+                    <label key={r.key} style={{
+                      display: "flex", alignItems: "center", gap: "0.6rem",
+                      padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
+                      background: role === r.key ? r.bg : "transparent",
+                      border: `1px solid ${role === r.key ? r.color + "44" : "transparent"}`,
+                      cursor: "pointer",
+                    }}>
+                      <input type="checkbox" checked={role === r.key}
+                        onChange={() => setRole(r.key)}
+                        style={{ accentColor: r.color, width: 16, height: 16 }} />
+                      <span style={{ color: role === r.key ? r.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
+                        {r.label}
+                      </span>
+                    </label>
+                  ))}
+                  <p style={{ fontSize: "0.75rem", color: "#475569", marginTop: "0.75rem" }}>
+                    Drepturile fiecărei calități se configurează din <strong>Drepturi & roluri</strong>.
+                  </p>
+                </div>
+              )}
+
+              {err && <div className="wizard__error" style={{ marginTop: "0.75rem" }}>{err}</div>}
+            </div>
+
+            <div className="modal__footer">
+              <button className="btn btn--secondary" onClick={onClose}>Anulează</button>
+              <button className="btn btn--primary" onClick={handleSubmit} disabled={saving || !email.trim()}>
+                {saving ? "Se trimite..." : "✉ Trimite invitație"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Pagina principală ────────────────────────────────────────────────────────
 
 export default function AsociatieContacteClient() {
-  const { activeId: asociatieId } = useAsociatie();
+  const { activeId: asociatieId, activeName } = useAsociatie();
   const [rows,     setRows]     = useState<ProprietarRow[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
   const [search,   setSearch]   = useState("");
   const [selected, setSelected] = useState<ProprietarRow | null>(null);
+  const [showAdd,  setShowAdd]  = useState(false);
 
   const load = useCallback(async () => {
     if (!asociatieId) { setRows([]); return; }
@@ -250,9 +402,14 @@ export default function AsociatieContacteClient() {
           <h1 className="page-title">Contacte proprietari</h1>
           <p className="page-sub">Click pe orice rând pentru calitate și date de contact</p>
         </div>
-        <Link className="btn btn--secondary" href="/utilizatori/drepturi">
-          ⚙ Drepturi & roluri
-        </Link>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <Link className="btn btn--secondary" href="/utilizatori/drepturi">
+            ⚙ Drepturi & roluri
+          </Link>
+          <button className="btn btn--primary" onClick={() => setShowAdd(true)} disabled={!asociatieId}>
+            + Adaugă utilizator
+          </button>
+        </div>
       </div>
 
       {/* Căutare + statistici */}
@@ -325,6 +482,10 @@ export default function AsociatieContacteClient() {
 
       {selected && (
         <ProprietarModal row={selected} onClose={() => setSelected(null)} onSaved={load} />
+      )}
+
+      {showAdd && asociatieId && (
+        <AddUserModal asociatieId={asociatieId} asociatieName={activeName || "—"} onClose={() => setShowAdd(false)} />
       )}
     </div>
   );

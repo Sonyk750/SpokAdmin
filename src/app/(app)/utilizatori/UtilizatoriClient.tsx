@@ -49,6 +49,8 @@ const ROLE_COLORS: Record<string, string> = {
   PRESEDINTE:  "#7c3aed",
   CENZOR:      "#0891b2",
   PROPRIETAR:  "#059669",
+  MEMBRU_CEX:  "#16a34a",
+  CASIER:      "#ea580c",
   OWNER:       "#db2777",
   MEMBER:      "#6b7280",
 }
@@ -139,6 +141,8 @@ function InviteModal({
                   <option value="PRESEDINTE">Președinte</option>
                   <option value="CENZOR">Cenzor</option>
                   <option value="PROPRIETAR">Proprietar</option>
+                  <option value="MEMBRU_CEX">Membru CEX</option>
+                  <option value="CASIER">Casier</option>
                 </select>
               </div>
               {asociatii.length > 0 && (

@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { authConfig } from "@/lib/auth.config";
+import { sendLoginNotification } from "@/lib/email";
 
 export const { handlers, auth, signIn, signOut, unstable_update: updateSession } = NextAuth({
   ...authConfig,
@@ -26,6 +27,7 @@ export const { handlers, auth, signIn, signOut, unstable_update: updateSession }
               include: { organization: true },
               take: 1,
             },
+            asocUsers: { select: { id: true }, take: 1 },
           },
         });
 
@@ -33,6 +35,20 @@ export const { handlers, auth, signIn, signOut, unstable_update: updateSession }
 
         const ok = await bcrypt.compare(credentials.password as string, user.password);
         if (!ok) return null;
+
+        // Notificare la primul login al unui utilizator invitat (rol pe asociație).
+        // Marcăm „a intrat deja" prin emailVerified (nefolosit altfel la conturile pe parolă).
+        // Nu blocăm / nu eșuăm autentificarea dacă emailul nu poate fi trimis.
+        if (!user.emailVerified && user.asocUsers.length > 0) {
+          try {
+            await db.user.update({ where: { id: user.id }, data: { emailVerified: new Date() } });
+            await sendLoginNotification({
+              userName:  user.name,
+              userEmail: user.email,
+              orgName:   user.memberships[0]?.organization?.name ?? null,
+            });
+          } catch { /* ignoră erorile de notificare */ }
+        }
 
         return {
           id:             user.id,

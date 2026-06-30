@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
-import { canManageOrg, invitationExpiresAt, ASOC_ROLES } from "@/lib/roles"
+import { canManageOrg, invitationExpiresAt, ASOC_ROLES, ASOC_ROLE_LABELS } from "@/lib/roles"
+import { sendInvitationEmail, emailConfigured } from "@/lib/email"
 
 // POST /api/utilizatori/invite
 // OWNER creează o invitație pentru un PRESEDINTE / CENZOR / PROPRIETAR
@@ -55,6 +56,30 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  const inviteUrl = `${process.env.NEXTAUTH_URL ?? ""}/invite/${invitation.token}`
-  return NextResponse.json({ invitation, inviteUrl }, { status: 201 })
+  const baseUrl   = process.env.NEXTAUTH_URL ?? new URL(req.url).origin
+  const inviteUrl = `${baseUrl}/invite/${invitation.token}`
+
+  // Trimite emailul de invitație. Dacă SMTP eșuează, invitația rămâne validă
+  // (adminul poate copia linkul returnat), deci nu blocăm răspunsul.
+  let emailSent = false
+  let emailError: string | null = null
+  if (emailConfigured()) {
+    const org = await db.organization.findUnique({ where: { id: me.organizationId }, select: { name: true } })
+    const asoc = asociatieId
+      ? await db.asociatie.findUnique({ where: { id: asociatieId }, select: { name: true } })
+      : null
+    const res = await sendInvitationEmail({
+      to:        email,
+      inviteUrl,
+      orgName:   org?.name ?? "asociația ta",
+      asocName:  asoc?.name ?? null,
+      roleLabel: ASOC_ROLE_LABELS[role as keyof typeof ASOC_ROLE_LABELS] ?? role,
+    })
+    emailSent  = res.ok
+    emailError = res.ok ? null : (res.error ?? "Eroare la trimiterea emailului")
+  } else {
+    emailError = "SMTP neconfigurat — folosește linkul de mai jos."
+  }
+
+  return NextResponse.json({ invitation, inviteUrl, emailSent, emailError }, { status: 201 })
 }
