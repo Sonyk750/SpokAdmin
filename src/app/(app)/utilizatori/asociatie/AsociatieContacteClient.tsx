@@ -13,6 +13,11 @@ const INVITE_ROLES: { key: string; label: string; color: string; bg: string }[] 
   { key: "MEMBRU_CEX", label: "Membru CEX", color: "#4ade80", bg: "rgba(74,222,128,0.12)" },
   { key: "CASIER",     label: "Casier",     color: "#fb923c", bg: "rgba(251,146,60,0.12)" },
 ];
+// Proprietar = bază; se poate combina cu UNA dintre calitățile extra.
+// Casier = exclusiv (blochează restul).
+const ROLE_PROP   = INVITE_ROLES.find(r => r.key === "PROPRIETAR")!;
+const ROLE_EXTRAS = INVITE_ROLES.filter(r => ["PRESEDINTE", "CENZOR", "MEMBRU_CEX"].includes(r.key));
+const ROLE_CASIER = INVITE_ROLES.find(r => r.key === "CASIER")!;
 
 // ─── Tipuri ───────────────────────────────────────────────────────────────────
 
@@ -220,11 +225,23 @@ function AddUserModal({
   const [tab,    setTab]    = useState<"date" | "calitate">("date");
   const [email,  setEmail]  = useState("");
   const [name,   setName]   = useState("");
-  const [role,   setRole]   = useState("PROPRIETAR");
+  // Proprietar = bază. `extra` = una dintre pres/cenzor/membru CEX (sau niciuna).
+  // `casier` = exclusiv (anulează proprietar + extra).
+  const [extra,  setExtra]  = useState<string>("");
+  const [casier, setCasier] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err,    setErr]    = useState<string | null>(null);
   const [result, setResult] = useState<{ email: string; emailSent: boolean; inviteUrl: string } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Rolul efectiv trimis în invitație (AsociatieUser.role acceptă o singură valoare).
+  const role          = casier ? "CASIER" : (extra || "PROPRIETAR");
+  const roleColor     = (INVITE_ROLES.find(r => r.key === role) ?? ROLE_PROP).color;
+  const calitateLabel = casier
+    ? "Casier"
+    : extra
+      ? `Proprietar + ${ROLE_EXTRAS.find(r => r.key === extra)?.label}`
+      : "Proprietar";
 
   async function handleSubmit() {
     if (!email.trim()) { setErr("Adresa de email este obligatorie."); setTab("date"); return; }
@@ -240,8 +257,6 @@ function AddUserModal({
     } catch (e: any) { setErr(e.message); }
     finally { setSaving(false); }
   }
-
-  const roleCfg = INVITE_ROLES.find(r => r.key === role)!;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -305,7 +320,7 @@ function AddUserModal({
                       onChange={e => setName(e.target.value)} />
                   </div>
                   <div style={{ fontSize: "0.78rem", color: "#64748b" }}>
-                    Calitate selectată: <strong style={{ color: roleCfg.color }}>{roleCfg.label}</strong> · pentru asociația <strong style={{ color: "#cbd5e1" }}>{asociatieName}</strong>
+                    Calitate selectată: <strong style={{ color: roleColor }}>{calitateLabel}</strong> · pentru asociația <strong style={{ color: "#cbd5e1" }}>{asociatieName}</strong>
                   </div>
                 </div>
               )}
@@ -315,24 +330,66 @@ function AddUserModal({
                   <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.75rem" }}>
                     Calitatea în asociație
                   </div>
-                  {INVITE_ROLES.map(r => (
+
+                  {/* Proprietar — bază (activă dacă nu e Casier) */}
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: "0.6rem",
+                    padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
+                    background: !casier ? ROLE_PROP.bg : "transparent",
+                    border: `1px solid ${!casier ? ROLE_PROP.color + "44" : "transparent"}`,
+                    cursor: "default", opacity: casier ? 0.5 : 1,
+                  }}>
+                    <input type="checkbox" checked={!casier} disabled readOnly
+                      style={{ accentColor: ROLE_PROP.color, width: 16, height: 16 }} />
+                    <span style={{ color: !casier ? ROLE_PROP.color : "#94a3b8", fontWeight: 600, fontSize: "0.88rem" }}>
+                      Proprietar
+                    </span>
+                    <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#475569" }}>de bază</span>
+                  </label>
+
+                  {/* Extra — una singură, combinabilă cu Proprietar; blocate dacă e Casier */}
+                  {ROLE_EXTRAS.map(r => (
                     <label key={r.key} style={{
                       display: "flex", alignItems: "center", gap: "0.6rem",
                       padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
-                      background: role === r.key ? r.bg : "transparent",
-                      border: `1px solid ${role === r.key ? r.color + "44" : "transparent"}`,
-                      cursor: "pointer",
+                      background: extra === r.key && !casier ? r.bg : "transparent",
+                      border: `1px solid ${extra === r.key && !casier ? r.color + "44" : "transparent"}`,
+                      cursor: casier ? "not-allowed" : "pointer", opacity: casier ? 0.4 : 1,
                     }}>
-                      <input type="checkbox" checked={role === r.key}
-                        onChange={() => setRole(r.key)}
+                      <input type="checkbox" checked={extra === r.key && !casier} disabled={casier}
+                        onChange={e => setExtra(e.target.checked ? r.key : "")}
                         style={{ accentColor: r.color, width: 16, height: 16 }} />
-                      <span style={{ color: role === r.key ? r.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
+                      <span style={{ color: extra === r.key && !casier ? r.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
                         {r.label}
                       </span>
+                      {extra && extra !== r.key && !casier && (
+                        <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: "#475569" }}>
+                          exclusiv cu {ROLE_EXTRAS.find(x => x.key === extra)?.label}
+                        </span>
+                      )}
                     </label>
                   ))}
+
+                  {/* Casier — exclusiv: blochează restul */}
+                  <label style={{
+                    display: "flex", alignItems: "center", gap: "0.6rem",
+                    padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem", marginTop: "0.5rem",
+                    background: casier ? ROLE_CASIER.bg : "transparent",
+                    border: `1px solid ${casier ? ROLE_CASIER.color + "44" : "transparent"}`,
+                    cursor: "pointer",
+                  }}>
+                    <input type="checkbox" checked={casier}
+                      onChange={e => { setCasier(e.target.checked); if (e.target.checked) setExtra(""); }}
+                      style={{ accentColor: ROLE_CASIER.color, width: 16, height: 16 }} />
+                    <span style={{ color: casier ? ROLE_CASIER.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
+                      Casier
+                    </span>
+                    <span style={{ marginLeft: "auto", fontSize: "0.68rem", color: "#475569" }}>exclusiv — blochează restul</span>
+                  </label>
+
                   <p style={{ fontSize: "0.75rem", color: "#475569", marginTop: "0.75rem" }}>
-                    Drepturile fiecărei calități se configurează din <strong>Drepturi & roluri</strong>.
+                    Proprietar e calitatea de bază; o poți combina cu una dintre Președinte / Cenzor / Membru CEX.
+                    Casier este exclusiv. Drepturile se configurează din <strong>Drepturi & roluri</strong>.
                   </p>
                 </div>
               )}
