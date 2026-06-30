@@ -290,7 +290,7 @@ function buildDocDef(
     for (const col of movCols) {
       if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!]) {
         const v = row.cheltuieli[col.cheltKey!] ?? 0;
-        cells.push(cell(v ? fmt2(v) : (isServiciiAscensor(col.cheltLabel) ? "(0)" : ""), "right"));
+        cells.push(cell(v ? fmt2(v) : (isServiciiAscensor(col.cheltLabel) ? "0" : ""), "right"));
       }
       if (col.kind === "totalLuna" && opts.showTotalLuna)
         cells.push(cell(fmt2(row.totalLuna), "right", true));
