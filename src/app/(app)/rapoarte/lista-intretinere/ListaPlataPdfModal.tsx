@@ -174,68 +174,116 @@ function buildDocDef(
   // ── Page geometry ───────────────────────────────────────────────────────────
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
+  const pageH  = opts.orientation === "landscape" ? size.w : size.h;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
+  const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
-  // ── Column descriptors ───────────────────────────────────────────────────────
-  // chars = estimated widest data value in characters (drives font auto-shrink + width)
-  // CHAR_W = pt per character per 1pt of font size (Roboto/sans-serif approximation)
-  const CHAR_W = 0.52;
-  const PAD    = 6; // total horizontal cell padding (3pt each side)
+  // ── Canvas-based exact text measurement (pt) ─────────────────────────────────
+  // Canvas measures CSS px; convert → pdfmake pt using 72/96 factor.
+  // Using sans-serif fallback gives a close approximation to Roboto metrics.
+  let _canvasCtx: CanvasRenderingContext2D | null = null;
+  function txtPt(text: string, fontPt: number, bold = false): number {
+    try {
+      if (!_canvasCtx) _canvasCtx = document.createElement("canvas").getContext("2d")!;
+      _canvasCtx.font = `${bold ? "bold " : ""}${fontPt * (96 / 72)}px ${opts.fontFamily}, sans-serif`;
+      return _canvasCtx.measureText(text).width * (72 / 96);
+    } catch {
+      // SSR fallback — should not happen (client component)
+      return text.length * fontPt * (bold ? 0.62 : 0.55);
+    }
+  }
 
-  type CD = { label: string; al: string; chars: number };
+  // Widest header line width at given font (headers are bold, fontSize+1)
+  const hdrPt = (label: string, fontPt: number) =>
+    label.split("\n").reduce((m, l) => Math.max(m, txtPt(l, fontPt + 1, true)), 0);
+
+  // ── Column descriptors: label, alignment, widest data sample ─────────────────
+  type CD = { label: string; al: string; sample: string };
   const cols: CD[] = [];
 
-  cols.push({ label: "Nr.\nAp.",        al: "center", chars: 4  });
+  const maxF2 = (vals: number[]) =>
+    vals.length ? fmt2(Math.max(0, ...vals.filter(Number.isFinite))) : "0.00";
+  const maxStr = (vals: string[], fallback: string) =>
+    vals.reduce((m, s) => (s ?? "").length > m.length ? s : m, fallback);
+
+  cols.push({ label: "Nr.\nAp.", al: "center",
+    sample: maxStr(rows.map(r => r.numar), "999") });
+
   if (opts.showProprietar)
-    cols.push({ label: "Proprietar",    al: "left",   chars: 18 });
+    cols.push({ label: "Proprietar", al: "left",
+      sample: maxStr(rows.map(r => r.proprietar ?? ""), "MMMMMMMMMMMMMMMMMM") });
+
   if (coloane.nrPersone && opts.showNrPersone)
-    cols.push({ label: "Pers.",         al: "center", chars: 3  });
+    cols.push({ label: "Pers.", al: "center",
+      sample: String(rows.reduce((m, r) => Math.max(m, r.nrPersone ?? 0), 0) || 9) });
+
   if (coloane.cotaParte && opts.showCotaParte)
-    cols.push({ label: "CPI",           al: "center", chars: 7  });
+    cols.push({ label: "CPI", al: "center",
+      sample: maxF2(rows.map(r => r.cotaParte ?? 0)) });
+
   if (coloane.suprafata && opts.showSuprafata)
-    cols.push({ label: "Supraf.\n(m²)", al: "center", chars: 7  });
+    cols.push({ label: "Supraf.\n(m²)", al: "center",
+      sample: maxF2(rows.map(r => r.suprafata ?? 0)) });
 
   for (const c of coloane.consumuri) {
     if (opts.consumViz[c.tip])
-      cols.push({ label: `${c.label}\n(${c.unit})`, al: "right", chars: 8 });
+      cols.push({ label: `${c.label}\n(${c.unit})`, al: "right",
+        sample: maxF2(rows.map(r => r.consumByTip[c.tip] ?? 0)) });
     if (c.valoareLeiKey && opts.consumLeiViz[c.tip])
-      cols.push({ label: `${c.label}\n(lei)`,       al: "right", chars: 8 });
+      cols.push({ label: `${c.label}\n(lei)`, al: "right",
+        sample: maxF2(rows.map(r => r.cheltuieli[c.valoareLeiKey!] ?? 0)) });
   }
+
   for (const col of movCols) {
     if (col.kind === "chelt" && opts.cheltViz[col.cheltKey!])
-      cols.push({ label: col.cheltLabel ?? "", al: "right", chars: 8 });
+      cols.push({ label: col.cheltLabel ?? "", al: "right",
+        sample: maxF2(rows.map(r => r.cheltuieli[col.cheltKey!] ?? 0)) });
     if (col.kind === "totalLuna" && opts.showTotalLuna)
-      cols.push({ label: "Total\nlună",       al: "right", chars: 8 });
+      cols.push({ label: "Total\nlună", al: "right",
+        sample: maxF2(rows.map(r => r.totalLuna)) });
   }
+
   if (coloane.hasRestantaIntretinere && opts.showRestanta)
-    cols.push({ label: "Rest.\nîntrețin.", al: "right", chars: 8 });
+    cols.push({ label: "Rest.\nîntrețin.", al: "right",
+      sample: maxF2(rows.map(r => r.restantaIntretinere)) });
+
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total")
-      cols.push({ label: "Fond.\nrest.", al: "right", chars: 8 });
+      cols.push({ label: "Fond.\nrest.", al: "right",
+        sample: maxF2(rows.map(r => r.totalFonduri)) });
     else
       for (const f of coloane.fonduri)
         if (opts.fondViz[f.id] !== false)
-          cols.push({ label: f.name, al: "right", chars: 8 });
+          cols.push({ label: f.name, al: "right",
+            sample: maxF2(rows.map(r => r.restantaFonduri[f.id] ?? 0)) });
   }
-  cols.push({ label: "TOTAL\n(lei)", al: "right", chars: 9 });
+
+  cols.push({ label: "TOTAL\n(lei)", al: "right",
+    sample: maxF2(rows.map(r => r.total)) });
+
   if (opts.showNrEnd)
-    cols.push({ label: "Nr.\nAp.", al: "center", chars: 4 });
+    cols.push({ label: "Nr.\nAp.", al: "center",
+      sample: maxStr(rows.map(r => r.numar), "999") });
 
-  // ── Auto-shrink font until all columns fit on page ───────────────────────────
-  const neededW = (fontSize: number) =>
-    cols.reduce((s, c) => s + Math.ceil(c.chars * fontSize * CHAR_W) + PAD, 0);
+  // ── Minimum width per column = max(header, data sample) + PAD ───────────────
+  function colMinW(col: CD, fontPt: number): number {
+    const h = hdrPt(col.label, fontPt);
+    const d = txtPt(col.sample, fontPt);
+    return Math.ceil(Math.max(h, d)) + PAD;
+  }
+
+  // ── Auto-shrink font until total min-widths ≤ availW ────────────────────────
   let fs = opts.fontSize;
-  while (fs > 5 && neededW(fs) > availW) fs--;
+  while (fs > 5 && cols.reduce((s, c) => s + colMinW(c, fs), 0) > availW) fs--;
 
-  // ── Proportional widths that sum exactly to availW (no overflow) ─────────────
-  const base     = cols.map(c => Math.ceil(c.chars * fs * CHAR_W) + PAD);
-  const baseSum  = base.reduce((s, v) => s + v, 0);
-  const extra    = Math.floor(availW) - baseSum;
-  const totChars = cols.reduce((s, c) => s + c.chars, 0);
-  const widths: number[] = base.map((w, i) =>
-    w + Math.floor(extra * cols[i].chars / totChars)
+  // ── Final widths: min-widths + distribute remaining space proportionally ─────
+  const minW   = cols.map(c => colMinW(c, fs));
+  const minSum = minW.reduce((s, v) => s + v, 0);
+  const extra  = Math.floor(availW) - minSum;
+  const widths: number[] = minW.map((w, i) =>
+    w + (extra > 0 ? Math.floor(extra * minW[i] / minSum) : 0)
   );
-  // absorb rounding remainder into last column
+  // Absorb rounding remainder in last column
   widths[widths.length - 1] += Math.floor(availW) - widths.reduce((s, v) => s + v, 0);
 
   // ── Header row ───────────────────────────────────────────────────────────────
@@ -246,6 +294,9 @@ function buildDocDef(
 
   // TOTAL label acoperă doar Nr. Ap. + Proprietar; totalurile Pers/CPI/Supraf apar separat
   const labelSpan = 1 + (opts.showProprietar ? 1 : 0);
+
+  // Pass explicit dimensions to pdfmake so page size matches availW exactly
+  const pdfPageSize = { width: pageW, height: pageH };
 
   // Data rows
   const dataRows: any[][] = rows.map((row) => {
@@ -382,8 +433,7 @@ function buildDocDef(
   const lineW = availW;
 
   return {
-    pageSize: opts.pageSize,
-    pageOrientation: opts.orientation,
+    pageSize: pdfPageSize,
     pageMargins: [pt(opts.marginLeft), pt(opts.marginTop), pt(opts.marginRight), pt(opts.marginBottom)],
     content: [
       {
