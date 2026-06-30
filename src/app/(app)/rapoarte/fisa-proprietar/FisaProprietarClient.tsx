@@ -5,6 +5,14 @@ import { useAsociatie } from "@/lib/AsociatieContext";
 import RoDate from "@/components/RoDate";
 
 interface IncRow { id: string; data: string; document: string; tipPlata: string; suma: number; detalii: string; soldInainte: number; }
+interface FisaRow {
+  data: string;
+  tip: "sold_initial" | "incasare";
+  descriere: string;
+  debit: number;
+  credit: number;
+  sold: number;
+}
 interface ListaRow { id: string; luna: number; an: number; totalLuna: number; totalDePlata: number; achitat: number; rest: number; }
 interface Fisa {
   proprietar: { nume: string; telefon: string | null; email: string | null; numarAp: string };
@@ -22,6 +30,35 @@ const fmt2 = (v: number) => v.toFixed(2);
 const LUNI = ["", "Ian", "Feb", "Mar", "Apr", "Mai", "Iun", "Iul", "Aug", "Sep", "Oct", "Noi", "Dec"];
 const metodaLabel = (m: string) => m === "casa" ? "Casă" : m === "banca" ? "Bancă" : m === "online" ? "Online" : m;
 function roDate(iso: string) { return new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" }); }
+function soldColor(v: number) {
+  if (v < -0.005) return "#4ade80";
+  if (v > 0.005) return "#f87171";
+  return "#64748b";
+}
+function buildRows(fisa: Fisa): FisaRow[] {
+  const initialSold = fisa.incasari[0]?.soldInainte ?? fisa.totalRestanta;
+  const rows: FisaRow[] = [{
+    data: "",
+    tip: "sold_initial",
+    descriere: initialSold < -0.005 ? "Sold inițial — avans la preluare" : "Sold inițial — restanță la preluare",
+    debit: initialSold > 0.005 ? initialSold : 0,
+    credit: initialSold < -0.005 ? -initialSold : 0,
+    sold: initialSold,
+  }];
+
+  for (const inc of fisa.incasari) {
+    rows.push({
+      data: inc.data,
+      tip: "incasare",
+      descriere: `Plată ${metodaLabel(inc.tipPlata)}${inc.document?.trim() ? ` · ${inc.document}` : ""}${inc.detalii ? ` · ${inc.detalii}` : ""}`,
+      debit: 0,
+      credit: inc.suma,
+      sold: inc.soldInainte - inc.suma,
+    });
+  }
+
+  return rows;
+}
 
 async function downloadPdf(asoc: AsocInfo | null, fisa: Fisa, dataStart: string, dataEnd: string) {
   const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
@@ -29,13 +66,17 @@ async function downloadPdf(asoc: AsocInfo | null, fisa: Fisa, dataStart: string,
   (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
 
   const totalIncasat = fisa.incasari.reduce((s, r) => s + r.suma, 0);
+  const rows = buildRows(fisa);
   const incBody: any[][] = [
-    [ { text: "Data", style: "th", alignment: "center" }, { text: "Document", style: "th", alignment: "center" }, { text: "Detalii", style: "th" }, { text: "Metodă", style: "th", alignment: "center" }, { text: "Sold înainte", style: "th", alignment: "right" }, { text: "Sumă", style: "th", alignment: "right" } ],
-    ...fisa.incasari.map(r => [
-      { text: roDate(r.data), alignment: "center", fontSize: 8 }, { text: r.document, alignment: "center", fontSize: 8 },
-      { text: r.detalii || "—", fontSize: 8 }, { text: metodaLabel(r.tipPlata), alignment: "center", fontSize: 8 }, { text: fmt2(r.soldInainte), alignment: "right", fontSize: 8 }, { text: fmt2(r.suma), alignment: "right", fontSize: 8 },
+    [ { text: "Data", style: "th", alignment: "center" }, { text: "Descriere", style: "th" }, { text: "Debit", style: "th", alignment: "right" }, { text: "Credit", style: "th", alignment: "right" }, { text: "Sold", style: "th", alignment: "right" } ],
+    ...rows.map(r => [
+      { text: r.tip === "sold_initial" ? "—" : roDate(r.data), alignment: "center", fontSize: 8, bold: r.tip === "sold_initial", color: r.tip === "sold_initial" ? "#444" : "#222" },
+      { text: r.descriere, fontSize: 8, bold: r.tip === "sold_initial", italics: r.tip === "sold_initial" },
+      { text: r.debit > 0 ? fmt2(r.debit) : "", alignment: "right", fontSize: 8, color: "#c0392b" },
+      { text: r.credit > 0 ? fmt2(r.credit) : "", alignment: "right", fontSize: 8, color: "#1a7a3f" },
+      { text: fmt2(r.sold), alignment: "right", fontSize: 8, bold: true, color: r.sold < -0.005 ? "#1a7a3f" : r.sold > 0.005 ? "#c0392b" : "#555" },
     ]),
-    [ { text: `TOTAL încasat`, colSpan: 5, alignment: "right", bold: true, fontSize: 9 }, {}, {}, {}, {}, { text: fmt2(totalIncasat), alignment: "right", bold: true, fontSize: 9 } ],
+    [ { text: `SOLD FINAL`, colSpan: 4, alignment: "right", bold: true, fontSize: 9 }, {}, {}, {}, { text: fmt2(fisa.totalRestanta), alignment: "right", bold: true, fontSize: 10, color: fisa.totalRestanta < -0.005 ? "#1a7a3f" : fisa.totalRestanta > 0.005 ? "#c0392b" : "#555" } ],
   ];
 
   const listeBody: any[][] = [
@@ -63,8 +104,9 @@ async function downloadPdf(asoc: AsocInfo | null, fisa: Fisa, dataStart: string,
         { text: `Restanță fonduri: ${fmt2(fisa.restantaFonduri)} lei`, fontSize: 9, alignment: "center" },
         { text: `TOTAL restanță: ${fmt2(fisa.totalRestanta)} lei`, fontSize: 9, bold: true, alignment: "right" },
       ], margin: [0, 0, 0, 12] },
-      { text: "Încasări", bold: true, fontSize: 10, margin: [0, 4, 0, 4] },
-      { table: { headerRows: 1, widths: [45, 50, "*", 45, 58, 50], body: incBody }, layout: tableLayout() },
+      { text: "Extras cronologic", bold: true, fontSize: 10, margin: [0, 4, 0, 4] },
+      { table: { headerRows: 1, widths: [50, "*", 55, 55, 55], body: incBody }, layout: tableLayout() },
+      { text: `Total încasat în perioadă: ${fmt2(totalIncasat)} lei`, fontSize: 9, alignment: "right", margin: [0, 6, 0, 0] },
       { text: "Liste de plată", bold: true, fontSize: 10, margin: [0, 14, 0, 4] },
       fisa.liste.length ? { table: { headerRows: 1, widths: ["*", "*", "*", "*", "*"], body: listeBody }, layout: tableLayout() } : { text: "Nicio listă de plată.", italics: true, fontSize: 8, color: "#777" },
     ],
@@ -120,6 +162,7 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const totalIncasat = fisa?.incasari.reduce((s, r) => s + r.suma, 0) ?? 0;
+  const rows = fisa ? buildRows(fisa) : [];
 
   async function handlePdf() {
     if (!fisa || !asociatieId) return;
@@ -138,13 +181,14 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
       <style>{`
         @media print { @page { size: A4 portrait; margin: 15mm; } body * { visibility: hidden; } #print-zone, #print-zone * { visibility: visible; } #print-zone { position: fixed; inset: 0; background: #fff; color: #000; font-family: "Times New Roman", serif; font-size: 10pt; } }
         @media screen { #print-zone { display: none !important; } }
+        .fisa-row--init td { font-style: italic; background: rgba(251,191,36,0.06); }
       `}</style>
 
       <div className="page-shell">
         <div className="page-header">
           <div>
             <h1 className="page-title">Fișă proprietar</h1>
-            <p className="page-sub">Extras pe apartament: solduri, încasări și liste de plată</p>
+            <p className="page-sub">Extras cronologic: sold inițial, încasări, sold curent</p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="btn btn--secondary" onClick={() => window.print()} disabled={!fisa}>🖨 Printează</button>
@@ -189,23 +233,22 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
           </div>
 
           <div className="table-wrap" style={{ margin: "0 1.5rem 1.5rem" }}>
-            <div style={{ fontWeight: 700, color: "#cbd5e1", margin: "0 0 0.5rem", fontSize: "0.9rem" }}>Încasări</div>
-            {fisa.incasari.length === 0 ? <div className="dash-panel__empty">Nicio încasare în perioadă.</div> : (
+            <div style={{ fontWeight: 700, color: "#cbd5e1", margin: "0 0 0.5rem", fontSize: "0.9rem" }}>Extras cronologic</div>
+            {rows.length === 0 ? <div className="dash-panel__empty">Nicio mișcare în perioadă.</div> : (
               <table className="data-table" style={{ fontSize: "0.8125rem" }}>
-                <thead><tr><th>Data</th><th>Document</th><th>Detalii</th><th style={{ textAlign: "center" }}>Metodă</th><th style={{ textAlign: "right" }}>Sold înainte (lei)</th><th style={{ textAlign: "right" }}>Sumă (lei)</th></tr></thead>
+                <thead><tr><th>Data</th><th>Descriere</th><th style={{ textAlign: "right" }}>Debit (lei)</th><th style={{ textAlign: "right" }}>Credit (lei)</th><th style={{ textAlign: "right" }}>Sold (lei)</th></tr></thead>
                 <tbody>
-                  {fisa.incasari.map(r => (
-                    <tr key={r.id}>
-                      <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(r.data)}</td>
-                      <td style={{ whiteSpace: "nowrap", fontWeight: 600, color: "#a78bfa" }}>{r.document}</td>
-                      <td style={{ color: "#94a3b8" }}>{r.detalii || "—"}</td>
-                      <td style={{ textAlign: "center", color: "#94a3b8" }}>{metodaLabel(r.tipPlata)}</td>
-                      <td style={{ textAlign: "right", color: "#cbd5e1", whiteSpace: "nowrap" }}>{fmt2(r.soldInainte)}</td>
-                      <td style={{ textAlign: "right", fontWeight: 700, color: "#4ade80", whiteSpace: "nowrap" }}>{fmt2(r.suma)}</td>
+                  {rows.map((r, i) => (
+                    <tr key={`${r.tip}-${i}`} className={r.tip === "sold_initial" ? "fisa-row--init" : undefined}>
+                      <td style={{ whiteSpace: "nowrap", color: r.tip === "sold_initial" ? "#fbbf24" : "#94a3b8" }}>{r.tip === "sold_initial" ? "Inițializare" : roDate(r.data)}</td>
+                      <td style={{ color: r.tip === "sold_initial" ? "#fbbf24" : "#cbd5e1", fontWeight: r.tip === "sold_initial" ? 600 : 400 }}>{r.descriere}</td>
+                      <td style={{ textAlign: "right", color: "#f87171", whiteSpace: "nowrap", fontWeight: r.debit > 0 ? 700 : 400 }}>{r.debit > 0 ? fmt2(r.debit) : ""}</td>
+                      <td style={{ textAlign: "right", color: "#4ade80", whiteSpace: "nowrap", fontWeight: r.credit > 0 ? 700 : 400 }}>{r.credit > 0 ? fmt2(r.credit) : ""}</td>
+                      <td style={{ textAlign: "right", fontWeight: 700, color: soldColor(r.sold), whiteSpace: "nowrap" }}>{fmt2(r.sold)}</td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot><tr><td colSpan={5} style={{ textAlign: "right", fontWeight: 700, color: "#94a3b8" }}>Total încasat</td><td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</td></tr></tfoot>
+                <tfoot><tr><td colSpan={3} style={{ textAlign: "right", fontWeight: 700, color: "#94a3b8" }}>Total încasat</td><td style={{ textAlign: "right", fontWeight: 800, color: "#4ade80" }}>{fmt2(totalIncasat)} lei</td><td style={{ textAlign: "right", fontWeight: 900, fontSize: "1rem", color: soldColor(fisa.totalRestanta) }}>{fmt2(fisa.totalRestanta)}</td></tr></tfoot>
               </table>
             )}
           </div>
@@ -247,21 +290,20 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
             <span>Restanță fonduri: <b>{fmt2(fisa.restantaFonduri)} lei</b></span>
             <span>TOTAL restanță: <b>{fmt2(fisa.totalRestanta)} lei</b></span>
           </div>
-          <div style={{ fontWeight: "bold", fontSize: "10pt", margin: "6pt 0 4pt" }}>Încasări</div>
+          <div style={{ fontWeight: "bold", fontSize: "10pt", margin: "6pt 0 4pt" }}>Extras cronologic</div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "9pt" }}>
-            <thead><tr>{["Data", "Document", "Detalii", "Metodă", "Sold înainte", "Sumă"].map((h, i) => <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "3pt 4pt", textAlign: i >= 4 ? "right" : i === 2 ? "left" : "center", fontWeight: "bold" }}>{h}</th>)}</tr></thead>
+            <thead><tr>{["Data", "Descriere", "Debit", "Credit", "Sold"].map((h, i) => <th key={i} style={{ background: "#e8e8e8", border: "1px solid #555", padding: "3pt 4pt", textAlign: i >= 2 ? "right" : i === 1 ? "left" : "center", fontWeight: "bold" }}>{h}</th>)}</tr></thead>
             <tbody>
-              {fisa.incasari.map((r, idx) => (
-                <tr key={r.id} style={{ background: idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center" }}>{roDate(r.data)}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center" }}>{r.document}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt" }}>{r.detalii || "—"}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center" }}>{metodaLabel(r.tipPlata)}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{fmt2(r.soldInainte)}</td>
-                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{fmt2(r.suma)}</td>
+              {rows.map((r, idx) => (
+                <tr key={idx} style={{ background: r.tip === "sold_initial" ? "#fffbe6" : idx % 2 === 1 ? "#f5f5f5" : "#fff" }}>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "center", fontStyle: r.tip === "sold_initial" ? "italic" : "normal" }}>{r.tip === "sold_initial" ? "Init." : roDate(r.data)}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", fontStyle: r.tip === "sold_initial" ? "italic" : "normal" }}>{r.descriere}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{r.debit > 0 ? fmt2(r.debit) : ""}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right" }}>{r.credit > 0 ? fmt2(r.credit) : ""}</td>
+                  <td style={{ border: "1px solid #999", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(r.sold)}</td>
                 </tr>
               ))}
-              <tr><td colSpan={5} style={{ borderTop: "2px solid #000", padding: "3pt 6pt", textAlign: "right", fontWeight: "bold" }}>TOTAL încasat</td><td style={{ borderTop: "2px solid #000", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIncasat)}</td></tr>
+              <tr><td colSpan={3} style={{ borderTop: "2px solid #000", padding: "3pt 6pt", textAlign: "right", fontWeight: "bold" }}>TOTAL încasat</td><td style={{ borderTop: "2px solid #000", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(totalIncasat)}</td><td style={{ borderTop: "2px solid #000", padding: "3pt 4pt", textAlign: "right", fontWeight: "bold" }}>{fmt2(fisa.totalRestanta)}</td></tr>
             </tbody>
           </table>
           {fisa.liste.length > 0 && (
