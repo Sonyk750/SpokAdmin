@@ -1,6 +1,13 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "../styles/globals.scss";
 import SwRegister from "./sw-register";
+
+export const viewport: Viewport = {
+  themeColor: "#080A0F",
+  viewportFit: "cover", // necesar pentru safe-area-inset pe iPhone (PWA standalone)
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://spokadmin.ro"),
@@ -198,7 +205,6 @@ export default function RootLayout({
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
-        <meta name="theme-color" content="#080A0F" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
       </head>
       <body>

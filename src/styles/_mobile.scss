@@ -1,0 +1,51 @@
+@use 'variables' as *;
+
+// ─── PWA / Mobile polish ──────────────────────────────────────────────────────
+// Optimizări pentru telefon și pentru rularea ca aplicație instalată (standalone).
+
+// Safe-area: când e instalat pe iPhone, conținutul să nu intre sub notch / sub
+// bara de jos (home indicator).
+.app-header { padding-top: env(safe-area-inset-top); }
+.sidebar    { padding-bottom: env(safe-area-inset-bottom); }
+
+@media (max-width: 768px) {
+  // Mai mult spațiu util pe ecran mic.
+  .app-main {
+    padding: 1rem 0.9rem calc(1.25rem + env(safe-area-inset-bottom));
+  }
+  .app-header { padding-left: 1rem; padding-right: 1rem; }
+
+  // Antetul paginii: titlu + acțiuni pe verticală, butoane mari, ușor de apăsat.
+  .page-header { flex-direction: column; align-items: stretch; }
+  .page-header .btn { width: 100%; }
+  .page-title { font-size: 1.25rem; }
+  .page-shell { gap: 1rem; }
+
+  // Tabele: scroll orizontal cu inerție + celule mai compacte.
+  .table-wrap { -webkit-overflow-scrolling: touch; }
+  .data-table { font-size: 0.8rem; }
+  .data-table thead th { padding: 0.5rem 0.6rem; }
+  .data-table tbody td { padding: 0.5rem 0.6rem; }
+
+  // Controalele de filtrare (lună/an/date) pe lățime plină.
+  .lp-controls { flex-direction: column; align-items: stretch; gap: 0.6rem; }
+  .lp-controls .form-field { width: 100%; }
+  .lp-controls .form-field .input,
+  .lp-controls .input { width: 100% !important; }
+  .lp-controls .btn { width: 100%; align-self: stretch !important; }
+
+  // Inputuri ≥16px → iOS NU mai dă zoom automat la focus.
+  .input, input, select, textarea { font-size: 16px; }
+
+  // Butoane tap-friendly.
+  .btn { padding: 0.7rem 1.1rem; }
+
+  // Modale stil „bottom sheet", cu safe-area jos.
+  .modal {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: calc(100dvh - env(safe-area-inset-top) - 0.5rem);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
