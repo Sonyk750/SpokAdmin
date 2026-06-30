@@ -19,18 +19,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   for (const s of soldFonduri) {
     if (!s.apartamentId || !s.fondId) continue;
     const restanta = parseFloat(s.restanta) || 0;
-    if (restanta === 0) continue; // nu salvăm 0
 
-    await db.fondApartament.upsert({
-      where:  { apartamentId_fondId: { apartamentId: s.apartamentId, fondId: s.fondId } },
-      update: { restanta },
-      create: {
-        apartamentId: s.apartamentId,
-        asociatieId:  id,
-        fondId:       s.fondId,
-        restanta,
-      },
-    });
+    if (restanta === 0) {
+      // Câmpul a fost golit — setăm 0 în înregistrarea existentă (fără a crea una nouă)
+      await db.fondApartament.updateMany({
+        where: { apartamentId: s.apartamentId, fondId: s.fondId },
+        data:  { restanta: 0 },
+      });
+    } else {
+      await db.fondApartament.upsert({
+        where:  { apartamentId_fondId: { apartamentId: s.apartamentId, fondId: s.fondId } },
+        update: { restanta },
+        create: {
+          apartamentId: s.apartamentId,
+          asociatieId:  id,
+          fondId:       s.fondId,
+          restanta,
+        },
+      });
+    }
   }
 
   await db.asociatie.update({ where: { id }, data: { wizardStep: 6 } });
