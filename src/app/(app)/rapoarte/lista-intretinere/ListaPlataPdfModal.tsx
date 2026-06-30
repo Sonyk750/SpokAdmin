@@ -174,6 +174,7 @@ function buildDocDef(
   // ── Page geometry ───────────────────────────────────────────────────────────
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
+  const pageH  = opts.orientation === "landscape" ? size.w : size.h;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
   const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
@@ -183,12 +184,12 @@ function buildDocDef(
   type CW = { label: string; al: string; wt: number };
   const cols: CW[] = [];
 
-  const W_NR   = 1.0; // Nr.Ap
-  const W_PROP = 3.5; // Proprietar
-  const W_PERS = 0.9; // Pers.
+  const W_NR   = 0.8; // Nr.Ap
+  const W_PROP = 2.0; // Proprietar — redus față de 3.5 pentru a da mai mult loc coloanelor de date
+  const W_PERS = 1.0; // Pers.
   const W_SM   = 1.2; // CPI, Suprafată
-  const W_NUM  = 1.8; // numeric data columns
-  const W_TOT  = 2.2; // TOTAL
+  const W_NUM  = 2.2; // numeric data columns — crescut față de 1.8
+  const W_TOT  = 2.5; // TOTAL
 
   cols.push({ label: "Nr.\nAp.", al: "center", wt: W_NR });
   if (opts.showProprietar)
@@ -243,7 +244,7 @@ function buildDocDef(
 
   // ── Header row ───────────────────────────────────────────────────────────────
   const th = (text: string, al = "right"): any => ({
-    text, bold: true, fontSize: fs + 1, alignment: al,
+    text, bold: true, fontSize: fs, alignment: al,
   });
   const hdr: any[] = cols.map(c => th(c.label, c.al));
 
@@ -386,8 +387,7 @@ function buildDocDef(
   const lineW = availW;
 
   return {
-    pageSize: opts.pageSize,
-    pageOrientation: opts.orientation,
+    pageSize: { width: Math.round(pageW), height: Math.round(pageH) },
     pageMargins: [pt(opts.marginLeft), pt(opts.marginTop), pt(opts.marginRight), pt(opts.marginBottom)],
     content: [
       {
