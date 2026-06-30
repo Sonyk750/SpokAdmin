@@ -205,6 +205,11 @@ export default function ExplicatiiClient({ defaultLuna, defaultAn }: { defaultLu
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asociatieId]);
 
+  // Sumar
+  const linii    = data ? data.sectiuni.flatMap(s => s.linii) : [];
+  const nrLinii  = linii.length;
+  const nrFacturi = new Set(linii.map(l => l.facturaNumar).filter(Boolean)).size;
+
   async function descarcaPdf() {
     if (!data) return;
     setPdfBusy(true);
@@ -233,8 +238,10 @@ export default function ExplicatiiClient({ defaultLuna, defaultAn }: { defaultLu
         </div>
         {data && data.sectiuni.length > 0 && (
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button className="btn btn--secondary" onClick={tiparestePdf} disabled={pdfBusy}>⎙ Tipărire</button>
-            <button className="btn btn--primary" onClick={descarcaPdf} disabled={pdfBusy}>⬇ Descarcă PDF</button>
+            <button className="btn btn--secondary" onClick={tiparestePdf} disabled={pdfBusy}>🖨 Printează</button>
+            <button className="btn btn--primary" onClick={descarcaPdf} disabled={pdfBusy}>
+              {pdfBusy ? "Se generează..." : "⬇ Descarcă PDF"}
+            </button>
           </div>
         )}
       </div>
@@ -278,65 +285,89 @@ export default function ExplicatiiClient({ defaultLuna, defaultAn }: { defaultLu
         </div>
       )}
 
-      {data && (
+      {data && data.sectiuni.length === 0 && !loading && (
+        <div className="empty-state">
+          <span className="empty-state__icon">🧾</span>
+          <div className="empty-state__title">
+            Nicio cheltuială distribuită în {LUNI[data.luna - 1]} {data.an}
+          </div>
+          <div className="empty-state__desc">Distribuie facturile lunii în secțiunea Facturi.</div>
+        </div>
+      )}
+
+      {data && data.sectiuni.length > 0 && (
         <>
-          <div className="lp-meta">
-            <span className="lp-meta__title">{data.asociatie.name}</span>
-            <span className="lp-meta__period">{LUNI[data.luna - 1]} {data.an}</span>
+          {/* Summary */}
+          <div className="dash-panel" style={{ marginBottom: "1rem", padding: "1rem 1.5rem", display: "flex", gap: "2rem", flexWrap: "wrap" }}>
+            <div>
+              <div style={sumLabel}>Total cheltuieli</div>
+              <div style={{ ...sumVal, color: "#a78bfa" }}>{fmtNr(data.total)} lei</div>
+            </div>
+            <div>
+              <div style={sumLabel}>Cheltuieli</div>
+              <div style={{ ...sumVal, color: "#22d3ee" }}>{nrLinii}</div>
+            </div>
+            <div>
+              <div style={sumLabel}>Facturi</div>
+              <div style={{ ...sumVal, color: "#4ade80" }}>{nrFacturi}</div>
+            </div>
           </div>
 
-          {data.sectiuni.length === 0 ? (
-            <div className="dash-panel">
-              <div className="dash-panel__empty">
-                Nicio cheltuială distribuită în {LUNI[data.luna - 1]} {data.an}. Distribuie facturile lunii în secțiunea Facturi.
-              </div>
-            </div>
-          ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Cheltuiala</th>
-                    <th style={{ textAlign: "center" }}>Numărul facturii</th>
-                    <th style={{ textAlign: "center" }}>Data facturii</th>
-                    <th style={{ textAlign: "right" }}>Suma</th>
-                    <th style={{ textAlign: "right" }}>Împărțită la</th>
-                    <th style={{ textAlign: "right" }}>Valoare pe unitate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.sectiuni.map(sect => (
-                    <React.Fragment key={sect.key}>
-                      <tr style={{ background: "rgba(124,58,237,0.12)", fontWeight: 700 }}>
-                        <td colSpan={3}>{sect.titlu}</td>
-                        <td style={{ textAlign: "right" }}>{fmtNr(sect.subtotal)}</td>
-                        <td colSpan={2} />
+          {/* Table */}
+          <div className="table-wrap">
+            <table className="data-table" style={{ fontSize: "0.8125rem" }}>
+              <thead>
+                <tr>
+                  <th>Cheltuiala</th>
+                  <th style={{ textAlign: "center" }}>Numărul facturii</th>
+                  <th style={{ textAlign: "center" }}>Data facturii</th>
+                  <th style={{ textAlign: "right" }}>Suma</th>
+                  <th style={{ textAlign: "right" }}>Împărțită la</th>
+                  <th style={{ textAlign: "right" }}>Valoare pe unitate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.sectiuni.map(sect => (
+                  <React.Fragment key={sect.key}>
+                    <tr style={{ background: "rgba(124,58,237,0.12)" }}>
+                      <td colSpan={3} style={{ fontWeight: 700, color: "#c4b5fd", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "0.72rem" }}>
+                        {sect.titlu}
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: 800, color: "#c4b5fd", whiteSpace: "nowrap" }}>{fmtNr(sect.subtotal)}</td>
+                      <td colSpan={2} style={{ background: "rgba(124,58,237,0.12)" }} />
+                    </tr>
+                    {sect.linii.map((l, i) => (
+                      <tr key={`${sect.key}-${i}`}>
+                        <td style={{ paddingLeft: "1.5rem", color: "#e2e8f0" }}>{l.label}</td>
+                        <td style={{ textAlign: "center", fontWeight: 600, color: "#a78bfa", whiteSpace: "nowrap" }}>{l.facturaNumar}</td>
+                        <td style={{ textAlign: "center", color: "#94a3b8", whiteSpace: "nowrap" }}>{fmtDateIso(l.facturaData)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap" }}>{fmtNr(l.suma)}</td>
+                        <td style={{ textAlign: "right", color: "#94a3b8", whiteSpace: "nowrap" }}>{fmtDiv(l)}</td>
+                        <td style={{ textAlign: "right", fontWeight: 600, color: "#22d3ee", whiteSpace: "nowrap" }}>
+                          {l.perUnit != null ? `${fmtNr(l.perUnit)} ${l.unitate}` : ""}
+                        </td>
                       </tr>
-                      {sect.linii.map((l, i) => (
-                        <tr key={`${sect.key}-${i}`}>
-                          <td style={{ paddingLeft: "1.5rem" }}>{l.label}</td>
-                          <td style={{ textAlign: "center", color: "#94a3b8" }}>{l.facturaNumar}</td>
-                          <td style={{ textAlign: "center", color: "#94a3b8" }}>{fmtDateIso(l.facturaData)}</td>
-                          <td style={{ textAlign: "right" }}>{fmtNr(l.suma)}</td>
-                          <td style={{ textAlign: "right", color: "#94a3b8" }}>{fmtDiv(l)}</td>
-                          <td style={{ textAlign: "right" }}>
-                            {l.perUnit != null ? `${fmtNr(l.perUnit)} ${l.unitate}` : ""}
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                  <tr style={{ background: "rgba(255,255,255,0.06)", fontWeight: 700 }}>
-                    <td colSpan={3}>TOTAL CHELTUIELI</td>
-                    <td style={{ textAlign: "right" }}>{fmtNr(data.total)}</td>
-                    <td colSpan={2} />
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
+                    ))}
+                  </React.Fragment>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} style={{ fontWeight: 800, color: "#94a3b8", textAlign: "right" }}>TOTAL CHELTUIELI</td>
+                  <td style={{ textAlign: "right", fontWeight: 800, color: "#a78bfa", whiteSpace: "nowrap" }}>{fmtNr(data.total)}</td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </>
       )}
     </div>
   );
 }
+
+const sumLabel: React.CSSProperties = {
+  fontSize: "0.625rem", fontWeight: 700, textTransform: "uppercase",
+  letterSpacing: "0.1em", color: "#475569", marginBottom: "0.25rem",
+};
+const sumVal: React.CSSProperties = { fontSize: "1.25rem", fontWeight: 800 };
