@@ -28,8 +28,8 @@ interface IncasareRow {
   id:             string;
   nrApartament:   string;
   proprietarNume: string | null;
-  serie:          string;
-  numarDocument:  number;
+  serie:          string | null;
+  numarDocument:  number | null;
   tipDocument:    string;
   tipPlata:       string;
   data:           string;
@@ -344,8 +344,8 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
   function openEditMode(inc: IncasareRow) {
     setEditData(new Date(inc.data).toISOString().slice(0, 10));
-    setEditSerie(inc.serie);
-    setEditNr(String(inc.numarDocument));
+    setEditSerie(inc.serie ?? "");
+    setEditNr(inc.numarDocument != null ? String(inc.numarDocument) : "");
     setEditTipDoc(inc.tipDocument);
     setEditTipPlata(inc.tipPlata);
     setEditObs(inc.observatii ?? "");
@@ -463,7 +463,10 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                 <tr key={inc.id} style={{ cursor: "pointer" }}
                   onClick={() => { setDetail(inc); setConfirmDel(null); setDeleteErr(null); setEditMode(false); }}>
                   <td>
-                    <span style={{ fontWeight: 700, color: "#a78bfa" }}>{inc.serie} {inc.numarDocument}</span>
+                    {inc.serie && inc.numarDocument != null
+                      ? <span style={{ fontWeight: 700, color: "#a78bfa" }}>{inc.serie} {inc.numarDocument}</span>
+                      : <span style={{ fontWeight: 700, color: "#64748b" }}>—</span>
+                    }
                     <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem", color: "#64748b" }}>
                       {TIP_DOC_LABEL[inc.tipDocument] ?? inc.tipDocument}
                     </span>
@@ -933,7 +936,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
           <div className="modal" style={{ maxWidth: "32rem" }}>
             <div className="modal__header">
               <span className="modal__title">
-                {TIP_DOC_LABEL[detail.tipDocument] ?? detail.tipDocument} {detail.serie} {detail.numarDocument}
+                {TIP_DOC_LABEL[detail.tipDocument] ?? detail.tipDocument}{detail.serie && detail.numarDocument != null ? ` ${detail.serie} ${detail.numarDocument}` : ""}
               </span>
               <button className="modal__close" onClick={() => { setDetail(null); setConfirmDel(null); setEditMode(false); }}>✕</button>
             </div>

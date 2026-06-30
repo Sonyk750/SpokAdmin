@@ -531,8 +531,8 @@ model Incasare {
   apartamentId   String
   nrApartament   String
   proprietarNume String?
-  serie          String
-  numarDocument  Int
+  serie          String?
+  numarDocument  Int?
   tipDocument    String   @default("chitanta") // chitanta / dispozitie_incasare / proces_verbal
   data           DateTime @default(now())
   tipPlata       String   @default("casa") // casa / banca / online

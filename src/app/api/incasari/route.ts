@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const body = await req.json();
-  const { asociatieId, apartamentId, tipDocument, tipPlata, data, pozitii, avans, avansRepartizat, observatii } = body;
+  const { asociatieId, apartamentId, tipDocument, tipPlata, data, pozitii, avansRepartizat, observatii, serieOverride, nrDocManual } = body;
 
   if (!asociatieId || !apartamentId || !Array.isArray(pozitii) || pozitii.length === 0)
     return NextResponse.json({ error: "Date incomplete" }, { status: 400 });
@@ -71,18 +71,26 @@ export async function POST(req: NextRequest) {
     return [p.prenume, p.nume].filter(Boolean).join(" ") || p.nume;
   })();
 
-  // Get/create document series
-  let serieRec = await db.incasareSerie.findUnique({ where: { asociatieId } });
-  if (!serieRec) {
-    serieRec = await db.incasareSerie.create({
-      data: { asociatieId, organizationId: orgId, serie: "CH", urmatorulNumar: 1 },
-    });
+  // Numărul de chitanță se atribuie DOAR pentru plăți prin casă
+  let serie: string | null = null;
+  let numarDocument: number | null = null;
+
+  if (!tipPlata || tipPlata === "casa") {
+    let serieRec = await db.incasareSerie.findUnique({ where: { asociatieId } });
+    if (!serieRec) {
+      serieRec = await db.incasareSerie.create({
+        data: { asociatieId, organizationId: orgId, serie: "CH", urmatorulNumar: 1 },
+      });
+    }
+    serie = serieOverride || serieRec.serie;
+    numarDocument = nrDocManual || serieRec.urmatorulNumar;
+    if (!nrDocManual) {
+      await db.incasareSerie.update({
+        where: { asociatieId },
+        data:  { urmatorulNumar: { increment: 1 } },
+      });
+    }
   }
-  const numarDocument = serieRec.urmatorulNumar;
-  await db.incasareSerie.update({
-    where: { asociatieId },
-    data:  { urmatorulNumar: { increment: 1 } },
-  });
 
   // Apply payments to solduri
   for (const p of pozitii as { tip: string; suma: number; fondId?: string }[]) {
@@ -136,7 +144,7 @@ export async function POST(req: NextRequest) {
       apartamentId,
       nrApartament:   ap.numar,
       proprietarNume,
-      serie:          serieRec.serie,
+      serie,
       numarDocument,
       tipDocument:    tipDocument || "chitanta",
       data:           data ? new Date(data) : new Date(),
