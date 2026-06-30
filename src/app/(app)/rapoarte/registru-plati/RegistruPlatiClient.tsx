@@ -110,6 +110,7 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
   const [asoc, setAsoc] = useState<AsocInfo | null>(null);
   const [dataStart, setDataStart] = useState(defaultStart);
   const [dataEnd, setDataEnd] = useState(defaultEnd);
+  const [metoda, setMetoda] = useState<"" | "casa" | "banca">("");
   const [rows, setRows] = useState<PlataRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -135,17 +136,18 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const total      = rows.reduce((s, r) => s + r.suma, 0);
+  const filtered   = metoda ? rows.filter(r => r.metoda === metoda) : rows;
+  const total      = filtered.reduce((s, r) => s + r.suma, 0);
   const totalCasa  = rows.filter(r => r.metoda === "casa").reduce((s, r) => s + r.suma, 0);
   const totalBanca = rows.filter(r => r.metoda !== "casa").reduce((s, r) => s + r.suma, 0);
 
   async function handleDownloadPdf() {
-    if (!rows.length || !asociatieId) return;
+    if (!filtered.length || !asociatieId) return;
     setPdfLoading(true); setError(null);
     try {
       const res = await fetch(`/api/asociatii/${asociatieId}`);
       const freshAsoc: AsocInfo = await res.json();
-      await generateAndDownloadPdf(freshAsoc, rows, dataStart, dataEnd);
+      await generateAndDownloadPdf(freshAsoc, filtered, dataStart, dataEnd);
     } catch (e: any) { setError(`Eroare PDF: ${e?.message ?? String(e)}`); }
     finally { setPdfLoading(false); }
   }
@@ -176,7 +178,7 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="btn btn--secondary" onClick={handlePrint}>🖨 Printează</button>
-            <button className="btn btn--primary" onClick={handleDownloadPdf} disabled={rows.length === 0 || pdfLoading}>
+            <button className="btn btn--primary" onClick={handleDownloadPdf} disabled={filtered.length === 0 || pdfLoading}>
               {pdfLoading ? "Se generează..." : "⬇ Descarcă PDF"}
             </button>
           </div>
@@ -190,6 +192,14 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
           <div className="form-field" style={{ marginBottom: 0 }}>
             <label className="form-field__label">Până la</label>
             <RoDate className="input" value={dataEnd} onChange={v => setDataEnd(v)} />
+          </div>
+          <div className="form-field" style={{ marginBottom: 0 }}>
+            <label className="form-field__label">Metodă</label>
+            <select className="input" value={metoda} onChange={e => setMetoda(e.target.value as any)}>
+              <option value="">Toate</option>
+              <option value="casa">Casă</option>
+              <option value="banca">Bancă</option>
+            </select>
           </div>
           <button className="btn btn--secondary" onClick={fetchData} disabled={loading} style={{ alignSelf: "flex-end" }}>
             {loading ? "Se încarcă..." : "Actualizează"}
@@ -220,7 +230,7 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
         </div>
       )}
 
-      {rows.length === 0 && !loading ? (
+      {filtered.length === 0 && !loading ? (
         <div className="empty-state">
           <span className="empty-state__icon">🧾</span>
           <div className="empty-state__title">Nicio plată în perioada selectată</div>
@@ -239,7 +249,7 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, idx) => (
+              {filtered.map((r, idx) => (
                 <tr key={r.id}>
                   <td style={{ color: "#64748b", textAlign: "center" }}>{idx + 1}</td>
                   <td style={{ whiteSpace: "nowrap", color: "#94a3b8" }}>{roDate(r.data)}</td>
@@ -257,7 +267,9 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={5} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>Total {roDate(dataStart)} — {roDate(dataEnd)}</td>
+                <td colSpan={5} style={{ fontWeight: 700, color: "#94a3b8", textAlign: "right" }}>
+                  Total {roDate(dataStart)} — {roDate(dataEnd)}{metoda ? ` · ${metodaLabel(metoda)}` : ""}
+                </td>
                 <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", whiteSpace: "nowrap" }}>{fmt2(total)} lei</td>
               </tr>
             </tfoot>
