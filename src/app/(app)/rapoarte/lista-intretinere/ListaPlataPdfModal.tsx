@@ -227,11 +227,10 @@ function buildDocDef(
   if (opts.showNrEnd)
     cols.push({ label: "Nr.\nAp.", al: "center", wt: W_NR });
 
-  // ── Widths: proportional floor division, remainder absorbed by last column ────
+  // ── Widths: ALL '*' — pdfmake distribuie spațiul garantat, nicio coloană nu depășește pagina ─
   const totalWt = cols.reduce((s, c) => s + c.wt, 0);
   const floor   = Math.floor(availW);
-  const widths: number[] = cols.map(c => Math.floor(c.wt / totalWt * floor));
-  widths[widths.length - 1] += floor - widths.reduce((s, v) => s + v, 0);
+  const widths: (number | string)[] = cols.map(() => '*');
 
   // ── Font auto-shrink: numeric column must fit "12345.67" (8 chars) ────────────
   const numColW = (W_NUM / totalWt) * floor;
@@ -426,6 +425,10 @@ function buildDocDef(
             ? { text: `Termen de plată: ${fmtDate(opts.termenPlata)}`, fontSize: fs + 1, bold: true, color: "#1d4ed8", alignment: "right" }
             : {},
         ],
+      },
+      {
+        text: `[debug] cols=${cols.length} | availW=${Math.round(availW)} | floor=${floor} | fs=${fs} | page=${opts.pageSize} ${opts.orientation} | mrgL=${opts.marginLeft} mrgR=${opts.marginRight}`,
+        fontSize: 5, color: '#cc0000', margin: [0, 0, 0, 2],
       },
       {
         table: { headerRows: 1, widths, body },
