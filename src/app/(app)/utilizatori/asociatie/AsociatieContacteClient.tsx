@@ -226,7 +226,9 @@ function AddUserModal({
   const [email,  setEmail]  = useState("");
   const [name,   setName]   = useState("");
   // Proprietar = bază. `extra` = una dintre pres/cenzor/membru CEX (sau niciuna).
-  // `casier` = exclusiv (anulează proprietar + extra).
+  // Cenzorul poate fi extern (fără proprietar) → `prop` devine opțional doar la Cenzor.
+  // Președinte / Membru CEX impun proprietar. `casier` = exclusiv.
+  const [prop,   setProp]   = useState(true);
   const [extra,  setExtra]  = useState<string>("");
   const [casier, setCasier] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -235,12 +237,15 @@ function AddUserModal({
   const [copied, setCopied] = useState(false);
 
   // Rolul efectiv trimis în invitație (AsociatieUser.role acceptă o singură valoare).
-  const role          = casier ? "CASIER" : (extra || "PROPRIETAR");
-  const roleColor     = (INVITE_ROLES.find(r => r.key === role) ?? ROLE_PROP).color;
+  const role       = casier ? "CASIER" : (extra || "PROPRIETAR");
+  const roleColor  = (INVITE_ROLES.find(r => r.key === role) ?? ROLE_PROP).color;
+  const extraLabel = ROLE_EXTRAS.find(r => r.key === extra)?.label;
+  // Proprietar e activ când nu e Casier și (nu e Cenzor → bază obligatorie) sau (Cenzor + bifat).
+  const propOn     = !casier && (extra === "CENZOR" ? prop : true);
   const calitateLabel = casier
     ? "Casier"
     : extra
-      ? `Proprietar + ${ROLE_EXTRAS.find(r => r.key === extra)?.label}`
+      ? (propOn ? `Proprietar + ${extraLabel}` : `${extraLabel} (extern)`)
       : "Proprietar";
 
   async function handleSubmit() {
@@ -331,23 +336,31 @@ function AddUserModal({
                     Calitatea în asociație
                   </div>
 
-                  {/* Proprietar — bază (activă dacă nu e Casier) */}
-                  <label style={{
-                    display: "flex", alignItems: "center", gap: "0.6rem",
-                    padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
-                    background: !casier ? ROLE_PROP.bg : "transparent",
-                    border: `1px solid ${!casier ? ROLE_PROP.color + "44" : "transparent"}`,
-                    cursor: "default", opacity: casier ? 0.5 : 1,
-                  }}>
-                    <input type="checkbox" checked={!casier} disabled readOnly
-                      style={{ accentColor: ROLE_PROP.color, width: 16, height: 16 }} />
-                    <span style={{ color: !casier ? ROLE_PROP.color : "#94a3b8", fontWeight: 600, fontSize: "0.88rem" }}>
-                      Proprietar
-                    </span>
-                    <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#475569" }}>de bază</span>
-                  </label>
+                  {/* Proprietar — bază. Editabil doar la Cenzor (poate fi extern). */}
+                  {(() => {
+                    const propLocked = casier || extra !== "CENZOR"; // forțat când nu e Cenzor
+                    return (
+                      <label style={{
+                        display: "flex", alignItems: "center", gap: "0.6rem",
+                        padding: "0.5rem 0.75rem", borderRadius: 8, marginBottom: "0.4rem",
+                        background: propOn ? ROLE_PROP.bg : "transparent",
+                        border: `1px solid ${propOn ? ROLE_PROP.color + "44" : "transparent"}`,
+                        cursor: propLocked ? "default" : "pointer", opacity: casier ? 0.5 : 1,
+                      }}>
+                        <input type="checkbox" checked={propOn} disabled={propLocked}
+                          onChange={e => setProp(e.target.checked)}
+                          style={{ accentColor: ROLE_PROP.color, width: 16, height: 16 }} />
+                        <span style={{ color: propOn ? ROLE_PROP.color : "#94a3b8", fontWeight: 600, fontSize: "0.88rem" }}>
+                          Proprietar
+                        </span>
+                        <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "#475569" }}>
+                          {extra === "CENZOR" && !casier ? "debifează pentru cenzor extern" : "de bază"}
+                        </span>
+                      </label>
+                    );
+                  })()}
 
-                  {/* Extra — una singură, combinabilă cu Proprietar; blocate dacă e Casier */}
+                  {/* Extra — una singură; blocate dacă e Casier */}
                   {ROLE_EXTRAS.map(r => (
                     <label key={r.key} style={{
                       display: "flex", alignItems: "center", gap: "0.6rem",
@@ -357,7 +370,10 @@ function AddUserModal({
                       cursor: casier ? "not-allowed" : "pointer", opacity: casier ? 0.4 : 1,
                     }}>
                       <input type="checkbox" checked={extra === r.key && !casier} disabled={casier}
-                        onChange={e => setExtra(e.target.checked ? r.key : "")}
+                        onChange={e => {
+                          if (e.target.checked) { setExtra(r.key); if (r.key !== "CENZOR") setProp(true); }
+                          else { setExtra(""); setProp(true); }
+                        }}
                         style={{ accentColor: r.color, width: 16, height: 16 }} />
                       <span style={{ color: extra === r.key && !casier ? r.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
                         {r.label}
@@ -379,7 +395,7 @@ function AddUserModal({
                     cursor: "pointer",
                   }}>
                     <input type="checkbox" checked={casier}
-                      onChange={e => { setCasier(e.target.checked); if (e.target.checked) setExtra(""); }}
+                      onChange={e => { setCasier(e.target.checked); if (e.target.checked) setExtra(""); else setProp(true); }}
                       style={{ accentColor: ROLE_CASIER.color, width: 16, height: 16 }} />
                     <span style={{ color: casier ? ROLE_CASIER.color : "#cbd5e1", fontWeight: 600, fontSize: "0.88rem" }}>
                       Casier
@@ -388,8 +404,9 @@ function AddUserModal({
                   </label>
 
                   <p style={{ fontSize: "0.75rem", color: "#475569", marginTop: "0.75rem" }}>
-                    Proprietar e calitatea de bază; o poți combina cu una dintre Președinte / Cenzor / Membru CEX.
-                    Casier este exclusiv. Drepturile se configurează din <strong>Drepturi & roluri</strong>.
+                    Proprietar e calitatea de bază, combinabilă cu una dintre Președinte / Cenzor / Membru CEX.
+                    <strong> Cenzorul poate fi extern</strong> (debifează Proprietar). Casier este exclusiv.
+                    Drepturile se configurează din <strong>Drepturi & roluri</strong>.
                   </p>
                 </div>
               )}
