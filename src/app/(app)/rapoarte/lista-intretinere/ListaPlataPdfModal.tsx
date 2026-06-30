@@ -174,7 +174,6 @@ function buildDocDef(
   // ── Page geometry ───────────────────────────────────────────────────────────
   const size   = PAGE_SIZES[opts.pageSize] ?? PAGE_SIZES.A4;
   const pageW  = opts.orientation === "landscape" ? size.h : size.w;
-  const pageH  = opts.orientation === "landscape" ? size.w : size.h;
   const availW = pageW - pt(opts.marginLeft) - pt(opts.marginRight);
   const PAD    = 6; // total horizontal padding per cell (3pt each side)
 
@@ -227,13 +226,18 @@ function buildDocDef(
   if (opts.showNrEnd)
     cols.push({ label: "Nr.\nAp.", al: "center", wt: W_NR });
 
-  // ── Widths: ALL '*' — pdfmake distribuie spațiul garantat, nicio coloană nu depășește pagina ─
-  const totalWt = cols.reduce((s, c) => s + c.wt, 0);
-  const floor   = Math.floor(availW);
-  const widths: (number | string)[] = cols.map(() => '*');
+  // ── Widths: proporționale, sum garantată < availW ────────────────────────────
+  // Nu folosi '*' — pdfmake respectă lățimea minimă a conținutului pentru '*',
+  // iar headerele lungi ("administrare", "administrative") forțează coloanele mai late
+  // decât cota lor, împingând ultimele coloane în afara paginii.
+  // Cu valori numerice, pdfmake folosește exact valorile specificate, indiferent de conținut.
+  const totalWt   = cols.reduce((s, c) => s + c.wt, 0);
+  const safeFloor = Math.floor(availW) - 2; // -2pt marjă față de rotunjirile interne pdfmake
+  const widths: number[] = cols.map(c => Math.floor(c.wt / totalWt * safeFloor));
+  widths[widths.length - 1] += safeFloor - widths.reduce((s, v) => s + v, 0);
 
   // ── Font auto-shrink: numeric column must fit "12345.67" (8 chars) ────────────
-  const numColW = (W_NUM / totalWt) * floor;
+  const numColW = (W_NUM / totalWt) * safeFloor;
   let fs = opts.fontSize;
   while (fs > 5 && 8 * fs * 0.56 + PAD > numColW) fs--;
 
@@ -246,8 +250,6 @@ function buildDocDef(
   // TOTAL label acoperă doar Nr. Ap. + Proprietar; totalurile Pers/CPI/Supraf apar separat
   const labelSpan = 1 + (opts.showProprietar ? 1 : 0);
 
-  // Pass explicit dimensions to pdfmake so page size matches availW exactly
-  const pdfPageSize = { width: pageW, height: pageH };
 
   // Data rows
   const dataRows: any[][] = rows.map((row) => {
@@ -384,7 +386,8 @@ function buildDocDef(
   const lineW = availW;
 
   return {
-    pageSize: pdfPageSize,
+    pageSize: opts.pageSize,
+    pageOrientation: opts.orientation,
     pageMargins: [pt(opts.marginLeft), pt(opts.marginTop), pt(opts.marginRight), pt(opts.marginBottom)],
     content: [
       {
@@ -425,10 +428,6 @@ function buildDocDef(
             ? { text: `Termen de plată: ${fmtDate(opts.termenPlata)}`, fontSize: fs + 1, bold: true, color: "#1d4ed8", alignment: "right" }
             : {},
         ],
-      },
-      {
-        text: `[debug] cols=${cols.length} | availW=${Math.round(availW)} | floor=${floor} | fs=${fs} | page=${opts.pageSize} ${opts.orientation} | mrgL=${opts.marginLeft} mrgR=${opts.marginRight}`,
-        fontSize: 5, color: '#cc0000', margin: [0, 0, 0, 2],
       },
       {
         table: { headerRows: 1, widths, body },
