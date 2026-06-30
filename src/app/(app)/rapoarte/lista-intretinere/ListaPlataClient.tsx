@@ -256,7 +256,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   const fixedEndCount = coloane
     ? (coloane.hasRestantaIntretinere ? 1 : 0)
       + (coloane.fonduri.length > 0 ? (fondMode === "total" ? 1 : coloane.fonduri.length) : 0)
-      + 1
+      + 2
     : 1;
 
   const consumGroupSpan = coloane?.consumuri.reduce((s, c) => s + 1 + (c.valoareLeiKey ? 1 : 0), 0) ?? 0;
@@ -481,7 +481,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                         </th>
                       )}
 
-                      <th className="lp-th-group" />
+                      <th colSpan={2} className="lp-th-group" />
                     </tr>
                   )}
 
@@ -544,6 +544,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                       <th key={f.id} className="lp-th--num lp-th--rest">{f.name}</th>
                     ))}
                     <th className="lp-th--num lp-th--total">TOTAL</th>
+                    <th className="lp-th--nr">Nr. Ap.</th>
                   </tr>
                 </thead>
 
@@ -608,6 +609,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                       <td className={`lp-td--num lp-td--total${row.total > 0 ? " lp-td--total--pos" : ""}`}>
                         {fmt2(row.total)}
                       </td>
+                      <td className="lp-td--nr">{row.numar}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -643,6 +645,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                       </td>
                     ))}
                     <td className="lp-td--num lp-tfoot__val lp-tfoot__val--total">{fmt2(totTotal)}</td>
+                    <td className="lp-tfoot__val" />
                   </tr>
                 </tfoot>
               </table>
