@@ -390,11 +390,61 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     };
   }
 
+  // 58mm thermal receipt — narrow single-column slip, auto height (one cut per receipt).
+  function buildChitantaThermalDoc(inc: IncasareRow): any {
+    const roDate = (iso: string) => new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const adresa = [asocInfo?.address, asocInfo?.sector ? `Sector ${asocInfo.sector}` : null, asocInfo?.city].filter(Boolean).join(", ");
+    const docLabel = TIP_DOC_LABEL[inc.tipDocument] ?? inc.tipDocument;
+    const docNr = inc.serie && inc.numarDocument != null ? ` ${inc.serie} ${inc.numarDocument}` : "";
+    // 58mm paper = 164pt; side margins 12pt → 140pt printable content width.
+    const W = 140;
+    const dash = (lineWidth: number) => ({ canvas: [{ type: "line", x1: 0, y1: 0, x2: W, y2: 0, lineWidth, lineColor: "#000", dash: { length: 2 } }], margin: [0, 4, 0, 4] });
+    const row = (label: string, val: string, opts: any = {}) => ({
+      columns: [
+        { text: label, width: "*", fontSize: opts.fs ?? 8, bold: !!opts.bold, italics: !!opts.italics, color: opts.color ?? "#000" },
+        { text: val, width: "auto", fontSize: opts.fsVal ?? opts.fs ?? 8, bold: !!opts.bold, italics: !!opts.italics, alignment: "right", color: opts.color ?? "#000" },
+      ],
+      margin: [0, 1, 0, 0],
+    });
+    const pozitiiLines: any[] = inc.pozitii.map(p => row(p.denumire, `${fmt2(p.suma)} lei`));
+    const avansArr: any[] = Array.isArray(inc.avans)
+      ? (inc.avans as any[]).map(a => row(a.denumire ?? "Avans", `− ${fmt2(a.suma)} lei`, { italics: true, color: "#444" }))
+      : (!Array.isArray(inc.avans) && (inc.avans as any)?.suma > 0
+          ? [row("Avans", `− ${fmt2((inc.avans as any).suma)} lei`, { italics: true, color: "#444" })]
+          : []);
+
+    return {
+      pageSize: { width: 164, height: "auto" },
+      pageMargins: [12, 10, 12, 12],
+      content: [
+        { text: asocInfo?.name ?? "", bold: true, fontSize: 10, alignment: "center" },
+        adresa ? { text: adresa, fontSize: 6.5, color: "#333", alignment: "center", margin: [0, 1, 0, 0] } : {},
+        asocInfo?.cui ? { text: `CUI: ${asocInfo.cui}`, fontSize: 6.5, color: "#333", alignment: "center" } : {},
+        dash(0.7),
+        { text: `${docLabel}${docNr}`, fontSize: 12, bold: true, alignment: "center" },
+        { text: `Data: ${roDate(inc.data)}`, fontSize: 8, alignment: "center", color: "#333", margin: [0, 1, 0, 0] },
+        dash(0.5),
+        { text: `Am primit de la: ${inc.proprietarNume ?? "—"}`, fontSize: 8, margin: [0, 0, 0, 1] },
+        { text: `Apartament nr.: ${inc.nrApartament}`, fontSize: 8, margin: [0, 0, 0, 4] },
+        { text: "Detaliu plată:", fontSize: 7.5, bold: true, color: "#333", margin: [0, 0, 0, 2] },
+        ...pozitiiLines,
+        ...avansArr,
+        dash(0.5),
+        row("TOTAL ÎNCASAT:", `${fmt2(inc.sumaIncasata)} lei`, { bold: true, fs: 9, fsVal: 10 }),
+        dash(0.7),
+        { text: `Casier: ${asocInfo?.adminName ?? ""}`, fontSize: 7.5, color: "#333", margin: [0, 6, 0, 0] },
+        { text: "Semnătura: ______________", fontSize: 7.5, color: "#333", margin: [0, 8, 0, 0] },
+      ],
+      styles: {},
+      defaultStyle: { font: "Roboto" },
+    };
+  }
+
   async function handlePrint(inc: IncasareRow) {
     const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
     const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
     (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
-    (pdfMake.default ?? pdfMake).createPdf(buildChitantaDoc(inc)).print();
+    (pdfMake.default ?? pdfMake).createPdf(buildChitantaThermalDoc(inc)).print();
   }
 
   async function handlePdf(inc: IncasareRow) {
