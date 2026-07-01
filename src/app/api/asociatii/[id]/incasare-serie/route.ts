@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { id } = await params;
@@ -22,8 +22,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { id } = await params;

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
 import { resolveAccess } from "@/lib/access";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
@@ -15,14 +15,14 @@ export async function GET(req: NextRequest) {
 
   if (!asociatieId) return NextResponse.json({ error: "Parametri lipsă" }, { status: 400 });
 
-  const access = await resolveAccess(session!.user as any, asociatieId);
+  const access = await resolveAccess(user, asociatieId);
 
   const dataStart = searchParams.get("dataStart");
   const dataEnd   = searchParams.get("dataEnd");
 
   const where: Record<string, unknown> = { asociatieId, organizationId: orgId };
   // Userii restricționați (ex. casier) văd doar chitanțele emise de ei.
-  if (!access.isAdmin) where.createdById = session!.user!.id;
+  if (!access.isAdmin) where.createdById = user!.id;
   if (dataStart || dataEnd) {
     where.data = {
       ...(dataStart ? { gte: new Date(dataStart) } : {}),
@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const body = await req.json();
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   if (!asociatieId || !apartamentId || !Array.isArray(pozitii) || pozitii.length === 0)
     return NextResponse.json({ error: "Date incomplete" }, { status: 400 });
 
-  const access = await resolveAccess(session!.user as any, asociatieId);
+  const access = await resolveAccess(user, asociatieId);
   if (!access.isAdmin && !access.perms.chit_add)
     return NextResponse.json({ error: "Nu ai dreptul să emiți chitanțe" }, { status: 403 });
   // Userii restricționați pot emite doar prin casă.
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
       avansJson:      avansItems.length > 0 ? JSON.stringify(avansItems) : null,
       pozitiiJson:    JSON.stringify(pozitii),
       observatii:     observatii || null,
-      createdById:    session!.user!.id,
+      createdById:    user!.id,
     },
   });
 
