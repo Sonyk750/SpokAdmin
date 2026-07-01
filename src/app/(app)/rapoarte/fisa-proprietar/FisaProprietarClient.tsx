@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useAsociatie } from "@/lib/AsociatieContext";
 import RoDate from "@/components/RoDate";
+import PlataOnlineModal from "./PlataOnlineModal";
 
 interface IncRow { id: string; data: string; document: string; tipPlata: string; suma: number; detalii: string; soldInainte: number; }
 interface FisaRow {
@@ -137,6 +138,7 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
   const [loading, setLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPlata, setShowPlata] = useState(false);
 
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); setAps([]); setApId(""); return; }
@@ -180,6 +182,15 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
 
   return (
     <>
+      {showPlata && apId && asociatieId && fisa && (
+        <PlataOnlineModal
+          apartamentId={apId}
+          asociatieId={asociatieId}
+          numarAp={fisa.proprietar.numarAp}
+          onClose={() => setShowPlata(false)}
+          onSuccess={() => { setShowPlata(false); fetchData(); }}
+        />
+      )}
       <style>{`
         @media print { @page { size: A4 portrait; margin: 15mm; } body * { visibility: hidden; } #print-zone, #print-zone * { visibility: visible; } #print-zone { position: fixed; inset: 0; background: #fff; color: #000; font-family: "Times New Roman", serif; font-size: 10pt; } }
         @media screen { #print-zone { display: none !important; } }
@@ -192,9 +203,18 @@ export default function FisaProprietarClient({ defaultStart, defaultEnd }: { def
             <h1 className="page-title">Fișă proprietar</h1>
             <p className="page-sub">Extras cronologic: sold inițial, încasări, sold curent</p>
           </div>
-          <div style={{ display: "flex", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button className="btn btn--secondary" onClick={() => window.print()} disabled={!fisa}>🖨 Printează</button>
             <button className="btn btn--primary" onClick={handlePdf} disabled={!fisa || pdfLoading}>{pdfLoading ? "Se generează..." : "⬇ Descarcă PDF"}</button>
+            {fisa && fisa.totalRestanta > 0.005 && (
+              <button
+                className="btn btn--primary"
+                onClick={() => setShowPlata(true)}
+                style={{ background: "#059669", boxShadow: "0 0 20px rgba(5,150,105,0.35)" }}
+              >
+                💳 Plătește online
+              </button>
+            )}
           </div>
         </div>
 

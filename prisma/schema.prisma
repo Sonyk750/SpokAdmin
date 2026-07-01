@@ -556,6 +556,24 @@ model Incasare {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Transferuri ÃƒÂ®ntre conturi (casÃ„Æ’ Ã¢â€ â€ bancÃ„Æ’) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
+// ─── Plati online proprietari (Stripe) ───────────────────────────────────────
+
+model StripePaymentIntent {
+  id             String   @id @default(cuid())
+  stripeId       String   @unique         // pi_xxx din Stripe
+  organizationId String
+  asociatieId    String
+  apartamentId   String
+  userId         String                   // proprietarul care plateste
+  suma           Float
+  pozitiiJson    String                   // JSON cu pozitiile platite
+  status         String   @default("pending") // pending / succeeded / canceled
+  createdAt      DateTime @default(now())
+
+  @@index([stripeId])
+  @@index([apartamentId])
+}
+
 model Transfer {
   id             String   @id @default(cuid())
   organizationId String

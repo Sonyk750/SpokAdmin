@@ -16,6 +16,7 @@
     "@auth/prisma-adapter": "^2.11.2",
     "@prisma/adapter-neon": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.8.0",
     "@types/pdfmake": "^0.3.3",
     "bcryptjs": "^3.0.3",
@@ -27,7 +28,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sass": "^1.101.0",
-    "stripe": "^22.2.1",
+    "stripe": "^22.3.0",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
