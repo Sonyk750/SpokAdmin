@@ -3,9 +3,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { sendAdminAbonamentNotification, sendClientAbonamentConfirmare } from "@/lib/email";
+import { SPOK_PLANS, type SpokPlan } from "@/lib/billing";
 import type Stripe from "stripe";
 
-async function syncSubscription(sub: Stripe.Subscription) {
+async function getOrgOwner(orgId: string) {
+  const member = await db.organizationMember.findFirst({
+    where: { organizationId: orgId, role: "OWNER" },
+    include: { user: { select: { name: true, email: true } } },
+  });
+  return member?.user ?? null;
+}
+
+async function syncSubscription(sub: Stripe.Subscription, sendEmails = false) {
   const orgId = sub.metadata?.organizationId;
   const plan  = sub.metadata?.plan ?? "standard";
   if (!orgId) return;
@@ -13,7 +23,7 @@ async function syncSubscription(sub: Stripe.Subscription) {
   const periodEndUnix = sub.items.data[0]?.current_period_end;
   const currentPeriodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
 
-  await db.organization.update({
+  const org = await db.organization.update({
     where: { id: orgId },
     data: {
       plan:                sub.status === "active" ? plan : "start",
@@ -22,6 +32,30 @@ async function syncSubscription(sub: Stripe.Subscription) {
       currentPeriodEnd,
     },
   });
+
+  if (sendEmails && sub.status === "active") {
+    const planInfo = SPOK_PLANS[plan as SpokPlan];
+    const owner    = await getOrgOwner(orgId);
+
+    await sendAdminAbonamentNotification({
+      orgName:   org.name,
+      userName:  owner?.name  ?? "—",
+      userEmail: owner?.email ?? "—",
+      plan,
+      priceRon:  planInfo?.priceRon ?? 0,
+    }).catch(console.error);
+
+    if (owner) {
+      await sendClientAbonamentConfirmare({
+        userName:  owner.name  ?? "",
+        userEmail: owner.email,
+        orgName:   org.name,
+        plan,
+        priceRon:  planInfo?.priceRon ?? 0,
+        periodEnd: currentPeriodEnd,
+      }).catch(console.error);
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -41,13 +75,13 @@ export async function POST(req: NextRequest) {
       const s = event.data.object as Stripe.Checkout.Session;
       if (s.mode === "subscription" && s.subscription) {
         const sub = await stripe.subscriptions.retrieve(s.subscription as string);
-        await syncSubscription(sub);
+        await syncSubscription(sub, true); // trimite emailuri la prima activare
       }
       break;
     }
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      await syncSubscription(event.data.object as Stripe.Subscription);
+      await syncSubscription(event.data.object as Stripe.Subscription, false);
       break;
     }
     case "invoice.payment_failed": {

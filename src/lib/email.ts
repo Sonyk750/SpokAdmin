@@ -78,6 +78,91 @@ export async function sendInvitationEmail(opts: {
   return sendMail({ to, subject: "Invitație SpokAdmin — activează-ți contul", html, text });
 }
 
+// ─── Abonament SpokAdmin ──────────────────────────────────────────────────────
+
+const PLAN_LABELS: Record<string, string> = {
+  start:    "Start (gratuit)",
+  standard: "Standard — 99 lei/lună",
+  pro:      "Pro — 199 lei/lună",
+};
+
+export async function sendAdminAbonamentNotification(opts: {
+  orgName: string;
+  userName: string;
+  userEmail: string;
+  plan: string;
+  priceRon: number;
+}) {
+  const { orgName, userName, userEmail, plan, priceRon } = opts;
+  const planLabel = PLAN_LABELS[plan] ?? plan;
+  const html = shell("Abonament nou confirmat ✓", `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin:0 0 16px">
+      <p style="margin:0;font-size:14px;font-weight:700;color:#166534">✓ Plată Stripe confirmată — abonament activat</p>
+    </div>
+    <table style="font-size:14px;border-collapse:collapse;width:100%">
+      <tr><td style="padding:7px 14px 7px 0;color:#64748b;white-space:nowrap">Organizație</td><td style="padding:7px 0;font-weight:700">${orgName}</td></tr>
+      <tr><td style="padding:7px 14px 7px 0;color:#64748b">Utilizator</td><td style="padding:7px 0">${userName}</td></tr>
+      <tr><td style="padding:7px 14px 7px 0;color:#64748b">Email</td><td style="padding:7px 0"><a href="mailto:${userEmail}" style="color:#7c3aed">${userEmail}</a></td></tr>
+      <tr><td style="padding:7px 14px 7px 0;color:#64748b">Plan</td><td style="padding:7px 0;font-weight:700;color:#7c3aed">${planLabel}</td></tr>
+      <tr><td style="padding:7px 14px 7px 0;color:#64748b">Sumă</td><td style="padding:7px 0;font-weight:800;color:#16a34a;font-size:16px">${priceRon} lei/lună</td></tr>
+    </table>
+    <p style="margin:16px 0 0;font-size:12px;color:#94a3b8">Abonamentul a fost activat automat. Clientul a primit confirmare pe email.</p>
+  `);
+  const text = `Abonament nou: ${orgName} (${userEmail}) — ${planLabel} — ${priceRon} lei/lună`;
+  return sendMail({ to: NOTIFY_EMAIL, subject: `SpokAdmin — abonament nou: ${orgName} — ${planLabel}`, html, text });
+}
+
+export async function sendClientAbonamentConfirmare(opts: {
+  userName: string;
+  userEmail: string;
+  orgName: string;
+  plan: string;
+  priceRon: number;
+  periodEnd: Date | null;
+}) {
+  const { userName, userEmail, orgName, plan, priceRon, periodEnd } = opts;
+  const planLabel = PLAN_LABELS[plan] ?? plan;
+  const APP_URL = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
+  const dateStr = periodEnd
+    ? periodEnd.toLocaleDateString("ro-RO", { day: "2-digit", month: "long", year: "numeric" })
+    : null;
+
+  const html = shell("Abonament activat — SpokAdmin", `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin:0 0 16px">
+      <p style="margin:0;font-size:14px;font-weight:700;color:#166534">✓ Plata a fost confirmată — abonamentul tău este activ!</p>
+    </div>
+    <p style="font-size:14px;line-height:1.7;margin:0 0 16px">Salut, <strong>${userName}</strong>!</p>
+    <p style="font-size:14px;line-height:1.7;margin:0 0 16px;color:#374151">
+      Mulțumim pentru abonarea la <strong>SpokAdmin</strong>. Contul organizației
+      <strong>${orgName}</strong> este acum activ pe planul ales.
+    </p>
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:16px 18px;margin:0 0 20px">
+      <p style="margin:0;font-size:14px;color:#374151;line-height:1.9">
+        <span style="color:#7c3aed;font-weight:700">Plan:</span> ${planLabel}<br>
+        <span style="color:#7c3aed;font-weight:700">Suma lunară:</span> ${priceRon} lei/lună<br>
+        ${dateStr ? `<span style="color:#7c3aed;font-weight:700">Prima reînnoire:</span> ${dateStr}<br>` : ""}
+        <span style="color:#7c3aed;font-weight:700">Anulare:</span> Oricând, fără penalități
+      </p>
+    </div>
+    <p style="font-size:14px;line-height:1.7;margin:0 0 20px;color:#374151">
+      Poți gestiona abonamentul (upgrade, anulare) direct din aplicație, la secțiunea
+      <strong>Abonament</strong> din meniu.
+    </p>
+    <p style="margin:0 0 24px">
+      <a href="${APP_URL}/dashboard" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px">
+        Intră în aplicație →
+      </a>
+    </p>
+    <p style="margin:0;font-size:12px;color:#94a3b8">
+      Întrebări sau probleme? Scrie-ne la
+      <a href="mailto:office@spokadmin.ro" style="color:#7c3aed">office@spokadmin.ro</a>
+      sau sună la <a href="tel:+40756362828" style="color:#7c3aed">0756 362 828</a>.
+    </p>
+  `);
+  const text = `Abonamentul SpokAdmin ${planLabel} pentru ${orgName} este activ. Acces: ${APP_URL}/dashboard`;
+  return sendMail({ to: userEmail, subject: `SpokAdmin — abonamentul tău ${planLabel} este activ ✓`, html, text });
+}
+
 export async function sendLoginNotification(opts: {
   userName: string | null; userEmail: string; orgName?: string | null;
 }) {
