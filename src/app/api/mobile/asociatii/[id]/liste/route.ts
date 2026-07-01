@@ -1,5 +1,5 @@
 // GET /api/mobile/asociatii/[id]/liste
-// Lunile care au listă de plată generată (pentru selectoarele mobile).
+// Lunile care au listă de plată (facturi distribuite sau ListaLuna generată).
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getApiUser } from "@/lib/mobile-auth";
@@ -15,11 +15,26 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ error: "Acces interzis" }, { status: 403 });
   }
 
+  // Lunile cu facturi distribuite (lista se calculează din ele).
+  const facturi = await db.factura.findMany({
+    where: { asociatieId: id, distribuireJson: { not: null } },
+    select: { luna: true, an: true },
+    distinct: ["luna", "an"],
+  });
+
+  // Plus lunile din ListaLuna, dacă există (cu status).
   const liste = await db.listaLuna.findMany({
     where: { asociatieId: id },
-    orderBy: [{ an: "desc" }, { luna: "desc" }],
     select: { luna: true, an: true, status: true },
   });
 
-  return NextResponse.json(liste);
+  const map = new Map<string, { luna: number; an: number; status: string }>();
+  for (const f of facturi) {
+    if (f.luna == null || f.an == null) continue;
+    map.set(`${f.an}-${f.luna}`, { luna: f.luna, an: f.an, status: "publicata" });
+  }
+  for (const l of liste) map.set(`${l.an}-${l.luna}`, { luna: l.luna, an: l.an, status: l.status });
+
+  const rezultat = [...map.values()].sort((a, b) => b.an - a.an || b.luna - a.luna);
+  return NextResponse.json(rezultat);
 }
