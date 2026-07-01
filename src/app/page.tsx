@@ -114,7 +114,7 @@ type Pkg = {
 
 const packages: Pkg[] = [
   {
-    key: "start", name: "Start", price: "0", unit: "14 zile gratuit", range: "1 asociatie · pana la 20 ap.",
+    key: "start", name: "Start", price: "0", unit: "gratuit 1 an", range: "1 asociatie · pana la 20 ap.",
     color: "cyan", cta: "Incepe gratuit", href: "/register",
     features: [
       "Pana la 20 de apartamente",
