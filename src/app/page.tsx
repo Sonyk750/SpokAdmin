@@ -320,8 +320,6 @@ export default function Home() {
   const [contactForm,   setContactForm]   = useState({ nume: "", email: "", telefon: "", mesaj: "" });
   const [contactSent,   setContactSent]   = useState(false);
   const [showPromoBar,  setShowPromoBar]  = useState(true);
-  const [checkoutPlan,  setCheckoutPlan]  = useState<string | null>(null);
-  const [checkoutError, setCheckoutError] = useState("");
 
   const handleSplashDone = useCallback(() => {
     setPageIn(true);
@@ -330,30 +328,9 @@ export default function Home() {
 
   const closeContact = () => { setShowContact(false); setContactSent(false); };
 
-  async function handlePlanClick(pkg: Pkg) {
+  function handlePlanClick(pkg: Pkg) {
     if (pkg.key === "enterprise") { setShowContact(true); return; }
-    if (pkg.key === "start")      { window.location.href = "/register"; return; }
-
-    setCheckoutPlan(pkg.key);
-    setCheckoutError("");
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: pkg.key }),
-      });
-      if (res.status === 401) {
-        window.location.href = `/register?plan=${pkg.key}`;
-        return;
-      }
-      const data = await res.json();
-      if (data.url) { window.location.href = data.url; return; }
-      setCheckoutError(data.error || "Eroare la initializarea platii. Incearca din nou.");
-    } catch (e) {
-      console.error("[checkout]", e);
-      setCheckoutError("Eroare de retea. Incearca din nou.");
-    }
-    setCheckoutPlan(null);
+    window.location.href = `/register?plan=${pkg.key}`;
   }
 
   return (
@@ -676,19 +653,13 @@ export default function Home() {
                     <button
                       className="pricing-card__btn"
                       onClick={() => handlePlanClick(pkg)}
-                      disabled={checkoutPlan === pkg.key}
                     >
-                      {checkoutPlan === pkg.key ? "Se redirectioneaza..." : pkg.cta}
+                      {pkg.cta}
                     </button>
                   </div>
                 </FadeIn>
               ))}
             </div>
-            {checkoutError && (
-              <p style={{ marginTop: "1rem", textAlign: "center", color: "#f87171", fontSize: "0.9375rem", fontWeight: 600 }}>
-                {checkoutError}
-              </p>
-            )}
           </div>
         </section>
 

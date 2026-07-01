@@ -1,13 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "@/app/components/Logo";
 
-export default function RegisterPage() {
+const PLAN_INFO: Record<string, { name: string; price: string; color: string }> = {
+  standard: { name: "Standard", price: "99 lei/lună", color: "#a78bfa" },
+  pro:      { name: "Pro",      price: "199 lei/lună", color: "#7c3aed" },
+};
+
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const planKey = searchParams.get("plan") ?? "";
+  const planInfo = PLAN_INFO[planKey] ?? null;
+
   const [form, setForm]     = useState({ name: "", email: "", password: "", companyName: "" });
   const [error, setError]   = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,6 +40,29 @@ export default function RegisterPage() {
       return;
     }
 
+    // Daca a ales un plan platit, initiaza checkout Stripe inainte de login
+    if (planInfo && data.userId) {
+      try {
+        const checkoutRes = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: planKey, userId: data.userId }),
+        });
+        const checkoutData = await checkoutRes.json();
+        if (checkoutData.url) {
+          // Login in background, redirect la Stripe
+          await signIn("credentials", { email: form.email, password: form.password, redirect: false });
+          window.location.href = checkoutData.url;
+          return;
+        }
+        // Checkout a esuat — continua normal catre dashboard
+        console.error("[checkout]", checkoutData.error);
+      } catch (e) {
+        console.error("[checkout]", e);
+      }
+    }
+
+    // Fara plan platit (sau checkout esuat) → login si dashboard
     await signIn("credentials", {
       email:    form.email,
       password: form.password,
@@ -49,8 +81,31 @@ export default function RegisterPage() {
 
         <div className="auth-card__header">
           <h1 className="auth-card__title">Creează cont</h1>
-          <p className="auth-card__sub">Începe administrarea profesională în câteva secunde</p>
+          {planInfo ? (
+            <p className="auth-card__sub">
+              Planul ales:{" "}
+              <strong style={{ color: planInfo.color }}>{planInfo.name} — {planInfo.price}</strong>
+            </p>
+          ) : (
+            <p className="auth-card__sub">Începe administrarea profesională în câteva secunde</p>
+          )}
         </div>
+
+        {planInfo && (
+          <div style={{
+            margin: "0 0 1.25rem",
+            padding: "0.875rem 1rem",
+            background: "rgba(124,58,237,0.08)",
+            border: "1px solid rgba(124,58,237,0.25)",
+            borderRadius: "0.75rem",
+            fontSize: "0.875rem",
+            color: "#c4b5fd",
+            lineHeight: 1.6,
+          }}>
+            <strong style={{ color: planInfo.color }}>✓ Plan {planInfo.name}</strong> — după înregistrare vei fi direcționat
+            către pagina de plată Stripe pentru a activa abonamentul.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="auth-form">
           {error && <div className="auth-alert">{error}</div>}
@@ -107,7 +162,9 @@ export default function RegisterPage() {
           </div>
 
           <button type="submit" className="btn btn--primary btn--full btn--lg" disabled={loading}>
-            {loading ? "Se creează contul..." : "Creează cont gratuit"}
+            {loading
+              ? (planInfo ? "Se procesează..." : "Se creează contul...")
+              : (planInfo ? `Creează cont și plătește ${planInfo.name}` : "Creează cont gratuit")}
           </button>
         </form>
 
@@ -119,5 +176,13 @@ export default function RegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

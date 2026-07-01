@@ -1,6 +1,6 @@
 // POST /api/stripe/checkout
 // Creeaza o sesiune Stripe Checkout pentru abonament lunar (Standard / Pro).
-// Necesita utilizator autentificat cu organizationId.
+// Auth: sesiune activa SAU userId din body (utilizator tocmai inregistrat, max 10 min).
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
@@ -22,10 +22,6 @@ async function getOrCreateCustomer(orgId: string, email: string | null | undefin
 }
 
 export async function POST(req: NextRequest) {
-  const user = await getApiUser(req);
-  const orgId = user?.organizationId;
-  if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
-
   const body = await req.json();
   const planKey = body.plan as SpokPlan;
   const planInfo = SPOK_PLANS[planKey];
@@ -33,9 +29,34 @@ export async function POST(req: NextRequest) {
   if (!planInfo || planInfo.priceRon === 0)
     return NextResponse.json({ error: "Plan invalid" }, { status: 400 });
 
-  const baseUrl = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
+  // Auth: sesiune activa
+  const sessionUser = await getApiUser(req);
+  let orgId: string | undefined = sessionUser?.organizationId ?? undefined;
+  let userEmail: string | null | undefined = sessionUser?.email;
 
-  const customerId = await getOrCreateCustomer(orgId, user.email);
+  // Fallback: userId din body (utilizator tocmai inregistrat, fara sesiune inca)
+  if (!orgId && body.userId) {
+    const dbUser = await db.user.findUnique({
+      where: { id: body.userId as string },
+      include: {
+        memberships: {
+          where: { role: "OWNER" },
+          include: { organization: { select: { id: true } } },
+          take: 1,
+        },
+      },
+    });
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+    if (dbUser && dbUser.createdAt > tenMinAgo) {
+      orgId = dbUser.memberships[0]?.organization?.id;
+      userEmail = dbUser.email;
+    }
+  }
+
+  if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
+
+  const baseUrl = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
+  const customerId = await getOrCreateCustomer(orgId, userEmail);
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
