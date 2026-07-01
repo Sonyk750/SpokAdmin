@@ -55,28 +55,38 @@ export async function POST(req: NextRequest) {
 
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
-  const baseUrl = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
-  const customerId = await getOrCreateCustomer(orgId, userEmail);
+  if (!process.env.STRIPE_SECRET_KEY) {
+    console.error("[checkout] STRIPE_SECRET_KEY lipseste din variabilele de mediu");
+    return NextResponse.json({ error: "Plata nu este configurata. Contactati administratorul." }, { status: 500 });
+  }
 
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    payment_method_types: ["card"],
-    mode: "subscription",
-    line_items: [{
-      price_data: {
-        currency: "ron",
-        product_data: { name: `SpokAdmin ${planInfo.name}` },
-        unit_amount: ronToBani(planInfo.priceRon),
-        recurring: { interval: "month" },
-      },
-      quantity: 1,
-    }],
-    metadata: { organizationId: orgId, plan: planKey },
-    subscription_data: { metadata: { organizationId: orgId, plan: planKey } },
-    success_url: `${baseUrl}/dashboard?abonament=success&plan=${planKey}`,
-    cancel_url: `${baseUrl}/dashboard?abonament=cancel`,
-    locale: "ro",
-  });
+  try {
+    const baseUrl = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
+    const customerId = await getOrCreateCustomer(orgId, userEmail);
 
-  return NextResponse.json({ url: session.url });
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      payment_method_types: ["card"],
+      mode: "subscription",
+      line_items: [{
+        price_data: {
+          currency: "ron",
+          product_data: { name: `SpokAdmin ${planInfo.name}` },
+          unit_amount: ronToBani(planInfo.priceRon),
+          recurring: { interval: "month" },
+        },
+        quantity: 1,
+      }],
+      metadata: { organizationId: orgId, plan: planKey },
+      subscription_data: { metadata: { organizationId: orgId, plan: planKey } },
+      success_url: `${baseUrl}/dashboard?abonament=success&plan=${planKey}`,
+      cancel_url: `${baseUrl}/dashboard?abonament=cancel`,
+      locale: "ro",
+    });
+
+    return NextResponse.json({ url: session.url });
+  } catch (e: any) {
+    console.error("[checkout] Stripe error:", e?.message ?? e);
+    return NextResponse.json({ error: e?.message ?? "Eroare Stripe. Incearca din nou." }, { status: 500 });
+  }
 }
