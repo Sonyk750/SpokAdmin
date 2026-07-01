@@ -390,61 +390,125 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
     };
   }
 
-  // 58mm thermal receipt — narrow single-column slip, auto height (one cut per receipt).
-  function buildChitantaThermalDoc(inc: IncasareRow): any {
+  // ── 58mm thermal receipt as an image ────────────────────────────────────────
+  // The casier prints on a POS-5802DD (58mm ESC/POS Bluetooth SPP printer) from an
+  // iPhone. iOS has no Web Bluetooth and the printer is SPP-only, so the app cannot
+  // print directly. Instead we render the slip to a 384px-wide PNG (58mm @203dpi) and
+  // hand it to the iOS Share sheet → the printer's own app prints the image.
+  function buildReceiptOps(inc: IncasareRow): any[] {
     const roDate = (iso: string) => new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" });
     const adresa = [asocInfo?.address, asocInfo?.sector ? `Sector ${asocInfo.sector}` : null, asocInfo?.city].filter(Boolean).join(", ");
     const docLabel = TIP_DOC_LABEL[inc.tipDocument] ?? inc.tipDocument;
     const docNr = inc.serie && inc.numarDocument != null ? ` ${inc.serie} ${inc.numarDocument}` : "";
-    // 58mm paper = 164pt; side margins 12pt → 140pt printable content width.
-    const W = 140;
-    const dash = (lineWidth: number) => ({ canvas: [{ type: "line", x1: 0, y1: 0, x2: W, y2: 0, lineWidth, lineColor: "#000", dash: { length: 2 } }], margin: [0, 4, 0, 4] });
-    const row = (label: string, val: string, opts: any = {}) => ({
-      columns: [
-        { text: label, width: "*", fontSize: opts.fs ?? 8, bold: !!opts.bold, italics: !!opts.italics, color: opts.color ?? "#000" },
-        { text: val, width: "auto", fontSize: opts.fsVal ?? opts.fs ?? 8, bold: !!opts.bold, italics: !!opts.italics, alignment: "right", color: opts.color ?? "#000" },
-      ],
-      margin: [0, 1, 0, 0],
-    });
-    const pozitiiLines: any[] = inc.pozitii.map(p => row(p.denumire, `${fmt2(p.suma)} lei`));
-    const avansArr: any[] = Array.isArray(inc.avans)
-      ? (inc.avans as any[]).map(a => row(a.denumire ?? "Avans", `− ${fmt2(a.suma)} lei`, { italics: true, color: "#444" }))
-      : (!Array.isArray(inc.avans) && (inc.avans as any)?.suma > 0
-          ? [row("Avans", `− ${fmt2((inc.avans as any).suma)} lei`, { italics: true, color: "#444" })]
-          : []);
+    const ops: any[] = [];
+    if (asocInfo?.name) ops.push({ t: "center", text: asocInfo.name, size: 22, bold: true });
+    if (adresa)         ops.push({ t: "center", text: adresa, size: 15 });
+    if (asocInfo?.cui)  ops.push({ t: "center", text: `CUI: ${asocInfo.cui}`, size: 15 });
+    ops.push({ t: "sep" });
+    ops.push({ t: "center", text: `${docLabel}${docNr}`, size: 26, bold: true });
+    ops.push({ t: "center", text: `Data: ${roDate(inc.data)}`, size: 16 });
+    ops.push({ t: "sep" });
+    ops.push({ t: "left", text: `Am primit de la: ${inc.proprietarNume ?? "—"}`, size: 18 });
+    ops.push({ t: "left", text: `Apartament nr.: ${inc.nrApartament}`, size: 18 });
+    ops.push({ t: "space", h: 4 });
+    ops.push({ t: "left", text: "Detaliu plată:", size: 15, bold: true });
+    inc.pozitii.forEach(p => ops.push({ t: "lr", left: p.denumire, right: `${fmt2(p.suma)} lei`, size: 18 }));
+    const avansList: any[] = Array.isArray(inc.avans)
+      ? (inc.avans as any[])
+      : (!Array.isArray(inc.avans) && (inc.avans as any)?.suma > 0 ? [inc.avans] : []);
+    avansList.forEach((a: any) => ops.push({ t: "lr", left: a.denumire ?? "Avans", right: `- ${fmt2(a.suma)} lei`, size: 18 }));
+    ops.push({ t: "sep" });
+    ops.push({ t: "lr", left: "TOTAL ÎNCASAT:", right: `${fmt2(inc.sumaIncasata)} lei`, size: 20, bold: true });
+    ops.push({ t: "sep" });
+    ops.push({ t: "space", h: 6 });
+    ops.push({ t: "left", text: `Casier: ${asocInfo?.adminName ?? ""}`, size: 15 });
+    ops.push({ t: "space", h: 10 });
+    ops.push({ t: "left", text: "Semnătura: ______________", size: 15 });
+    return ops;
+  }
 
-    return {
-      pageSize: { width: 164, height: "auto" },
-      pageMargins: [12, 10, 12, 12],
-      content: [
-        { text: asocInfo?.name ?? "", bold: true, fontSize: 10, alignment: "center" },
-        adresa ? { text: adresa, fontSize: 6.5, color: "#333", alignment: "center", margin: [0, 1, 0, 0] } : {},
-        asocInfo?.cui ? { text: `CUI: ${asocInfo.cui}`, fontSize: 6.5, color: "#333", alignment: "center" } : {},
-        dash(0.7),
-        { text: `${docLabel}${docNr}`, fontSize: 12, bold: true, alignment: "center" },
-        { text: `Data: ${roDate(inc.data)}`, fontSize: 8, alignment: "center", color: "#333", margin: [0, 1, 0, 0] },
-        dash(0.5),
-        { text: `Am primit de la: ${inc.proprietarNume ?? "—"}`, fontSize: 8, margin: [0, 0, 0, 1] },
-        { text: `Apartament nr.: ${inc.nrApartament}`, fontSize: 8, margin: [0, 0, 0, 4] },
-        { text: "Detaliu plată:", fontSize: 7.5, bold: true, color: "#333", margin: [0, 0, 0, 2] },
-        ...pozitiiLines,
-        ...avansArr,
-        dash(0.5),
-        row("TOTAL ÎNCASAT:", `${fmt2(inc.sumaIncasata)} lei`, { bold: true, fs: 9, fsVal: 10 }),
-        dash(0.7),
-        { text: `Casier: ${asocInfo?.adminName ?? ""}`, fontSize: 7.5, color: "#333", margin: [0, 6, 0, 0] },
-        { text: "Semnătura: ______________", fontSize: 7.5, color: "#333", margin: [0, 8, 0, 0] },
-      ],
-      styles: {},
-      defaultStyle: { font: "Roboto" },
+  // Walks the ops top-to-bottom; when draw=false it only accumulates height (measuring
+  // pass), when draw=true it paints. Returns the total height in px.
+  function renderReceipt(ctx: CanvasRenderingContext2D, ops: any[], width: number, pad: number, draw: boolean): number {
+    const font = (size: number, bold: boolean) => `${bold ? "bold " : ""}${size}px Arial, Helvetica, sans-serif`;
+    const contentW = width - pad * 2;
+    const wrap = (text: string, size: number, bold: boolean, maxW: number): string[] => {
+      ctx.font = font(size, bold);
+      const lines: string[] = [];
+      let cur = "";
+      for (const w of String(text).split(/\s+/)) {
+        const test = cur ? `${cur} ${w}` : w;
+        if (cur && ctx.measureText(test).width > maxW) { lines.push(cur); cur = w; }
+        else cur = test;
+      }
+      if (cur) lines.push(cur);
+      return lines.length ? lines : [""];
     };
+    let y = pad;
+    for (const op of ops) {
+      if (op.t === "sep") {
+        y += 6;
+        if (draw) {
+          ctx.strokeStyle = "#000"; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(width - pad, y); ctx.stroke();
+          ctx.setLineDash([]);
+        }
+        y += 8;
+      } else if (op.t === "space") {
+        y += op.h;
+      } else if (op.t === "lr") {
+        const lh = Math.round(op.size * 1.35);
+        ctx.font = font(op.size, !!op.bold);
+        const leftMax = contentW - ctx.measureText(op.right).width - 8;
+        wrap(op.left, op.size, !!op.bold, leftMax).forEach((ln, i) => {
+          if (draw) {
+            ctx.fillStyle = "#000"; ctx.textBaseline = "top"; ctx.font = font(op.size, !!op.bold);
+            ctx.textAlign = "left";  ctx.fillText(ln, pad, y);
+            if (i === 0) { ctx.textAlign = "right"; ctx.fillText(op.right, width - pad, y); }
+          }
+          y += lh;
+        });
+      } else { // center / left
+        const lh = Math.round(op.size * 1.35);
+        wrap(op.text, op.size, !!op.bold, contentW).forEach(ln => {
+          if (draw) {
+            ctx.fillStyle = "#000"; ctx.textBaseline = "top"; ctx.font = font(op.size, !!op.bold);
+            if (op.t === "center") { ctx.textAlign = "center"; ctx.fillText(ln, width / 2, y); }
+            else                   { ctx.textAlign = "left";   ctx.fillText(ln, pad, y); }
+          }
+          y += lh;
+        });
+      }
+    }
+    return y + pad;
+  }
+
+  async function buildChitantaImageBlob(inc: IncasareRow): Promise<Blob> {
+    const width = 384; // 58mm printable ≈ 384 dots @203dpi
+    const pad = 10;
+    const ops = buildReceiptOps(inc);
+    const measureCtx = document.createElement("canvas").getContext("2d")!;
+    const height = Math.ceil(renderReceipt(measureCtx, ops, width, pad, false));
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, width, height);
+    renderReceipt(ctx, ops, width, pad, true);
+    return await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(b => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png"));
   }
 
   async function handlePrint(inc: IncasareRow) {
-    const pdfMake  = (await import("pdfmake/build/pdfmake"))  as any;
-    const pdfFonts = (await import("pdfmake/build/vfs_fonts")) as any;
-    (pdfMake.default ?? pdfMake).vfs = pdfFonts.default ?? pdfFonts;
-    (pdfMake.default ?? pdfMake).createPdf(buildChitantaThermalDoc(inc)).print();
+    const blob = await buildChitantaImageBlob(inc);
+    const file = new File([blob], `chitanta_ap${inc.nrApartament}.png`, { type: "image/png" });
+    const nav = navigator as any;
+    // iPhone/PWA: hand the slip to the Share sheet → user picks the thermal printer's app.
+    if (nav.canShare && nav.canShare({ files: [file] })) {
+      try { await nav.share({ files: [file], title: "Chitanță" }); return; }
+      catch (e: any) { if (e?.name === "AbortError") return; }
+    }
+    // Fallback (desktop / no Web Share): open the slip image so it can be saved or printed.
+    window.open(URL.createObjectURL(blob), "_blank");
   }
 
   async function handlePdf(inc: IncasareRow) {
@@ -618,7 +682,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
                         onClick={() => { setDetail(inc); openEditMode(inc); setConfirmDel(null); }}>
                         ✎
                       </button>
-                      <button className="btn-action" title="Printează"
+                      <button className="btn-action" title="Trimite chitanța la imprimanta termică"
                         onClick={() => handlePrint(inc)}>
                         🖨
                       </button>
