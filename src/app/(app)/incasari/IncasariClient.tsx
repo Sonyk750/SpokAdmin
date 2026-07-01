@@ -1131,8 +1131,7 @@ export default function IncasariClient({ defaultLuna, defaultAn }: { defaultLuna
 
               <div className="modal__footer">
                 <button className="btn btn--secondary" onClick={() => setModalOpen(false)}>Anulare</button>
-                <button className="btn btn--primary" onClick={handleSave}
-                  disabled={saving || !selectedApId || totalAchitat <= 0 || (avans > 0 && Math.abs(avansItems.reduce((s,a) => s+(parseFloat(a.suma)||0),0) - avans) > 0.01)}>
+                <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
                   {saving ? "Se salvează..." : `Salvează chitanța${totalAchitat > 0 ? ` — ${fmt2(sumaPlatitaNum > 0 ? sumaPlatitaNum : totalAchitat)} lei` : ""}`}
                 </button>
               </div>
