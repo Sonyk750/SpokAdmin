@@ -321,6 +321,7 @@ export default function Home() {
   const [contactSent,   setContactSent]   = useState(false);
   const [showPromoBar,  setShowPromoBar]  = useState(true);
   const [checkoutPlan,  setCheckoutPlan]  = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState("");
 
   const handleSplashDone = useCallback(() => {
     setPageIn(true);
@@ -333,26 +334,25 @@ export default function Home() {
     if (pkg.key === "enterprise") { setShowContact(true); return; }
     if (pkg.key === "start")      { window.location.href = "/register"; return; }
 
-    // Paid plan: check session via API, then redirect accordingly
     setCheckoutPlan(pkg.key);
+    setCheckoutError("");
     try {
-      const sessionRes = await fetch("/api/auth/session");
-      const sessionData = await sessionRes.json();
-
-      if (!sessionData?.user) {
-        window.location.href = `/register?plan=${pkg.key}`;
-        return;
-      }
-
-      // Logged-in → initiate Stripe checkout
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan: pkg.key }),
       });
+      if (res.status === 401) {
+        window.location.href = `/register?plan=${pkg.key}`;
+        return;
+      }
       const data = await res.json();
       if (data.url) { window.location.href = data.url; return; }
-    } catch { /* fall through */ }
+      setCheckoutError(data.error || "Eroare la initializarea platii. Incearca din nou.");
+    } catch (e) {
+      console.error("[checkout]", e);
+      setCheckoutError("Eroare de retea. Incearca din nou.");
+    }
     setCheckoutPlan(null);
   }
 
@@ -684,6 +684,11 @@ export default function Home() {
                 </FadeIn>
               ))}
             </div>
+            {checkoutError && (
+              <p style={{ marginTop: "1rem", textAlign: "center", color: "#f87171", fontSize: "0.9375rem", fontWeight: 600 }}>
+                {checkoutError}
+              </p>
+            )}
           </div>
         </section>
 
