@@ -238,6 +238,14 @@ export default function Sidebar({
 
         <div className="sidebar__footer">
           <Link
+            href="/abonament"
+            onClick={close}
+            className={`snav-help${isActive("/abonament") ? " snav-help--active" : ""}`}
+          >
+            <span style={{ fontSize: "1rem" }}>💳</span>
+            <span>Abonament</span>
+          </Link>
+          <Link
             href="/ajutor"
             onClick={close}
             className={`snav-help${isActive("/ajutor") ? " snav-help--active" : ""}`}

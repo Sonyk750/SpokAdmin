@@ -320,6 +320,7 @@ export default function Home() {
   const [contactForm,   setContactForm]   = useState({ nume: "", email: "", telefon: "", mesaj: "" });
   const [contactSent,   setContactSent]   = useState(false);
   const [showPromoBar,  setShowPromoBar]  = useState(true);
+  const [checkoutPlan,  setCheckoutPlan]  = useState<string | null>(null);
 
   const handleSplashDone = useCallback(() => {
     setPageIn(true);
@@ -327,6 +328,33 @@ export default function Home() {
   }, []);
 
   const closeContact = () => { setShowContact(false); setContactSent(false); };
+
+  async function handlePlanClick(pkg: Pkg) {
+    if (pkg.key === "enterprise") { setShowContact(true); return; }
+    if (pkg.key === "start")      { window.location.href = "/register"; return; }
+
+    // Paid plan: check session via API, then redirect accordingly
+    setCheckoutPlan(pkg.key);
+    try {
+      const sessionRes = await fetch("/api/auth/session");
+      const sessionData = await sessionRes.json();
+
+      if (!sessionData?.user) {
+        window.location.href = `/register?plan=${pkg.key}`;
+        return;
+      }
+
+      // Logged-in → initiate Stripe checkout
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: pkg.key }),
+      });
+      const data = await res.json();
+      if (data.url) { window.location.href = data.url; return; }
+    } catch { /* fall through */ }
+    setCheckoutPlan(null);
+  }
 
   return (
     <>
@@ -645,13 +673,13 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
-                    <a
-                      href={pkg.href}
+                    <button
                       className="pricing-card__btn"
-                      onClick={pkg.href === "#contact" ? (e) => { e.preventDefault(); setShowContact(true); } : undefined}
+                      onClick={() => handlePlanClick(pkg)}
+                      disabled={checkoutPlan === pkg.key}
                     >
-                      {pkg.cta}
-                    </a>
+                      {checkoutPlan === pkg.key ? "Se redirectioneaza..." : pkg.cta}
+                    </button>
                   </div>
                 </FadeIn>
               ))}
