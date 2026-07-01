@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   const asociatii = await db.asociatie.findMany({
     where,
     orderBy: { name: "asc" },
-    select: { id: true, name: true, city: true, address: true },
+    select: { id: true, name: true, city: true, address: true, cui: true },
   });
 
   return NextResponse.json(asociatii);
