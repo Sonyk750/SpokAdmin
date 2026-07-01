@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
 
 // Registru bancă — operațiunile prin contul bancar selectat.
@@ -7,8 +7,8 @@ import { db } from "@/lib/db";
 // deci se atribuie contului principal (primul din listă). Transferurile sunt
 // atribuite precis după numele contului.
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;

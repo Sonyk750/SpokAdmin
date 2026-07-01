@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
 
 const CASA = "Casă";
@@ -8,8 +8,8 @@ const CASA = "Casă";
 // cu încasări/plăți separate pe numerar (casă) și bancă.
 // Transferurile casă↔bancă apar ca operațiuni pereche (ies dintr-un cont, intră în altul).
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  const orgId = session?.user?.organizationId;
+  const user = await getApiUser(req);
+  const orgId = user?.organizationId;
   if (!orgId) return NextResponse.json({ error: "Neautorizat" }, { status: 401 });
 
   const { searchParams } = req.nextUrl;
