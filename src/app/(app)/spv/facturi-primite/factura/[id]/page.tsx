@@ -42,11 +42,22 @@ export default function FacturaSPVPage() {
       <style>{`
         @media print {
           .no-print { display: none !important; }
-          body { background: white !important; }
-          @page { margin: 15mm; size: A4; }
+          html, body { width: 210mm; min-height: 297mm; background: white !important; }
+          body { margin: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          @page { margin: 8mm; size: A4 portrait; }
+          .page {
+            width: 100% !important;
+            max-width: none !important;
+            min-height: auto !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
+          }
+          table { page-break-inside: auto; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
         }
         body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; }
-        .page { background: white; max-width: 210mm; margin: 0 auto; padding: 20mm; box-shadow: 0 0 20px rgba(0,0,0,.1); }
+        .page { background: white; max-width: 210mm; margin: 0 auto; padding: 14mm; box-shadow: 0 0 20px rgba(0,0,0,.1); }
       `}</style>
 
       <div className="no-print" style={{ padding: "1rem 2rem", background: "#1e1b4b", display: "flex", gap: "0.75rem", alignItems: "center" }}>
