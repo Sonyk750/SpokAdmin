@@ -313,12 +313,13 @@ function FadeIn({ children, delay = 0 }: { children: React.ReactNode; delay?: nu
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
-  const [introVisible, setIntroVisible] = useState(true);
-  const [pageIn,       setPageIn]       = useState(false);
-  const [openFaq,      setOpenFaq]      = useState<number | null>(null);
-  const [showContact,  setShowContact]  = useState(false);
-  const [contactForm,  setContactForm]  = useState({ nume: "", email: "", telefon: "", mesaj: "" });
-  const [contactSent,  setContactSent]  = useState(false);
+  const [introVisible,  setIntroVisible]  = useState(true);
+  const [pageIn,        setPageIn]        = useState(false);
+  const [openFaq,       setOpenFaq]       = useState<number | null>(null);
+  const [showContact,   setShowContact]   = useState(false);
+  const [contactForm,   setContactForm]   = useState({ nume: "", email: "", telefon: "", mesaj: "" });
+  const [contactSent,   setContactSent]   = useState(false);
+  const [showPromoBar,  setShowPromoBar]  = useState(true);
 
   const handleSplashDone = useCallback(() => {
     setPageIn(true);
@@ -329,6 +330,29 @@ export default function Home() {
 
   return (
     <>
+      {/* ── Promo bar ── */}
+      {showPromoBar && (
+        <div className="promo-bar">
+          <div className="promo-bar__inner">
+            <span className="promo-bar__fire">🔥</span>
+            <span className="promo-bar__pill">Oferta lansare</span>
+            <p className="promo-bar__text">
+              <strong>Primii 10 clienti corporate</strong> primesc{" "}
+              <strong className="promo-bar__highlight">20% reducere</strong> la orice pachet,
+              valabil <strong>un an intreg.</strong>{" "}
+              <span className="promo-bar__slots">Mai sunt doar cateva locuri libere.</span>
+            </p>
+            <button
+              className="promo-bar__cta"
+              onClick={() => { setShowPromoBar(false); setShowContact(true); }}
+            >
+              Rezerva acum →
+            </button>
+            <button className="promo-bar__close" onClick={() => setShowPromoBar(false)} aria-label="Inchide">×</button>
+          </div>
+        </div>
+      )}
+
       {/* ── Splash ── */}
       {introVisible && <SplashParticles onSkip={handleSplashDone} />}
 
@@ -430,10 +454,10 @@ export default function Home() {
       </div>
 
       {/* ── Main ── */}
-      <main className={`page-main${pageIn ? "" : " page-main--hidden"}`}>
+      <main className={`page-main${pageIn ? "" : " page-main--hidden"}`} style={{ paddingTop: showPromoBar ? "calc(4rem + 2.75rem)" : "4rem" }}>
 
         {/* ─ Header ─ */}
-        <header className="header">
+        <header className="header" style={{ top: showPromoBar ? "2.75rem" : 0 }}>
           <div className="header__inner">
             <Logo height={42} />
             <nav className="header__nav">
