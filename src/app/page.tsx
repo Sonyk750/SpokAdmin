@@ -169,6 +169,70 @@ const faqs = [
   { q: "Oferiti training pentru initializare?",   a: "Da. Acordam training personalizat la sediul clientului care include initializarea completa a asociatiei in aplicatie si crearea primei liste de plata. La finalul sesiunii pleci cu tot configurat si cu toate cunostintele necesare pentru a administra independent." },
 ];
 
+// ─── Phone illustration (mobile app section) ─────────────────────────────────
+
+function PhoneIllustration() {
+  return (
+    <svg viewBox="0 0 280 520" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+      {/* phone frame */}
+      <rect x="20" y="8" width="240" height="504" rx="38" fill="#050814" stroke="rgba(255,255,255,0.14)" strokeWidth="1.5"/>
+      <rect x="24" y="12" width="232" height="496" rx="35" fill="rgba(255,255,255,0.015)"/>
+      {/* dynamic island */}
+      <rect x="100" y="20" width="80" height="14" rx="7" fill="#0a0f1e"/>
+      {/* status bar */}
+      <text x="40" y="52" fontFamily="DM Sans, sans-serif" fontSize="11" fontWeight="600" fill="rgba(255,255,255,0.5)">9:41</text>
+      <text x="240" y="52" fontFamily="DM Sans, sans-serif" fontSize="10" fill="rgba(255,255,255,0.4)" textAnchor="end">⚡ 84%</text>
+      {/* app header */}
+      <rect x="24" y="60" width="232" height="54" fill="rgba(124,58,237,0.1)"/>
+      <circle cx="52" cy="87" r="11" fill="rgba(124,58,237,0.25)" stroke="rgba(167,139,250,0.4)"/>
+      <text x="52" y="92" fontFamily="DM Sans, sans-serif" fontSize="9" fontWeight="800" fill="#a78bfa" textAnchor="middle">SA</text>
+      <text x="72" y="84" fontFamily="DM Sans, sans-serif" fontSize="13" fontWeight="700" fill="#fff">SpokAdmin</text>
+      <text x="72" y="100" fontFamily="DM Sans, sans-serif" fontSize="9" fill="rgba(255,255,255,0.45)">Bloc 5 · Ap. 12 · Popescu Ion</text>
+      {/* balance card */}
+      <rect x="32" y="128" width="216" height="88" rx="16" fill="rgba(124,58,237,0.1)" stroke="rgba(124,58,237,0.25)"/>
+      <text x="50" y="154" fontFamily="DM Sans, sans-serif" fontSize="9" fontWeight="600" fill="rgba(255,255,255,0.45)" letterSpacing="1.5">SOLD CURENT</text>
+      <text x="50" y="179" fontFamily="DM Sans, sans-serif" fontSize="24" fontWeight="800" fill="#fff">- 142,50 lei</text>
+      <text x="50" y="199" fontFamily="DM Sans, sans-serif" fontSize="9" fill="rgba(255,255,255,0.4)">Scadenta: 15 Iulie 2026</text>
+      {/* pay button */}
+      <rect x="32" y="228" width="216" height="48" rx="14" fill="#7c3aed"/>
+      <rect x="32" y="228" width="216" height="48" rx="14" fill="url(#payGrad)"/>
+      <defs>
+        <linearGradient id="payGrad" x1="32" y1="228" x2="248" y2="276" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#7c3aed"/>
+          <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.7"/>
+        </linearGradient>
+      </defs>
+      <text x="140" y="258" fontFamily="DM Sans, sans-serif" fontSize="14" fontWeight="700" fill="#fff" textAnchor="middle">Plateste online</text>
+      {/* section label */}
+      <text x="50" y="298" fontFamily="DM Sans, sans-serif" fontSize="8" fontWeight="700" fill="rgba(255,255,255,0.35)" letterSpacing="2">INFORMATII ASOCIATIE</text>
+      {/* info rows */}
+      {([
+        ["Administrator", "Ionescu M."],
+        ["Fond rulment", "4.200 lei"],
+        ["Urmatoarea sedinta", "20 Iul 2026"],
+      ] as [string, string][]).map(([label, value], i) => (
+        <g key={label}>
+          <rect x="32" y={310 + i * 36} width="216" height="30" rx="8" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)"/>
+          <text x="48" y={330 + i * 36} fontFamily="DM Sans, sans-serif" fontSize="10" fill="rgba(255,255,255,0.42)">{label}</text>
+          <text x="232" y={330 + i * 36} fontFamily="DM Sans, sans-serif" fontSize="10" fontWeight="600" fill="#fff" textAnchor="end">{value}</text>
+        </g>
+      ))}
+      {/* notification */}
+      <rect x="32" y="426" width="216" height="52" rx="14" fill="rgba(6,182,212,0.07)" stroke="rgba(6,182,212,0.22)"/>
+      <circle cx="56" cy="452" r="11" fill="rgba(6,182,212,0.15)" stroke="rgba(6,182,212,0.35)"/>
+      <text x="56" y="457" fontFamily="DM Sans, sans-serif" fontSize="12" textAnchor="middle" fill="#67e8f9">🔔</text>
+      <text x="75" y="447" fontFamily="DM Sans, sans-serif" fontSize="10" fontWeight="600" fill="#fff">Lista iunie 2026 disponibila</text>
+      <text x="75" y="463" fontFamily="DM Sans, sans-serif" fontSize="9" fill="rgba(255,255,255,0.4)">Acum 1 ora · Descarca PDF</text>
+      {/* bottom nav bar */}
+      <rect x="24" y="488" width="232" height="64" fill="rgba(5,8,20,0.8)"/>
+      <line x1="24" y1="488" x2="256" y2="488" stroke="rgba(255,255,255,0.07)" strokeWidth="1"/>
+      {(["🏠","💳","📋","👤"] as string[]).map((icon, i) => (
+        <text key={i} x={65 + i * 52} y={525} fontFamily="DM Sans, sans-serif" fontSize="16" textAnchor="middle" fill={i === 0 ? "#a78bfa" : "rgba(255,255,255,0.28)"}>{icon}</text>
+      ))}
+    </svg>
+  );
+}
+
 // ─── Hero illustration (dashboard mock) ───────────────────────────────────────
 
 const V = "#7c3aed";
@@ -596,6 +660,66 @@ export default function Home() {
                 </FadeIn>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* ─ Aplicatie Mobila ─ */}
+        <section className="section section--alt">
+          <div className="container">
+            <FadeIn>
+              <div className="mobile-app-banner">
+                <div className="mobile-app-banner__content">
+                  <div className="badge badge--cyan mobile-app-banner__badge">
+                    <span className="badge__dot" style={{ background: "#67e8f9" }} />
+                    In curand · iOS &amp; Android
+                  </div>
+                  <h2 className="section-heading">
+                    SpokAdmin<br />
+                    <span className="gradient">in buzunarul tau</span>
+                  </h2>
+                  <p className="section-desc">
+                    Lansam aplicatia mobila pentru <strong>iOS si Android</strong>. Toti proprietarii si utilizatorii vor primi <strong>acces gratuit</strong> la toate informatiile asociatiei si isi vor putea plati cotele de intretinere online, direct de pe telefon — oricand, fara sa astepte chitante fizice.
+                  </p>
+                  <ul className="mobile-app-features">
+                    {[
+                      "Acces gratuit pentru toti proprietarii si utilizatorii",
+                      "Plata online a cotelor de intretinere",
+                      "Notificari la aparitia listei de plata lunare",
+                      "Documente si informatii asociatie in timp real",
+                      "Istoric plati si situatia contului personal",
+                    ].map(f => (
+                      <li key={f} className="mobile-app-features__item">
+                        <span className="mobile-app-features__check">✓</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="app-store-badges">
+                    <div className="app-store-badge">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26" aria-hidden="true">
+                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                      </svg>
+                      <div>
+                        <p className="app-store-badge__soon">Curand pe</p>
+                        <strong className="app-store-badge__name">App Store</strong>
+                      </div>
+                    </div>
+                    <div className="app-store-badge">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="26" height="26" aria-hidden="true">
+                        <path d="M3.18 23.76c.3.17.64.22.97.15l11.44-11.44L12 8.88 3.18 23.76zm17.15-11.9-2.81-1.63-3.22 3.22 3.22 3.22 2.85-1.65c.81-.47.81-1.7-.04-2.16zM2.34.26C2.13.48 2 .82 2 1.27v21.46c0 .45.13.79.35 1.01L2.45 23.82l12.02-12.02V11.7L2.45.15 2.34.26zm9.27 9.27L3.18.24c-.3-.18-.66-.2-.97-.04l8.82 9.39.58-.06z"/>
+                      </svg>
+                      <div>
+                        <p className="app-store-badge__soon">Curand pe</p>
+                        <strong className="app-store-badge__name">Google Play</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mobile-app-banner__phone">
+                  <PhoneIllustration />
+                </div>
+              </div>
+            </FadeIn>
           </div>
         </section>
 
