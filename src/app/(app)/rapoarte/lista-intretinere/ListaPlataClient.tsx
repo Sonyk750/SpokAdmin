@@ -226,6 +226,26 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
     finally { setClosing(false); }
   }
 
+  // Trimite manual înștiințarea de plată către proprietari — dublă confirmare,
+  // pentru că e o acțiune ireversibilă (email real, nu se poate retrage).
+  const [sendingEmail, setSendingEmail] = useState(false);
+  async function trimiteEmailProprietari() {
+    if (!asociatieId) return;
+    if (!confirm(`Sunteți siguri că vreți să trimiteți înștiințare de plată la proprietari pentru ${LUNI[luna - 1]} ${an}?`)) return;
+    if (!confirm(`Confirmare finală: se trimite email cu suma de plată către toți proprietarii cu cont în asociație. Continui?`)) return;
+    setSendingEmail(true); setError(null);
+    try {
+      const r = await fetch(`/api/asociatii/${asociatieId}/lista-plata-email`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ luna, an }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Eroare");
+      alert(`Email trimis către ${j.trimise} proprietari.${j.faraEmail ? ` ${j.faraEmail} proprietari nu au email în cont.` : ""}`);
+    } catch (e: any) { setError(e.message); }
+    finally { setSendingEmail(false); }
+  }
+
   const [fondMode,     setFondMode]     = useState<FondMode>("detaliat");
   const [data,         setData]         = useState<ListaData | null>(null);
   const [loading,      setLoading]      = useState(false);
@@ -422,6 +442,12 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
             <button className="btn btn--secondary" onClick={deschideLista} disabled={closing}
               title="Deschide lista afișată (anulează reportarea) — funcționează doar pt. cea mai recentă lună închisă">
               {closing ? "Se procesează…" : `🔓 Deschide lista ${LUNI[luna - 1]}`}
+            </button>
+          )}
+          {data?.lista?.status === "inchisa" && (
+            <button className="btn btn--secondary" onClick={trimiteEmailProprietari} disabled={sendingEmail}
+              title="Trimite email cu suma de plată către toți proprietarii cu cont în asociație">
+              {sendingEmail ? "Se trimite…" : "📧 Trimite email"}
             </button>
           )}
           {data && (

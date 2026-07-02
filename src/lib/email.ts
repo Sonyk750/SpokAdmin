@@ -183,6 +183,24 @@ export async function sendListaPlataPublicata(opts: {
   return sendMail({ to, subject: `SpokAdmin — listă de plată ${perioada} disponibilă pentru verificare`, html, text });
 }
 
+export async function sendInstiintarePlataProprietar(opts: {
+  to: string; asocName: string; luna: number; an: number; numarAp: string; suma: number;
+}) {
+  const { to, asocName, luna, an, numarAp, suma } = opts;
+  const perioada = `${LUNI_LABELS[luna - 1] ?? luna} ${an}`;
+  const sumaStr = suma.toFixed(2);
+  const html = shell("Înștiințare de plată", `
+    <p style="margin:0 0 12px;font-size:14px;line-height:1.6">Lista de întreținere pentru <strong>${asocName}</strong> — apartament <strong>${numarAp}</strong> — perioada <strong>${perioada}</strong> — a fost închisă.</p>
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:16px 18px;margin:0 0 18px">
+      <p style="margin:0;font-size:14px;color:#374151">Sumă de plată</p>
+      <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#7c3aed">${sumaStr} lei</p>
+    </div>
+    <p style="margin:0;font-size:14px;line-height:1.6;color:#374151">Toate documentele asociației (listă, facturi, chitanțe) le găsești oricând în contul tău din aplicația SpokAdmin, unde ai acces cu drepturile tale de proprietar.</p>
+  `);
+  const text = `Înștiințare de plată — ${asocName}, ap. ${numarAp}, ${perioada}: sumă de plată ${sumaStr} lei. Documentele asociației le găsești în contul tău din aplicația SpokAdmin.`;
+  return sendMail({ to, subject: `SpokAdmin — înștiințare de plată ${perioada} (ap. ${numarAp})`, html, text });
+}
+
 export async function sendLoginNotification(opts: {
   userName: string | null; userEmail: string; orgName?: string | null;
 }) {
