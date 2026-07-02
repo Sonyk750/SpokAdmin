@@ -31,10 +31,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Idempotent: nu reînchide o lună deja închisă
   const existing = await db.listaLuna.findUnique({
     where:  { asociatieId_luna_an: { asociatieId: id, luna, an } },
-    select: { status: true },
+    select: { status: true, confirmContabilAt: true, confirmPresedinteAt: true, confirmCenzorAt: true },
   });
   if (existing?.status === "inchisa") {
     return NextResponse.json({ error: "Lista acestei luni este deja închisă." }, { status: 409 });
+  }
+
+  // Închiderea (bifa Șef departament contabil) e ultimul pas — necesită confirmarea
+  // prealabilă a Contabilului, Președintelui și Cenzorului.
+  if (!existing?.confirmContabilAt || !existing?.confirmPresedinteAt || !existing?.confirmCenzorAt) {
+    return NextResponse.json({ error: "Lista trebuie confirmată de Contabil, Președinte și Cenzor înainte de închidere." }, { status: 400 });
   }
 
   const [chargeByAp, apartamente] = await Promise.all([

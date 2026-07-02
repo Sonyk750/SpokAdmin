@@ -40,6 +40,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Lista este închisă — nu mai poate fi modificată." }, { status: 409 });
   }
 
+  // Președinte/Cenzor confirmă doar după ce Contabilul a trimis lista la verificare.
+  if ((field === "presedinte" || field === "cenzor") && value && !existing?.confirmContabilAt) {
+    return NextResponse.json({ error: "Contabilul trebuie să trimită întâi lista la verificare." }, { status: 400 });
+  }
+
   const wasContabilSet = !!existing?.confirmContabilAt;
 
   const lista = await db.listaLuna.upsert({
