@@ -590,7 +590,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                     ))}
 
                     {coloane.hasRestantaIntretinere && (
-                      <th className="lp-th--num lp-th--rest">Restanță / Avans</th>
+                      <th className="lp-th--num lp-th--rest">Restanță</th>
                     )}
                     {hasFonduri && fondMode === "total" && (
                       <th className="lp-th--num lp-th--rest">Restanță fonduri</th>
@@ -646,7 +646,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
 
                       {coloane.hasRestantaIntretinere && (
                         <td className={`lp-td--num${row.restantaIntretinere > 0 ? " lp-td--red" : row.restantaIntretinere < 0 ? " lp-td--green" : ""}`}>
-                          {row.restantaIntretinere < 0 ? `Avans ${fmt2(Math.abs(row.restantaIntretinere))}` : fmt2(row.restantaIntretinere)}
+                          {fmt2(row.restantaIntretinere)}
                         </td>
                       )}
                       {hasFonduri && fondMode === "total" && (
@@ -690,7 +690,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                     ))}
                     {coloane.hasRestantaIntretinere && (
                       <td className={`lp-td--num lp-tfoot__val${totRestanta > 0 ? " lp-td--red" : totRestanta < 0 ? " lp-td--green" : ""}`}>
-                        {totRestanta < 0 ? `Avans ${fmt2(Math.abs(totRestanta))}` : fmt2(totRestanta)}
+                        {fmt2(totRestanta)}
                       </td>
                     )}
                     {hasFonduri && fondMode === "total" && (

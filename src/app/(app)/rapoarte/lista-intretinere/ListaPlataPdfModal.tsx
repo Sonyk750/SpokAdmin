@@ -257,7 +257,7 @@ function buildDocDef(
       cols.push({ label: "Total\nlună", al: "right", wt: W_NUM });
   }
   if (coloane.hasRestantaIntretinere && opts.showRestanta)
-    cols.push({ label: "Restanță /\nAvans", al: "right", wt: W_NUM });
+    cols.push({ label: "Restanță", al: "right", wt: W_NUM });
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
     if (opts.fondMode === "total")
       cols.push({ label: "Fond.\nrest.", al: "right", wt: W_NUM });
@@ -334,9 +334,8 @@ function buildDocDef(
 
     if (coloane.hasRestantaIntretinere && opts.showRestanta) {
       const v = row.restantaIntretinere;
-      const text  = v > 0 ? fmt2(v) : v < 0 ? `Avans ${fmt2(Math.abs(v))}` : "";
       const color = v > 0 ? "#b91c1c" : v < 0 ? "#15803d" : undefined;
-      cells.push(cell(text, "right", false, color));
+      cells.push(cell(v ? fmt2(v) : "", "right", false, color));
     }
 
     if (coloane.fonduri.length > 0 && opts.showFonduri) {
@@ -401,9 +400,8 @@ function buildDocDef(
 
   if (coloane.hasRestantaIntretinere && opts.showRestanta) {
     const t = rows.reduce((s, r) => s + r.restantaIntretinere, 0);
-    const text  = t < 0 ? `Avans ${fmt2(Math.abs(t))}` : fmt2(t);
     const color = t < 0 ? "#15803d" : "#b91c1c";
-    totRow.push({ text, alignment: "right", bold: true, fontSize: fs, color });
+    totRow.push({ text: fmt2(t), alignment: "right", bold: true, fontSize: fs, color });
   }
 
   if (coloane.fonduri.length > 0 && opts.showFonduri) {
