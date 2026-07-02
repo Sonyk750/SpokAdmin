@@ -128,6 +128,26 @@ function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// ─── Persistarea setărilor de format (nu și datele, care sunt legate de lună) ──
+
+const PDF_SETTINGS_KEY = "lp-pdf-settings";
+
+type SavedPdfSettings = Omit<PdfOptions, "dataAfisare" | "termenPlata">;
+
+function loadSavedSettings(): Partial<SavedPdfSettings> | null {
+  try {
+    const raw = localStorage.getItem(PDF_SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveSettings(opts: PdfOptions) {
+  const rest: Partial<PdfOptions> = { ...opts };
+  delete rest.dataAfisare;
+  delete rest.termenPlata;
+  try { localStorage.setItem(PDF_SETTINGS_KEY, JSON.stringify(rest)); } catch {}
+}
+
 function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions {
   const consumViz: Record<string, boolean> = {};
   const consumLeiViz: Record<string, boolean> = {};
@@ -140,7 +160,7 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
   const fondViz: Record<string, boolean> = {};
   for (const f of coloane.fonduri) fondViz[f.id] = true;
 
-  return {
+  const base: PdfOptions = {
     pageSize: "A4",
     orientation: "landscape",
     fontSize: 7,
@@ -166,6 +186,22 @@ function initOpts(coloane: Coloane, fondMode: "total" | "detaliat"): PdfOptions 
     zileScadente: 15,
     termenPlata: addDays(todayIso(), 15),
   };
+
+  const saved = loadSavedSettings();
+  if (!saved) return base;
+
+  const merged: PdfOptions = {
+    ...base,
+    ...saved,
+    consumViz:    { ...base.consumViz,    ...(saved.consumViz    ?? {}) },
+    consumLeiViz: { ...base.consumLeiViz, ...(saved.consumLeiViz ?? {}) },
+    cheltViz:     { ...base.cheltViz,     ...(saved.cheltViz     ?? {}) },
+    fondViz:      { ...base.fondViz,      ...(saved.fondViz      ?? {}) },
+    dataAfisare:  base.dataAfisare, // mereu azi, nu se salvează
+    termenPlata:  base.termenPlata,
+  };
+  merged.termenPlata = addDays(merged.dataAfisare, merged.zileScadente);
+  return merged;
 }
 
 // ─── PDF document builder ─────────────────────────────────────────────────────
@@ -557,6 +593,7 @@ export default function ListaPlataPdfModal({
   const [actionLoading, setActionLoading] = useState(false);
 
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [savedFlash,   setSavedFlash]   = useState(false);
   const genIdRef    = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -619,6 +656,12 @@ export default function ListaPlataPdfModal({
     }
   }
 
+  function handleSaveSettings() {
+    saveSettings(opts);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1800);
+  }
+
   // ── Option updaters ────────────────────────────────────────────────────────
 
   function upd<K extends keyof PdfOptions>(key: K, val: PdfOptions[K]) {
@@ -661,6 +704,14 @@ export default function ListaPlataPdfModal({
           Preview PDF — Listă întreținere {LUNI[luna - 1]} {an}
         </span>
         <div style={{ marginLeft: "auto", display: "flex", gap: "0.5rem" }}>
+          <button
+            className="btn btn--secondary"
+            onClick={handleSaveSettings}
+            title="Păstrează formatul (pagină, font, margini, coloane) și pentru următoarea deschidere"
+            style={{ fontSize: "0.8125rem", padding: "0.5rem 1rem" }}
+          >
+            {savedFlash ? "✓ Salvat" : "💾 Salvează setările"}
+          </button>
           <button
             className="btn btn--secondary"
             onClick={handlePrint}
