@@ -18,6 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     where:  { id, organizationId: orgId },
     select: {
       id: true, valoare: true, status: true, furnizorId: true, asociatieId: true,
+      serie: true, numar: true, dataEmiterii: true,
       plati:        { select: { id: true, suma: true, data: true, metoda: true, fondName: true, notes: true, idTranzactie: true, serieCh: true, nrCh: true }, orderBy: { data: "asc" } },
       avansMiscari: { select: { id: true, suma: true, tip: true, data: true, notes: true, plataId: true }, orderBy: { data: "asc" } },
     },
@@ -31,8 +32,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ? await getAvansSold(db, factura.asociatieId, factura.furnizorId)
     : 0;
 
-  // Total datorat furnizorului = restul tuturor facturilor neachitate ale aceluiași furnizor
+  // Total datorat furnizorului = restul tuturor facturilor neachitate ale aceluiași furnizor,
+  // plus lista individuală a acestor restanțe (folosită pentru alegerea manuală în modalul de plată).
   let totalDatoratFurnizor = restCurent;
+  let restante: { id: string; serie: string | null; numar: string | null; valoare: number; rest: number; dataEmiterii: string | null; isCurrent: boolean }[] =
+    restCurent > EPS
+      ? [{ id: factura.id, serie: factura.serie, numar: factura.numar, valoare: factura.valoare, rest: restCurent, dataEmiterii: factura.dataEmiterii?.toISOString() ?? null, isCurrent: true }]
+      : [];
+
   if (factura.furnizorId) {
     const alteFacturi = await db.factura.findMany({
       where: {
@@ -42,16 +49,26 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         organizationId: orgId,
       },
       select: {
-        valoare:      true,
+        id: true, serie: true, numar: true, valoare: true, dataEmiterii: true,
         plati:        { select: { suma: true } },
         avansMiscari: { select: { suma: true } },
       },
     });
-    const alteRest = alteFacturi.reduce((s, f) => {
-      const ac = computeAcoperit(f.plati, f.avansMiscari);
-      return s + Math.max(0, f.valoare - ac);
-    }, 0);
+    const alteRestante = alteFacturi
+      .map(f => ({
+        id: f.id, serie: f.serie, numar: f.numar, valoare: f.valoare,
+        rest: r2(f.valoare - computeAcoperit(f.plati, f.avansMiscari)),
+        dataEmiterii: f.dataEmiterii?.toISOString() ?? null, isCurrent: false,
+      }))
+      .filter(f => f.rest > EPS);
+    const alteRest = alteRestante.reduce((s, f) => s + f.rest, 0);
     totalDatoratFurnizor = r2(restCurent + alteRest);
+
+    restante = restante.concat(alteRestante).sort((a, b) => {
+      const da = a.dataEmiterii ? new Date(a.dataEmiterii).getTime() : 0;
+      const db_ = b.dataEmiterii ? new Date(b.dataEmiterii).getTime() : 0;
+      return da - db_;
+    });
   }
 
   return NextResponse.json({
@@ -61,6 +78,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status:   factura.status,
     avansSold,
     totalDatoratFurnizor,
+    restante,
     plati:        factura.plati.map(p => ({ ...p, data: p.data.toISOString() })),
     avansMiscari: factura.avansMiscari.map(m => ({ ...m, data: m.data.toISOString() })),
   });

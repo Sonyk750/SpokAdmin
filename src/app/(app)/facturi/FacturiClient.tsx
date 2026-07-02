@@ -40,9 +40,11 @@ interface FacturaRow {
 
 interface PlataRow { id: string; suma: number; data: string; metoda: string; fondName: string | null; notes: string | null; idTranzactie: string | null; serieCh: string | null; nrCh: number | null; }
 interface AvansMiscareRow { id: string; suma: number; tip: string; data: string; notes: string | null; plataId: string | null; }
+interface RestantaRow { id: string; serie: string | null; numar: string | null; valoare: number; rest: number; dataEmiterii: string | null; isCurrent: boolean; }
 interface PlataData {
   valoare: number; acoperit: number; rest: number; status: string; avansSold: number;
   totalDatoratFurnizor?: number;
+  restante?: RestantaRow[];
   plati: PlataRow[]; avansMiscari: AvansMiscareRow[];
 }
 
@@ -290,6 +292,8 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
   const [plataLoading,setPlataLoading]= useState(false);
   const [plataSaving, setPlataSaving] = useState(false);
   const [plataErr,    setPlataErr]    = useState<string | null>(null);
+  const [plataMode,     setPlataMode]     = useState<"manual" | "auto">("manual");
+  const [plataTargetId, setPlataTargetId] = useState("");
 
   // ── Plată din fond la creare ─────────────────────────────────────────────────
   const [platesteDinFond, setPlatesteDinFond] = useState(false);
@@ -508,6 +512,7 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
   async function openPlata(f: FacturaRow) {
     setSelected(f); setModal("plata"); setPlataErr(null); setPlataData(null);
+    setPlataMode("manual");
     fetch(`/api/asociatii/${f.asociatieId}/fonduri`)
       .then(r => r.json())
       .then(d => setFonduriList(Array.isArray(d) ? d : []))
@@ -515,28 +520,35 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
     const data = await loadPlataData(f.id);
     const totalDatorat = data?.totalDatoratFurnizor ?? data?.rest ?? 0;
     setPlataForm({ suma: totalDatorat > 0 ? String(totalDatorat) : "", metoda: "banca", fondId: "", data: todayISO(), notes: "", idTranzactie: "", serieCh: "", nrCh: "" });
+    const restante = data?.restante ?? [];
+    setPlataTargetId((data?.rest ?? 0) > 0.01 ? f.id : (restante[0]?.id ?? ""));
   }
 
   async function submitPlata() {
     if (!selected) return;
     const suma = parseFloat(plataForm.suma);
     if (!plataForm.suma || isNaN(suma) || suma <= 0) return setPlataErr("Suma trebuie să fie un număr pozitiv.");
+    const auto = plataMode === "auto" && !!selected.furnizorId;
+    if (!auto && !plataTargetId) return setPlataErr("Selectează restanța pe care o plătești.");
     const fondSel = fonduriList.find(f => f.id === plataForm.fondId);
-    if (fondSel && fondSel.sold <= 0) return setPlataErr(`Fondul "${fondSel.name}" nu are sold disponibil — alege alt fond sau plătește fără fond.`);
+    if (!auto && fondSel && fondSel.sold <= 0) return setPlataErr(`Fondul "${fondSel.name}" nu are sold disponibil — alege alt fond sau plătește fără fond.`);
     setPlataSaving(true); setPlataErr(null);
     try {
-      const res = await fetch(`/api/facturi/${selected.id}/plati`, {
+      const url  = auto ? `/api/furnizori/${selected.furnizorId}/plati` : `/api/facturi/${plataTargetId}/plati`;
+      const body: Record<string, any> = {
+        suma,
+        metoda:       plataForm.metoda,
+        data:         plataForm.data || undefined,
+        notes:        plataForm.notes.trim() || undefined,
+        idTranzactie: plataForm.metoda === "banca" ? (plataForm.idTranzactie.trim() || undefined) : undefined,
+        serieCh:      plataForm.metoda === "casa"  ? (plataForm.serieCh.trim() || undefined) : undefined,
+        nrCh:         plataForm.metoda === "casa"  ? (parseInt(plataForm.nrCh) || undefined) : undefined,
+      };
+      if (auto) body.asociatieId = selected.asociatieId;
+      else      body.fondId = plataForm.fondId || undefined;
+      const res = await fetch(url, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          suma,
-          metoda:       plataForm.metoda,
-          fondId:       plataForm.fondId || undefined,
-          data:         plataForm.data || undefined,
-          notes:        plataForm.notes.trim() || undefined,
-          idTranzactie: plataForm.metoda === "banca" ? (plataForm.idTranzactie.trim() || undefined) : undefined,
-          serieCh:      plataForm.metoda === "casa"  ? (plataForm.serieCh.trim() || undefined) : undefined,
-          nrCh:         plataForm.metoda === "casa"  ? (parseInt(plataForm.nrCh) || undefined) : undefined,
-        }),
+        body: JSON.stringify(body),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Eroare server");
@@ -1135,10 +1147,14 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
 
       {/* ── Modal Plată ────────────────────────────────────────────────────── */}
       {modal === "plata" && selected && (() => {
-        const restNow = plataData?.rest ?? 0;
-        const sumaN   = parseFloat(plataForm.suma) || 0;
-        const surplus = Math.round((sumaN - restNow) * 100) / 100;
         const hasFurnizor = !!selected.furnizor;
+        const restante  = plataData?.restante ?? [];
+        const targetRow = restante.find(r => r.id === plataTargetId);
+        const auto      = plataMode === "auto" && hasFurnizor;
+        const restNow   = auto ? 0 : (targetRow?.rest ?? plataData?.rest ?? 0);
+        const sumaN     = parseFloat(plataForm.suma) || 0;
+        const surplus   = Math.round((sumaN - restNow) * 100) / 100;
+        const totalRestante = restante.reduce((s, r) => s + r.rest, 0);
         return (
         <div className="modal-overlay">
           <div className="modal">
@@ -1157,35 +1173,53 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
               {plataLoading && !plataData && <div style={{ textAlign: "center", color: "#475569", padding: "1.5rem" }}>Se încarcă...</div>}
 
               {plataData && (<>
-                {/* Sumar */}
-                {(() => {
-                  const alteRest = hasFurnizor ? Math.round(((plataData.totalDatoratFurnizor ?? plataData.rest) - plataData.rest) * 100) / 100 : 0;
-                  const total    = hasFurnizor ? (plataData.totalDatoratFurnizor ?? plataData.rest) : plataData.rest;
-                  return (
-                    <div style={{ padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <tbody>
-                          <tr>
-                            <td style={{ color: "#94a3b8", fontSize: "0.85rem", paddingBottom: "0.3rem" }}>Factură curentă</td>
-                            <td style={{ textAlign: "right", fontWeight: 700, color: "#c4b5fd", paddingBottom: "0.3rem" }}>{fmt2(plataData.rest)} lei</td>
+                {/* Restanțe furnizor + mod de alocare */}
+                {hasFurnizor && restante.length > 1 && (
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                    <button type="button"
+                      className={`btn ${plataMode === "manual" ? "btn--primary" : "btn--secondary"}`}
+                      onClick={() => setPlataMode("manual")}>Manual — aleg eu</button>
+                    <button type="button"
+                      className={`btn ${plataMode === "auto" ? "btn--primary" : "btn--secondary"}`}
+                      onClick={() => setPlataMode("auto")}>Automat — cea mai veche întâi</button>
+                  </div>
+                )}
+
+                {restante.length > 0 && (
+                  <div style={{ padding: "0.75rem 1rem", background: "#0f172a", borderRadius: "0.5rem", marginBottom: "1rem" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <tbody>
+                        {restante.map(r => (
+                          <tr key={r.id}>
+                            {!auto && (
+                              <td style={{ width: "1.5rem" }}>
+                                <input type="radio" name="plataTarget" checked={plataTargetId === r.id}
+                                  onChange={() => setPlataTargetId(r.id)} />
+                              </td>
+                            )}
+                            <td style={{ color: r.isCurrent ? "#c4b5fd" : "#94a3b8", fontSize: "0.85rem", paddingBottom: "0.3rem" }}>
+                              {r.isCurrent ? "Factură curentă" : ([r.serie, r.numar].filter(Boolean).join("/") || "Factură")}
+                              {r.dataEmiterii ? ` · ${new Date(r.dataEmiterii).toLocaleDateString("ro-RO")}` : ""}
+                            </td>
+                            <td style={{ textAlign: "right", fontWeight: 700, color: r.isCurrent ? "#c4b5fd" : "#fbbf24", paddingBottom: "0.3rem" }}>{fmt2(r.rest)} lei</td>
                           </tr>
-                          {alteRest > 0.01 && (
-                            <tr>
-                              <td style={{ color: "#94a3b8", fontSize: "0.85rem", paddingBottom: "0.3rem" }}>Restanță</td>
-                              <td style={{ textAlign: "right", fontWeight: 700, color: "#fbbf24", paddingBottom: "0.3rem" }}>{fmt2(alteRest)} lei</td>
-                            </tr>
-                          )}
-                          {alteRest > 0.01 && (
-                            <tr style={{ borderTop: "1px solid #1e293b" }}>
-                              <td style={{ color: "#e2e8f0", fontSize: "0.9rem", fontWeight: 700, paddingTop: "0.4rem" }}>Total de plată</td>
-                              <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", fontSize: "1.05rem", paddingTop: "0.4rem" }}>{fmt2(total)} lei</td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })()}
+                        ))}
+                        {restante.length > 1 && (
+                          <tr style={{ borderTop: "1px solid #1e293b" }}>
+                            {!auto && <td />}
+                            <td style={{ color: "#e2e8f0", fontSize: "0.9rem", fontWeight: 700, paddingTop: "0.4rem" }}>Total restanțe</td>
+                            <td style={{ textAlign: "right", fontWeight: 800, color: "#f87171", fontSize: "1.05rem", paddingTop: "0.4rem" }}>{fmt2(totalRestante)} lei</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                    {auto && (
+                      <p style={{ fontSize: "0.78rem", color: "#38bdf8", marginTop: "0.5rem", marginBottom: 0 }}>
+                        ⓘ Suma introdusă se aplică automat, în ordinea datei, de la cea mai veche restanță.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Formular plată nouă */}
                 <div className="form-grid form-grid--2">
@@ -1245,12 +1279,12 @@ export default function FacturiClient({ furnizori: initialFurnizori, defaultLuna
                   </div>
                 </div>
 
-                {surplus > 0.01 && hasFurnizor && (
+                {!auto && surplus > 0.01 && hasFurnizor && (
                   <div style={{ fontSize: "0.8rem", color: "#38bdf8", marginTop: "0.5rem" }}>
-                    ⓘ Surplus de <strong>{fmt2(surplus)} lei</strong> → se adaugă ca avans la {selected.furnizor?.nume}.
+                    ⓘ Surplus de <strong>{fmt2(surplus)} lei</strong> → se aplică automat pe următoarea restanță mai veche a lui {selected.furnizor?.nume}.
                   </div>
                 )}
-                {surplus > 0.01 && !hasFurnizor && (
+                {!auto && surplus > 0.01 && !hasFurnizor && (
                   <div style={{ fontSize: "0.8rem", color: "#fbbf24", marginTop: "0.5rem" }}>
                     ⚠ Suma depășește restul, dar factura nu are furnizor — atribuie un furnizor (editează factura) pentru a putea înregistra avansul.
                   </div>
