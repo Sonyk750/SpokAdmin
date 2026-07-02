@@ -56,11 +56,13 @@ export async function GET(req: NextRequest) {
 
   // Nivele de vizibilitate: contabilul (admin) vede mereu totul; Președinte/Cenzor
   // (și restul rolurilor interne) doar după ce contabilul a bifat publicarea;
-  // Proprietarii doar după ce lista e închisă definitiv (bifă șef departament contabil).
+  // Proprietarii și Casierul doar după ce lista e închisă definitiv (bifă șef
+  // departament contabil) — casierul încasează doar pe liste deja închise.
   if (!access.isAdmin) {
-    const publicPentruProprietar = listaLuna?.status === "inchisa";
-    const publicPentruConsiliu   = !!listaLuna?.confirmContabilAt || publicPentruProprietar;
-    const vizibil = access.role === "PROPRIETAR" ? publicPentruProprietar : publicPentruConsiliu;
+    const publicDupaInchidere = listaLuna?.status === "inchisa";
+    const publicDupaContabil  = !!listaLuna?.confirmContabilAt || publicDupaInchidere;
+    const doarDupaInchidere   = access.role === "PROPRIETAR" || access.role === "CASIER";
+    const vizibil = doarDupaInchidere ? publicDupaInchidere : publicDupaContabil;
     if (!vizibil) {
       return NextResponse.json({ error: "Lista nu a fost încă publicată." }, { status: 403 });
     }

@@ -33,13 +33,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (f.luna == null || f.an == null) continue;
     map.set(`${f.an}-${f.luna}`, { luna: f.luna, an: f.an, status: "publicata" });
   }
-  // Nivele de vizibilitate (vezi /api/lista-plata): Proprietarii văd doar lunile
-  // închise; Președinte/Cenzor/restul rolurilor interne, doar după bifa contabilului.
+  // Nivele de vizibilitate (vezi /api/lista-plata): Proprietarii și Casierul
+  // văd doar lunile închise; Președinte/Cenzor/restul rolurilor interne, doar
+  // după bifa contabilului.
   for (const l of liste) {
     if (!access.isAdmin) {
-      const publicPentruProprietar = l.status === "inchisa";
-      const publicPentruConsiliu   = !!l.confirmContabilAt || publicPentruProprietar;
-      const vizibil = access.role === "PROPRIETAR" ? publicPentruProprietar : publicPentruConsiliu;
+      const publicDupaInchidere = l.status === "inchisa";
+      const publicDupaContabil  = !!l.confirmContabilAt || publicDupaInchidere;
+      const doarDupaInchidere   = access.role === "PROPRIETAR" || access.role === "CASIER";
+      const vizibil = doarDupaInchidere ? publicDupaInchidere : publicDupaContabil;
       if (!vizibil) continue;
     }
     map.set(`${l.an}-${l.luna}`, { luna: l.luna, an: l.an, status: l.status });
