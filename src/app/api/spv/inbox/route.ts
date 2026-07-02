@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { resolveFurnizorId } from "@/lib/furnizor"
+import { consumaAvansPeFactura } from "@/lib/avans-furnizor"
 import { unzipSync } from "fflate"
 
 // Importă facturile primite din SPV în lista de facturi (idempotent — nu dublează).
@@ -41,7 +42,7 @@ async function importSpvToFacturi(orgId: string, asociatieId: string) {
     }
 
     const d = inv.issueDate ?? null
-    await db.factura.create({
+    const created = await db.factura.create({
       data: {
         organizationId: orgId,
         asociatieId,
@@ -55,7 +56,10 @@ async function importSpvToFacturi(orgId: string, asociatieId: string) {
         status:       "neplatita",
         aiData:       `spv:${inv.id}`,
       },
+      select: { id: true, organizationId: true, asociatieId: true, furnizorId: true },
     })
+    // Furnizorul putea avea deja avans disponibil — îl aplicăm imediat pe factura importată.
+    await consumaAvansPeFactura(db, created)
     await db.spvInvoice.update({ where: { id: inv.id }, data: { status: "PROCESSED" } })
   }
 }

@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveFurnizorId } from "@/lib/furnizor";
-import { depuneAvans, consumaAvansPeFacturileFurnizorului, resetWizardInitAvans, WIZARD_AVANS_NOTE } from "@/lib/avans-furnizor";
+import { depuneAvans, consumaAvansPeFactura, consumaAvansPeFacturileFurnizorului, resetWizardInitAvans, WIZARD_AVANS_NOTE } from "@/lib/avans-furnizor";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         if (val > 0) {
           // Valoare pozitivă = restanță (datorie la preluare) → factură neplătită.
           const dataDate = dataRestante ? new Date(dataRestante) : new Date();
-          await tx.factura.create({
+          const created = await tx.factura.create({
             data: {
               organizationId: orgId,
               asociatieId:    id,
@@ -57,7 +57,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               status:         "neplatita",
               notes:          "wizard-init-restante-furnizori",
             },
+            select: { id: true, organizationId: true, asociatieId: true, furnizorId: true },
           });
+          // Furnizorul putea avea deja avans disponibil (dintr-o rulare anterioară a
+          // pasului 8 sau dintr-o supraplată) — îl aplicăm imediat pe noua restanță.
+          await consumaAvansPeFactura(tx, created);
         } else {
           // Valoare negativă = avans (asociația a plătit înainte de factură) → sold de avans
           // la furnizor, consumat automat pe facturile deja introduse și pe cele viitoare.
