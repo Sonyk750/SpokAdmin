@@ -414,8 +414,8 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
 
       {/* ── Modal Adaugă plată (avans furnizor) ──────────────────────────── */}
       {showAdd && (
-        <div className="modal-overlay" onClick={() => !addSaving && setShowAdd(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: "480px" }}>
             <div className="modal__header">
               <h2 className="modal__title">Adaugă plată</h2>
               <button className="modal__close" onClick={() => setShowAdd(false)}>×</button>
