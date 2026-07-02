@@ -51,8 +51,21 @@ export async function GET(req: NextRequest) {
 
   const listaLuna = await db.listaLuna.findUnique({
     where:  { asociatieId_luna_an: { asociatieId, luna, an } },
-    select: { status: true, confirmContabilAt: true, confirmPresedinteAt: true, confirmCenzorAt: true, inchisaAt: true },
+    select: { id: true, status: true, confirmContabilAt: true, confirmPresedinteAt: true, confirmCenzorAt: true, inchisaAt: true },
   });
+
+  // Odată închisă, suma lunii a fost deja adunată în SoldApartament.restantaIntretinere
+  // (reportare pt. luna următoare) — dacă am recalcula totalLuna live din facturi ȘI am
+  // mai adăuga soldul curent, am număra suma lunii de două ori. Pt. o lună închisă, restanța
+  // afișată trebuie să fie cea dinaintea închiderii (snapshot), nu soldul curent (deja crescut).
+  let restantaVecheByAp: Record<string, number> = {};
+  if (listaLuna?.status === "inchisa") {
+    const snapshot = await db.listaLunaApartament.findMany({
+      where:  { listaId: listaLuna.id },
+      select: { apartamentId: true, restantaVeche: true },
+    });
+    restantaVecheByAp = Object.fromEntries(snapshot.map(s => [s.apartamentId, s.restantaVeche]));
+  }
 
   // Nivele de vizibilitate: contabilul (admin) vede mereu totul; Președinte/Cenzor
   // (și restul rolurilor interne) doar după ce contabilul a bifat publicarea;
@@ -127,7 +140,9 @@ export async function GET(req: NextRequest) {
       restantaFonduri[fond.id] = fa?.restanta ?? 0;
     }
 
-    const restantaIntretinere = (sold?.restantaIntretinere ?? 0) + (sold?.intretinereCurenta ?? 0);
+    const restantaIntretinere = listaLuna?.status === "inchisa"
+      ? (restantaVecheByAp[ap.id] ?? 0)
+      : (sold?.restantaIntretinere ?? 0) + (sold?.intretinereCurenta ?? 0);
     const totalFonduri = Object.values(restantaFonduri).reduce((s, v) => s + v, 0);
     const total = restantaIntretinere + totalFonduri;
 
