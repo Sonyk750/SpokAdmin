@@ -592,7 +592,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                     ))}
 
                     {coloane.hasRestantaIntretinere && (
-                      <th className="lp-th--num lp-th--rest">Restanță întreținere</th>
+                      <th className="lp-th--num lp-th--rest">Restanță / Avans</th>
                     )}
                     {hasFonduri && fondMode === "total" && (
                       <th className="lp-th--num lp-th--rest">Restanță fonduri</th>
@@ -647,8 +647,8 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                       })}
 
                       {coloane.hasRestantaIntretinere && (
-                        <td className={`lp-td--num${row.restantaIntretinere > 0 ? " lp-td--red" : ""}`}>
-                          {fmt2(row.restantaIntretinere)}
+                        <td className={`lp-td--num${row.restantaIntretinere > 0 ? " lp-td--red" : row.restantaIntretinere < 0 ? " lp-td--green" : ""}`}>
+                          {row.restantaIntretinere < 0 ? `Avans ${fmt2(Math.abs(row.restantaIntretinere))}` : fmt2(row.restantaIntretinere)}
                         </td>
                       )}
                       {hasFonduri && fondMode === "total" && (
@@ -691,7 +691,9 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
                       </td>
                     ))}
                     {coloane.hasRestantaIntretinere && (
-                      <td className="lp-td--num lp-tfoot__val lp-td--red">{fmt2(totRestanta)}</td>
+                      <td className={`lp-td--num lp-tfoot__val${totRestanta > 0 ? " lp-td--red" : totRestanta < 0 ? " lp-td--green" : ""}`}>
+                        {totRestanta < 0 ? `Avans ${fmt2(Math.abs(totRestanta))}` : fmt2(totRestanta)}
+                      </td>
                     )}
                     {hasFonduri && fondMode === "total" && (
                       <td className="lp-td--num lp-tfoot__val lp-td--red">{fmt2(totTotalFonduri)}</td>
