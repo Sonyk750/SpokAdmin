@@ -455,6 +455,32 @@ export default function WizardClient({
   );
   const [disabledContorIds, setDisabledContorIds] = useState<Set<string>>(new Set());
 
+  // ─── Dirty-tracking pentru salvarea silențioasă (Înapoi / click pe tab) ────
+  // Simpla navigare între pași NU trebuie să suprascrie datele din DB — doar
+  // modificările reale de valori se salvează (vezi silentSaveStep mai jos).
+  const snapshotFor = useCallback((s: number): string => {
+    switch (s) {
+      case 1: return JSON.stringify({ asocInfo, blocuri });
+      case 3: return JSON.stringify({ proprietari });
+      case 4: return JSON.stringify({ solduri });
+      case 6: return JSON.stringify({ soldFonduri });
+      case 7: return JSON.stringify({ soldContribFonduri, soldFondAsoc });
+      case 8: return JSON.stringify({ furnizoriRestante, dataRestanteFurnizori });
+      case 9: return JSON.stringify({ soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn });
+      default: return "";
+    }
+  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, furnizoriRestante, dataRestanteFurnizori, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
+
+  const lastSavedRef = useRef<Record<number, string>>({
+    1: JSON.stringify({ asocInfo, blocuri }),
+    3: JSON.stringify({ proprietari }),
+    4: JSON.stringify({ solduri }),
+    6: JSON.stringify({ soldFonduri }),
+    7: JSON.stringify({ soldContribFonduri, soldFondAsoc }),
+    8: JSON.stringify({ furnizoriRestante, dataRestanteFurnizori }),
+    9: JSON.stringify({ soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn }),
+  });
+
   // ─── API helper ──────────────────────────────────────────────────────────
 
   async function api(path: string, body: unknown) {
@@ -473,6 +499,7 @@ export default function WizardClient({
     setSaving(true); setError(null);
     try {
       await api("info", { info: asocInfo, blocuri });
+      lastSavedRef.current[1] = JSON.stringify({ asocInfo, blocuri });
       setMaxStep(prev => Math.max(prev, 2)); setStep(2);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -526,6 +553,7 @@ export default function WizardClient({
         };
       });
       await api("proprietari", { proprietari: payload });
+      lastSavedRef.current[3] = JSON.stringify({ proprietari });
       setMaxStep(p => Math.max(p, 4)); setStep(4);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -541,6 +569,7 @@ export default function WizardClient({
           restantaCurenta:     s.restantaCurenta     || "0",
         })),
       });
+      lastSavedRef.current[4] = JSON.stringify({ solduri });
       setMaxStep(p => Math.max(p, 5)); setStep(5);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -597,6 +626,7 @@ export default function WizardClient({
     setSaving(true); setError(null);
     try {
       await api("sold-fonduri", { soldFonduri });
+      lastSavedRef.current[6] = JSON.stringify({ soldFonduri });
       setMaxStep(p => Math.max(p, 7)); setStep(7);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -609,6 +639,7 @@ export default function WizardClient({
         solduriFonduri: soldContribFonduri.map(s => ({ apartamentId: s.apartamentId, fondId: s.fondId, sold: s.sold || "0" })),
         soldFondAsoc,
       });
+      lastSavedRef.current[7] = JSON.stringify({ soldContribFonduri, soldFondAsoc });
       setMaxStep(p => Math.max(p, 8)); setStep(8);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -629,6 +660,7 @@ export default function WizardClient({
         .filter(f => f.cui.trim())
         .map(f => ({ furnizorNume: f.nume.trim(), furnizorCui: f.cui.trim(), restanta: f.restanta }));
       await api("restante-furnizori", { restante, dataRestante: dataRestanteFurnizori });
+      lastSavedRef.current[8] = JSON.stringify({ furnizoriRestante, dataRestanteFurnizori });
       setMaxStep(p => Math.max(p, 9)); setStep(9);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -644,6 +676,7 @@ export default function WizardClient({
         primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null,
         primaListaAn:   primaListaAn   ? parseInt(primaListaAn)   : null,
       });
+      lastSavedRef.current[9] = JSON.stringify({ soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn });
       setMaxStep(p => Math.max(p, 10)); setStep(10);
     } catch (e: any) { setError(e.message); }
     finally { setSaving(false); }
@@ -688,7 +721,12 @@ export default function WizardClient({
   }, [indexRows]);
 
   // ─── Silent save (fără navigare) — folosit la Înapoi și la click pe step label ─
+  // Salvează doar dacă valorile pasului chiar s-au schimbat față de ultima
+  // salvare — altfel simpla navigare între taburi ar suprascrie datele din DB
+  // cu orice mai era în formular (ex. valori vechi dintr-o sesiune neatinsă).
   const silentSaveStep = useCallback(async (s: number) => {
+    const snap = snapshotFor(s);
+    if (!snap || snap === lastSavedRef.current[s]) return;
     try {
       if (s === 1) await api("info", { info: asocInfo, blocuri });
       else if (s === 3) {
@@ -705,8 +743,10 @@ export default function WizardClient({
       else if (s === 7) await api("solduri-fonduri", { solduriFonduri: soldContribFonduri.map(s2 => ({ apartamentId: s2.apartamentId, fondId: s2.fondId, sold: s2.sold || "0" })), soldFondAsoc });
       else if (s === 8) await api("restante-furnizori", { restante: furnizoriRestante.filter(f => f.nume.trim() || f.cui.trim()).map(f => ({ furnizorNume: f.nume.trim(), furnizorCui: f.cui.trim(), restanta: f.restanta })), dataRestante: dataRestanteFurnizori });
       else if (s === 9) await api("sold-initial", { soldCasa: soldCasa ? parseFloat(soldCasa) : null, dataSoldCasa, banci: banci.map(b => ({ ...b, sold: b.sold ? parseFloat(b.sold) : null })), primaListaLuna: primaListaLuna ? parseInt(primaListaLuna) : null, primaListaAn: primaListaAn ? parseInt(primaListaAn) : null });
+      else return;
+      lastSavedRef.current[s] = snap;
     } catch { /* silent — nu blocăm navigarea */ }
-  }, [asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, furnizoriRestante, dataRestanteFurnizori, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
+  }, [snapshotFor, asocInfo, blocuri, proprietari, solduri, soldFonduri, soldContribFonduri, soldFondAsoc, furnizoriRestante, dataRestanteFurnizori, soldCasa, dataSoldCasa, banci, primaListaLuna, primaListaAn]);
 
   const finalizeaza = useCallback(async () => {
     setSaving(true); setError(null);
