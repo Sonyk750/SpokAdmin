@@ -210,19 +210,18 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
     finally { setClosing(false); }
   }
 
-  async function redeschideLista() {
+  // Deschide lista efectiv afișată (nu presupune "ultima lună închisă" —
+  // serverul refuză oricum dacă nu e cea mai recentă lună închisă).
+  async function deschideLista() {
     if (!asociatieId) return;
-    // Ultima lună închisă = luna dinaintea perioadei curente
-    const cl = perioadaCurentaLuna === 1 ? 12 : (perioadaCurentaLuna ?? 1) - 1;
-    const ca = perioadaCurentaLuna === 1 ? (perioadaCurentaAn ?? 0) - 1 : (perioadaCurentaAn ?? 0);
-    if (!confirm(`Redeschizi lista pe ${LUNI[cl - 1]} ${ca}? Reportarea în restanță se anulează, iar perioada curentă revine la ${LUNI[cl - 1]} ${ca}.`)) return;
+    if (!confirm(`Deschizi lista pe ${LUNI[luna - 1]} ${an}? Reportarea în restanță se anulează, iar perioada curentă revine la ${LUNI[luna - 1]} ${an}.`)) return;
     setClosing(true); setError(null);
     try {
-      const r = await fetch(`/api/asociatii/${asociatieId}/inchide-lista?luna=${cl}&an=${ca}`, { method: "DELETE" });
+      const r = await fetch(`/api/asociatii/${asociatieId}/inchide-lista?luna=${luna}&an=${an}`, { method: "DELETE" });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? "Eroare");
       refreshPerioada();
-      setLuna(cl); setAn(ca);
+      await genereaza();
     } catch (e: any) { setError(e.message); }
     finally { setClosing(false); }
   }
@@ -413,18 +412,17 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          {perioadaCurentaLuna && perioadaCurentaAn && (
-            isCurenta ? (
-              <button className="btn btn--primary" onClick={() => setShowCloseCard(true)} disabled={closing || !data}
-                title="Deschide cardul de confirmare pentru închiderea lunii">
-                {closing ? "Se procesează…" : `🔒 Închide lista ${LUNI[luna - 1]}`}
-              </button>
-            ) : (
-              <button className="btn btn--secondary" onClick={redeschideLista} disabled={closing}
-                title="Redeschide ultima lună închisă (anulează reportarea)">
-                {closing ? "Se procesează…" : "↩ Redeschide ultima lună"}
-              </button>
-            )
+          {perioadaCurentaLuna && perioadaCurentaAn && isCurenta && (
+            <button className="btn btn--primary" onClick={() => setShowCloseCard(true)} disabled={closing || !data}
+              title="Deschide cardul de confirmare pentru închiderea lunii">
+              {closing ? "Se procesează…" : `🔒 Închide lista ${LUNI[luna - 1]}`}
+            </button>
+          )}
+          {data?.lista?.status === "inchisa" && (
+            <button className="btn btn--secondary" onClick={deschideLista} disabled={closing}
+              title="Deschide lista afișată (anulează reportarea) — funcționează doar pt. cea mai recentă lună închisă">
+              {closing ? "Se procesează…" : `🔓 Deschide lista ${LUNI[luna - 1]}`}
+            </button>
           )}
           {data && (
             <>
