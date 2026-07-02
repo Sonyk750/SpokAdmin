@@ -25,7 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // Plus lunile din ListaLuna, dacă există (cu status).
   const liste = await db.listaLuna.findMany({
     where: { asociatieId: id },
-    select: { luna: true, an: true, status: true },
+    select: { luna: true, an: true, status: true, confirmContabilAt: true },
   });
 
   const map = new Map<string, { luna: number; an: number; status: string }>();
@@ -33,7 +33,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (f.luna == null || f.an == null) continue;
     map.set(`${f.an}-${f.luna}`, { luna: f.luna, an: f.an, status: "publicata" });
   }
-  for (const l of liste) map.set(`${l.an}-${l.luna}`, { luna: l.luna, an: l.an, status: l.status });
+  // Nivele de vizibilitate (vezi /api/lista-plata): Proprietarii văd doar lunile
+  // închise; Președinte/Cenzor/restul rolurilor interne, doar după bifa contabilului.
+  for (const l of liste) {
+    if (!access.isAdmin) {
+      const publicPentruProprietar = l.status === "inchisa";
+      const publicPentruConsiliu   = !!l.confirmContabilAt || publicPentruProprietar;
+      const vizibil = access.role === "PROPRIETAR" ? publicPentruProprietar : publicPentruConsiliu;
+      if (!vizibil) continue;
+    }
+    map.set(`${l.an}-${l.luna}`, { luna: l.luna, an: l.an, status: l.status });
+  }
 
   const rezultat = [...map.values()].sort((a, b) => b.an - a.an || b.luna - a.luna);
   return NextResponse.json(rezultat);

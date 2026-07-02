@@ -643,6 +643,9 @@ model ListaLuna {
   totalCheltuieli Float   @default(0)
   publicatAt     DateTime?
   inchisaAt      DateTime?
+  confirmContabilAt   DateTime? // bifat de contabil -> publica pt Presedinte + Cenzor
+  confirmPresedinteAt DateTime?
+  confirmCenzorAt     DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

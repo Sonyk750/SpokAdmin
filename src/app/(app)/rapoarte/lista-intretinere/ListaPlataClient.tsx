@@ -42,12 +42,21 @@ interface Row {
   total:               number;
 }
 
+interface ListaConfirmari {
+  status:              string;
+  confirmContabilAt:   string | null;
+  confirmPresedinteAt: string | null;
+  confirmCenzorAt:     string | null;
+  inchisaAt:           string | null;
+}
+
 interface ListaData {
   asociatie: { id: string; name: string };
   luna:      number;
   an:        number;
   coloane:   Coloane;
   rows:      Row[];
+  lista?:    ListaConfirmari;
 }
 
 type FondMode = "total" | "detaliat";
@@ -85,6 +94,26 @@ function withTotalLast(cols: MovCol[]): MovCol[] {
   const total = cols.filter(c => c.kind === "totalLuna");
   const rest  = cols.filter(c => c.kind !== "totalLuna");
   return [...rest, ...total];
+}
+
+function ConfirmRow({ label, desc, checked, disabled, busy, onChange }: {
+  label: string; desc?: string; checked: boolean; disabled?: boolean; busy?: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label style={{
+      display: "flex", alignItems: "flex-start", gap: "0.6rem", padding: "0.6rem 0",
+      cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1,
+    }}>
+      <input type="checkbox" checked={checked} disabled={disabled || busy}
+        onChange={e => onChange(e.target.checked)}
+        style={{ width: 16, height: 16, marginTop: 2, accentColor: "#7c3aed", flexShrink: 0 }} />
+      <span>
+        <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>{label}{busy ? " …" : ""}</div>
+        {desc && <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: 2 }}>{desc}</div>}
+      </span>
+    </label>
+  );
 }
 
 function isServiciiAscensor(label?: string): boolean {
@@ -134,6 +163,34 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
   // Închidere / redeschidere listă
   const [closing, setClosing] = useState(false);
   const isCurenta = luna === perioadaCurentaLuna && an === perioadaCurentaAn;
+
+  // Card „Închide lista" — bifele de confirmare (contabil / președinte / cenzor)
+  const [showCloseCard, setShowCloseCard] = useState(false);
+  const [confirmBusy,   setConfirmBusy]   = useState<string | null>(null);
+
+  async function toggleConfirmare(field: "contabil" | "presedinte" | "cenzor", value: boolean) {
+    if (!asociatieId) return;
+    setConfirmBusy(field); setError(null);
+    try {
+      const r = await fetch(`/api/asociatii/${asociatieId}/lista-confirmari`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ luna, an, field, value }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Eroare");
+      setData(d => d ? {
+        ...d,
+        lista: {
+          status: j.status,
+          confirmContabilAt:   j.confirmContabilAt,
+          confirmPresedinteAt: j.confirmPresedinteAt,
+          confirmCenzorAt:     j.confirmCenzorAt,
+          inchisaAt:           d.lista?.inchisaAt ?? null,
+        },
+      } : d);
+    } catch (e: any) { setError(e.message); }
+    finally { setConfirmBusy(null); }
+  }
 
   async function inchideLista() {
     if (!asociatieId) return;
@@ -358,8 +415,8 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
           {perioadaCurentaLuna && perioadaCurentaAn && (
             isCurenta ? (
-              <button className="btn btn--primary" onClick={inchideLista} disabled={closing || !data}
-                title="Reportează restanțele + întreținerea lunii și avansează perioada">
+              <button className="btn btn--primary" onClick={() => setShowCloseCard(true)} disabled={closing || !data}
+                title="Deschide cardul de confirmare pentru închiderea lunii">
                 {closing ? "Se procesează…" : `🔒 Închide lista ${LUNI[luna - 1]}`}
               </button>
             ) : (
@@ -652,6 +709,53 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
             </div>
           )}
         </>
+      )}
+
+      {showCloseCard && data && (
+        <div className="modal-overlay" onClick={() => setShowCloseCard(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+            <div className="modal__header">
+              <h2 className="modal__title">Închide lista {LUNI[luna - 1]} {an}</h2>
+              <button className="modal__close" onClick={() => setShowCloseCard(false)}>×</button>
+            </div>
+            <div className="modal__body">
+              <ConfirmRow
+                label="Contabil"
+                desc="Publică lista pentru Președinte și Cenzor și trimite email de înștiințare către aceștia."
+                checked={!!data.lista?.confirmContabilAt}
+                busy={confirmBusy === "contabil"}
+                onChange={v => toggleConfirmare("contabil", v)}
+              />
+              <ConfirmRow
+                label="Președinte"
+                checked={!!data.lista?.confirmPresedinteAt}
+                disabled={!data.lista?.confirmContabilAt}
+                busy={confirmBusy === "presedinte"}
+                onChange={v => toggleConfirmare("presedinte", v)}
+              />
+              <ConfirmRow
+                label="Cenzor"
+                checked={!!data.lista?.confirmCenzorAt}
+                disabled={!data.lista?.confirmContabilAt}
+                busy={confirmBusy === "cenzor"}
+                onChange={v => toggleConfirmare("cenzor", v)}
+              />
+              <div style={{ borderTop: "1px solid #334155", margin: "0.25rem 0" }} />
+              <ConfirmRow
+                label="Șef departament contabil"
+                desc="Publică lista și pentru Proprietari și închide definitiv luna — restanțele + întreținerea se reportează, iar procesul o ia de la capăt cu luna următoare."
+                checked={false}
+                disabled={!(data.lista?.confirmContabilAt && data.lista?.confirmPresedinteAt && data.lista?.confirmCenzorAt)}
+                busy={closing}
+                onChange={async v => { if (v) { await inchideLista(); setShowCloseCard(false); } }}
+              />
+              {error && <div className="wizard__error" style={{ marginTop: "0.75rem" }}>{error}</div>}
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button className="btn btn--secondary" onClick={() => setShowCloseCard(false)}>Renunță</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showPdfModal && data && coloane && asociatieId && (

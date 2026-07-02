@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getApiUser } from "@/lib/mobile-auth";
 import { db } from "@/lib/db";
+import { resolveAccess, can } from "@/lib/access";
 
 const TIP_LABEL: Record<string, string> = {
   apa_rece:  "Apă rece",
@@ -42,6 +43,28 @@ export async function GET(req: NextRequest) {
     select: { id: true, name: true },
   });
   if (!asociatie) return NextResponse.json({ error: "Asociație negăsită" }, { status: 404 });
+
+  const access = await resolveAccess(user, asociatieId);
+  if (!can(access, "lista_plata")) {
+    return NextResponse.json({ error: "Acces interzis" }, { status: 403 });
+  }
+
+  const listaLuna = await db.listaLuna.findUnique({
+    where:  { asociatieId_luna_an: { asociatieId, luna, an } },
+    select: { status: true, confirmContabilAt: true, confirmPresedinteAt: true, confirmCenzorAt: true, inchisaAt: true },
+  });
+
+  // Nivele de vizibilitate: contabilul (admin) vede mereu totul; Președinte/Cenzor
+  // (și restul rolurilor interne) doar după ce contabilul a bifat publicarea;
+  // Proprietarii doar după ce lista e închisă definitiv (bifă șef departament contabil).
+  if (!access.isAdmin) {
+    const publicPentruProprietar = listaLuna?.status === "inchisa";
+    const publicPentruConsiliu   = !!listaLuna?.confirmContabilAt || publicPentruProprietar;
+    const vizibil = access.role === "PROPRIETAR" ? publicPentruProprietar : publicPentruConsiliu;
+    if (!vizibil) {
+      return NextResponse.json({ error: "Lista nu a fost încă publicată." }, { status: 403 });
+    }
+  }
 
   const [apartamente, fonduri] = await Promise.all([
     db.apartament.findMany({
@@ -222,5 +245,8 @@ export async function GET(req: NextRequest) {
     hasTotalLuna,
   };
 
-  return NextResponse.json({ asociatie, luna, an, coloane, rows });
+  return NextResponse.json({
+    asociatie, luna, an, coloane, rows,
+    lista: listaLuna ?? { status: "draft", confirmContabilAt: null, confirmPresedinteAt: null, confirmCenzorAt: null, inchisaAt: null },
+  });
 }
