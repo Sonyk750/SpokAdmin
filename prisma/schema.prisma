@@ -421,6 +421,9 @@ model Factura {
   // NU se distribuie pe apartamente). Distinctă de plată — statusul rămâne pe plăți (casă/bancă).
   fondId          String?
   fondName        String?
+  // Marchează facturile de restanță create de wizard-ul de inițializare (pasul 8),
+  // ca re-rularea pasului să le poată identifica sigur, fără să depindă de `notes`.
+  sourceWizard    Boolean   @default(false)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -515,6 +518,9 @@ model AvansFurnizorMiscare {
   tip       String // depunere | consum
   metoda    String? // casa / banca / online (pentru depuneri; consumul nu mișcă numerar)
   notes     String?
+  // Marchează depunerile create de wizard-ul de inițializare (pasul 8), ca re-rularea
+  // pasului să le identifice sigur — nu mai depinde de textul din `notes`.
+  sourceWizard Boolean @default(false)
   createdAt DateTime @default(now())
 
   avans   AvansFurnizor @relation(fields: [avansId], references: [id], onDelete: Cascade)

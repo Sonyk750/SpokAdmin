@@ -23,7 +23,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     await db.$transaction(async (tx) => {
       // Șterge facturile (restanțe) generate anterior de wizard pentru această asociație
       await tx.factura.deleteMany({
-        where: { asociatieId: id, notes: "wizard-init-restante-furnizori" },
+        where: { asociatieId: id, sourceWizard: true },
       });
       // Anulează avansurile de preluare anterioare → pasul 8 e re-rulabil fără dublare.
       await resetWizardInitAvans(tx, id);
@@ -56,6 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
               dataEmiterii:   dataDate,
               status:         "neplatita",
               notes:          "wizard-init-restante-furnizori",
+              sourceWizard:   true,
             },
             select: { id: true, organizationId: true, asociatieId: true, furnizorId: true },
           });
@@ -65,7 +66,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         } else {
           // Valoare negativă = avans (asociația a plătit înainte de factură) → sold de avans
           // la furnizor, consumat automat pe facturile deja introduse și pe cele viitoare.
-          await depuneAvans(tx, { organizationId: orgId, asociatieId: id, furnizorId }, -val, null, "wizard-init", null, WIZARD_AVANS_NOTE);
+          await depuneAvans(tx, { organizationId: orgId, asociatieId: id, furnizorId }, -val, null, "wizard-init", null, WIZARD_AVANS_NOTE, true);
           await consumaAvansPeFacturileFurnizorului(tx, { organizationId: orgId, asociatieId: id, furnizorId });
         }
       }

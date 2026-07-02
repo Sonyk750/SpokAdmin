@@ -86,13 +86,14 @@ export async function depuneAvans(
   metoda: string,
   plataId?: string | null,
   notes?: string | null,
+  sourceWizard = false,
 ): Promise<void> {
   const val = r2(suma);
   if (val <= EPS) return;
 
   const av = await getOrCreateAvans(client, params.organizationId, params.asociatieId, params.furnizorId);
   await client.avansFurnizorMiscare.create({
-    data: { avansId: av.id, facturaId, plataId: plataId ?? null, suma: val, tip: "depunere", metoda, notes: notes ?? null },
+    data: { avansId: av.id, facturaId, plataId: plataId ?? null, suma: val, tip: "depunere", metoda, notes: notes ?? null, sourceWizard },
   });
   await client.avansFurnizor.update({
     where: { id: av.id },
@@ -174,7 +175,7 @@ export async function consumaAvansPeFacturileFurnizorului(
 // supraplăți) rămân în mișcările păstrate — doar se realocă la reconsum.
 export async function resetWizardInitAvans(client: DbClient, asociatieId: string): Promise<void> {
   const avansuri = await client.avansFurnizor.findMany({
-    where:  { asociatieId, miscari: { some: { tip: "depunere", notes: WIZARD_AVANS_NOTE } } },
+    where:  { asociatieId, miscari: { some: { tip: "depunere", sourceWizard: true } } },
     select: { id: true },
   });
   for (const av of avansuri) {
@@ -185,7 +186,7 @@ export async function resetWizardInitAvans(client: DbClient, asociatieId: string
     const facturaIds = [...new Set(consum.map(m => m.facturaId).filter((x): x is string => !!x))];
 
     await client.avansFurnizorMiscare.deleteMany({ where: { avansId: av.id, tip: "consum" } });
-    await client.avansFurnizorMiscare.deleteMany({ where: { avansId: av.id, tip: "depunere", notes: WIZARD_AVANS_NOTE } });
+    await client.avansFurnizorMiscare.deleteMany({ where: { avansId: av.id, tip: "depunere", sourceWizard: true } });
 
     const remaining = await client.avansFurnizorMiscare.findMany({ where: { avansId: av.id }, select: { suma: true } });
     await client.avansFurnizor.update({ where: { id: av.id }, data: { sold: r2(remaining.reduce((s, m) => s + m.suma, 0)) } });
