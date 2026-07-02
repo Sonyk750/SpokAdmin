@@ -163,26 +163,6 @@ export async function sendClientAbonamentConfirmare(opts: {
   return sendMail({ to: userEmail, subject: `SpokAdmin — abonamentul tău ${planLabel} este activ ✓`, html, text });
 }
 
-// ─── Lista de plată — confirmare contabil ────────────────────────────────────
-
-const LUNI_LABELS = [
-  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
-];
-
-export async function sendListaPlataPublicata(opts: {
-  to: string; asocName: string; luna: number; an: number;
-}) {
-  const { to, asocName, luna, an } = opts;
-  const perioada = `${LUNI_LABELS[luna - 1] ?? luna} ${an}`;
-  const html = shell("Listă de plată disponibilă spre verificare", `
-    <p style="margin:0 0 12px;font-size:14px;line-height:1.6">Lista de plată pentru <strong>${asocName}</strong> — perioada <strong>${perioada}</strong> — a fost întocmită de contabil și este disponibilă pentru verificare.</p>
-    <p style="margin:0;font-size:14px;line-height:1.6">O poți consulta din aplicația SpokAdmin.</p>
-  `);
-  const text = `Lista de plată ${asocName} — ${perioada} a fost întocmită și este disponibilă pentru verificare.`;
-  return sendMail({ to, subject: `SpokAdmin — listă de plată ${perioada} disponibilă pentru verificare`, html, text });
-}
-
 export async function sendLoginNotification(opts: {
   userName: string | null; userEmail: string; orgName?: string | null;
 }) {

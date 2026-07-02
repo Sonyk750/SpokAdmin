@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { sendListaPlataPublicata } from "@/lib/email";
 
 async function ownedAsociatie(orgId: string, id: string) {
-  return db.asociatie.findFirst({ where: { id, organizationId: orgId }, select: { id: true, name: true } });
+  return db.asociatie.findFirst({ where: { id, organizationId: orgId }, select: { id: true } });
 }
 
 const FIELD_MAP = {
@@ -45,25 +44,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Contabilul trebuie să trimită întâi lista la verificare." }, { status: 400 });
   }
 
-  const wasContabilSet = !!existing?.confirmContabilAt;
-
   const lista = await db.listaLuna.upsert({
     where:  { asociatieId_luna_an: { asociatieId: id, luna, an } },
     create: { organizationId: orgId, asociatieId: id, luna, an, [key]: value ? new Date() : null },
     update: { [key]: value ? new Date() : null },
   });
-
-  if (field === "contabil" && value && !wasContabilSet) {
-    const membri = await db.asociatieUser.findMany({
-      where:  { asociatieId: id, role: { in: ["PRESEDINTE", "CENZOR"] }, isSuspended: false },
-      select: { user: { select: { email: true } } },
-    });
-    await Promise.all(
-      membri
-        .filter(m => m.user?.email)
-        .map(m => sendListaPlataPublicata({ to: m.user!.email, asocName: asoc.name, luna, an }))
-    );
-  }
 
   return NextResponse.json({
     ok: true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { articolKey } from "@/lib/distributie";
+import { isPerioadaInchisa } from "@/lib/perioada";
 
 interface DistRow {
   apartamentId: string;
@@ -21,9 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params;
   const factura = await db.factura.findFirst({
     where:  { id, organizationId: orgId },
-    select: { id: true, valoare: true, luna: true, an: true, furnizorId: true },
+    select: { id: true, asociatieId: true, valoare: true, luna: true, an: true, furnizorId: true },
   });
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
+
+  if (factura.luna && factura.an && await isPerioadaInchisa(factura.asociatieId, factura.luna, factura.an)) {
+    return NextResponse.json({ error: "Luna facturii este închisă — nu mai poate fi redistribuită." }, { status: 409 });
+  }
 
   const { rows, criteriuByCol, consumTipByCol, invata } = await req.json() as {
     rows:            DistRow[];

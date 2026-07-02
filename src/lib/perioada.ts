@@ -8,6 +8,15 @@ export function nextMonth(luna: number, an: number): Perioada {
   return luna >= 12 ? { luna: 1, an: an + 1 } : { luna: luna + 1, an };
 }
 
+/** O lună închisă (listă de plată) e read-only: chitanțe/facturi din acea perioadă nu se mai modifică. */
+export async function isPerioadaInchisa(asociatieId: string, luna: number, an: number): Promise<boolean> {
+  const lista = await db.listaLuna.findUnique({
+    where:  { asociatieId_luna_an: { asociatieId, luna, an } },
+    select: { status: true },
+  });
+  return lista?.status === "inchisa";
+}
+
 /**
  * Perioada curentă a unei asociații:
  *  - luna următoare celei mai recente liste închise, dacă există;

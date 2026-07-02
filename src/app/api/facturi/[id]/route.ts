@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { recomputeFacturaStatus } from "@/lib/avans-furnizor";
 import { resolveFurnizorId } from "@/lib/furnizor";
+import { isPerioadaInchisa } from "@/lib/perioada";
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const EPS = 0.01;
@@ -19,6 +20,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params;
   const factura = await getFactura(id, orgId);
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
+
+  if (factura.luna && factura.an && await isPerioadaInchisa(factura.asociatieId, factura.luna, factura.an)) {
+    return NextResponse.json({ error: "Luna facturii este închisă — nu mai poate fi modificată." }, { status: 409 });
+  }
 
   const body = await req.json() as {
     furnizorId?:   string | null;
@@ -104,11 +109,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const factura = await db.factura.findFirst({
     where:  { id, organizationId: orgId },
     select: {
-      id: true,
+      id: true, asociatieId: true, luna: true, an: true,
       avansMiscari: { select: { id: true, suma: true, avansId: true, avans: { select: { sold: true } } } },
     },
   });
   if (!factura) return NextResponse.json({ error: "Factură negăsită." }, { status: 404 });
+
+  if (factura.luna && factura.an && await isPerioadaInchisa(factura.asociatieId, factura.luna, factura.an)) {
+    return NextResponse.json({ error: "Luna facturii este închisă — nu mai poate fi ștearsă." }, { status: 409 });
+  }
 
   // O depunere generată de această factură nu poate fi anulată dacă avansul
   // respectiv a fost deja consumat pe altă factură.

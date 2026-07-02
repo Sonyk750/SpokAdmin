@@ -721,7 +721,7 @@ export default function ListaPlataClient({ defaultLuna, defaultAn }: { defaultLu
             <div className="modal__body">
               <ConfirmRow
                 label="Contabil"
-                desc="Publică lista pentru Președinte și Cenzor și trimite email de înștiințare către aceștia."
+                desc="Publică lista pentru Președinte și Cenzor."
                 checked={!!data.lista?.confirmContabilAt}
                 busy={confirmBusy === "contabil"}
                 onChange={v => toggleConfirmare("contabil", v)}
