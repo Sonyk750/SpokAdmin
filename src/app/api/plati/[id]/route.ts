@@ -21,12 +21,16 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   };
 
   const plata = await db.plata.findFirst({
-    where:  { id, factura: { organizationId: orgId } },
-    select: { id: true, facturaId: true, factura: { select: { asociatieId: true, furnizorId: true } } },
+    where:  { id, OR: [{ factura: { organizationId: orgId } }, { facturaId: null, organizationId: orgId }] },
+    select: {
+      id: true, facturaId: true, asociatieId: true,
+      factura: { select: { asociatieId: true, furnizorId: true } },
+    },
   });
   if (!plata) return NextResponse.json({ error: "Plată negăsită." }, { status: 404 });
+  const asociatieId = plata.factura?.asociatieId ?? plata.asociatieId!;
 
-  const access = await resolveAccess(session!.user as any, plata.factura.asociatieId);
+  const access = await resolveAccess(session!.user as any, asociatieId);
   if (!access.isAdmin) return NextResponse.json({ error: "Nu ai dreptul să editezi plăți." }, { status: 403 });
 
   const suma = body.suma != null ? Number(body.suma) : undefined;
@@ -53,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     },
   });
 
-  await recomputeFacturaStatus(db, plata.facturaId);
+  if (plata.facturaId) await recomputeFacturaStatus(db, plata.facturaId);
 
   return NextResponse.json({ ok: true });
 }
@@ -67,16 +71,18 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const { id } = await params;
 
   const plata = await db.plata.findFirst({
-    where:  { id, factura: { organizationId: orgId } },
+    where:  { id, OR: [{ factura: { organizationId: orgId } }, { facturaId: null, organizationId: orgId }] },
     select: {
-      id: true, suma: true,
+      id: true, suma: true, facturaId: true, asociatieId: true, furnizorId: true,
       factura: { select: { id: true, asociatieId: true, furnizorId: true } },
       avansMiscari: { select: { id: true, suma: true, avansId: true, avans: { select: { sold: true } } } },
     },
   });
   if (!plata) return NextResponse.json({ error: "Plată negăsită." }, { status: 404 });
+  const asociatieId = plata.factura?.asociatieId ?? plata.asociatieId!;
+  const furnizorId  = plata.factura?.furnizorId ?? plata.furnizorId ?? null;
 
-  const access = await resolveAccess(session!.user as any, plata.factura.asociatieId);
+  const access = await resolveAccess(session!.user as any, asociatieId);
   if (!access.isAdmin) return NextResponse.json({ error: "Nu ai dreptul să ștergi plăți." }, { status: 403 });
 
   for (const m of plata.avansMiscari) {
@@ -94,10 +100,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
       await tx.avansFurnizorMiscare.delete({ where: { id: m.id } });
     }
     await tx.plata.delete({ where: { id: plata.id } });
-    const summary   = await recomputeFacturaStatus(tx, plata.factura.id);
-    const avansSold = plata.factura.furnizorId
-      ? await getAvansSold(tx, plata.factura.asociatieId, plata.factura.furnizorId)
-      : 0;
+    const summary   = plata.facturaId ? await recomputeFacturaStatus(tx, plata.facturaId) : null;
+    const avansSold = furnizorId ? await getAvansSold(tx, asociatieId, furnizorId) : 0;
     return { ...summary, avansSold };
   });
 

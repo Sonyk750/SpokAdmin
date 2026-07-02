@@ -42,9 +42,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     }
     await tx.plata.delete({ where: { id: plata.id } });
 
-    const summary   = await recomputeFacturaStatus(tx, plata.factura.id);
-    const avansSold = plata.factura.furnizorId
-      ? await getAvansSold(tx, plata.factura.asociatieId, plata.factura.furnizorId)
+    const summary   = await recomputeFacturaStatus(tx, plata.factura!.id);
+    const avansSold = plata.factura!.furnizorId
+      ? await getAvansSold(tx, plata.factura!.asociatieId, plata.factura!.furnizorId)
       : 0;
     return { ...summary, avansSold };
   });

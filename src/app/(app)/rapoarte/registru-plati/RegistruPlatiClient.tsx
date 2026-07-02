@@ -138,6 +138,21 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
   const [deleting, setDeleting] = useState(false);
   const [delErr,   setDelErr]   = useState<string | null>(null);
 
+  // Adaugă plată (avans liber la furnizor)
+  const [showAdd,      setShowAdd]      = useState(false);
+  const [furnizori,    setFurnizori]    = useState<{ id: string; nume: string }[]>([]);
+  const [addFurnizorId, setAddFurnizorId] = useState("");
+  const [addData,      setAddData]      = useState("");
+  const [addSuma,      setAddSuma]      = useState("");
+  const [addMetoda,    setAddMetoda]    = useState("banca");
+  const [addNotes,     setAddNotes]     = useState("");
+  const [addTranz,     setAddTranz]     = useState("");
+  const [addSerieCh,   setAddSerieCh]   = useState("");
+  const [addNrCh,      setAddNrCh]      = useState("");
+  const [addSaving,    setAddSaving]    = useState(false);
+  const [addErr,       setAddErr]       = useState<string | null>(null);
+  const [avansSold,    setAvansSold]    = useState<number | null>(null);
+
   useEffect(() => {
     if (!asociatieId) { setAsoc(null); return; }
     fetch(`/api/asociatii/${asociatieId}`).then(r => r.json()).then(d => setAsoc(d)).catch(() => {});
@@ -209,6 +224,45 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
     finally { setEditSaving(false); }
   }
 
+  function openAdd() {
+    setAddFurnizorId(""); setAddData(new Date().toISOString().slice(0, 10));
+    setAddSuma(""); setAddMetoda("banca"); setAddNotes("");
+    setAddTranz(""); setAddSerieCh(""); setAddNrCh("");
+    setAvansSold(null); setAddErr(null);
+    setShowAdd(true);
+    if (asociatieId) {
+      fetch(`/api/furnizori?asociatieId=${asociatieId}`).then(r => r.json()).then(setFurnizori).catch(() => setFurnizori([]));
+    }
+  }
+
+  useEffect(() => {
+    if (!showAdd || !asociatieId || !addFurnizorId) { setAvansSold(null); return; }
+    fetch(`/api/avans-furnizor?asociatieId=${asociatieId}&furnizorId=${addFurnizorId}`)
+      .then(r => r.json()).then(d => setAvansSold(d.sold ?? 0)).catch(() => setAvansSold(null));
+  }, [showAdd, asociatieId, addFurnizorId]);
+
+  async function saveAdd() {
+    if (!asociatieId || !addFurnizorId) { setAddErr("Selectează un furnizor."); return; }
+    setAddSaving(true); setAddErr(null);
+    try {
+      const body: Record<string, any> = {
+        asociatieId,
+        suma:   parseFloat(addSuma),
+        metoda: addMetoda,
+        data:   addData,
+        notes:  addNotes || null,
+      };
+      if (addMetoda === "banca") body.idTranzactie = addTranz || null;
+      if (addMetoda === "casa")  { body.serieCh = addSerieCh || null; body.nrCh = addNrCh ? parseInt(addNrCh) : null; }
+      const res  = await fetch(`/api/furnizori/${addFurnizorId}/plati`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Eroare");
+      setShowAdd(false);
+      fetchData();
+    } catch (e: any) { setAddErr(e.message); }
+    finally { setAddSaving(false); }
+  }
+
   async function confirmDelete() {
     if (!delRow) return;
     setDeleting(true); setDelErr(null);
@@ -245,6 +299,9 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
             <p className="page-sub">Plăți către furnizori în perioada selectată</p>
           </div>
           <div style={{ display: "flex", gap: "0.75rem" }}>
+            {isAdmin && (
+              <button className="btn btn--primary" onClick={openAdd}>＋ Adaugă plată</button>
+            )}
             <button className="btn btn--secondary" onClick={handlePrint}>🖨 Printează</button>
             <button className="btn btn--primary" onClick={handleDownloadPdf} disabled={filtered.length === 0 || pdfLoading}>
               {pdfLoading ? "Se generează..." : "⬇ Descarcă PDF"}
@@ -352,6 +409,80 @@ export default function RegistruPlatiClient({ defaultStart, defaultEnd }: { defa
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* ── Modal Adaugă plată (avans furnizor) ──────────────────────────── */}
+      {showAdd && (
+        <div className="modal-overlay" onClick={() => !addSaving && setShowAdd(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: "480px" }}>
+            <div className="modal__header">
+              <h2 className="modal__title">Adaugă plată</h2>
+              <button className="modal__close" onClick={() => setShowAdd(false)}>×</button>
+            </div>
+            <div className="modal__body">
+              {addErr && <div className="wizard__error" style={{ marginBottom: "0.75rem" }}>{addErr}</div>}
+              <div className="form-field">
+                <label className="form-field__label">Furnizor</label>
+                <select className="input" value={addFurnizorId} onChange={e => setAddFurnizorId(e.target.value)}>
+                  <option value="">— Selectează furnizor —</option>
+                  {furnizori.map(f => <option key={f.id} value={f.id}>{f.nume}</option>)}
+                </select>
+              </div>
+              {addFurnizorId && avansSold !== null && (
+                <div style={{ fontSize: "0.8rem", color: "#64748b", margin: "0.5rem 0 0.75rem" }}>
+                  Sold avans curent: <strong style={{ color: "#e2e8f0" }}>{fmt2(avansSold)} lei</strong>
+                </div>
+              )}
+              <div className="form-grid form-grid--2" style={{ marginTop: "0.75rem" }}>
+                <div className="form-field">
+                  <label className="form-field__label">Data</label>
+                  <RoDate value={addData} onChange={v => setAddData(v)} />
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Suma (lei)</label>
+                  <input type="number" className="input" step="0.01" min="0.01" value={addSuma} onChange={e => setAddSuma(e.target.value)} />
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Metodă plată</label>
+                  <select className="input" value={addMetoda} onChange={e => setAddMetoda(e.target.value)}>
+                    <option value="casa">Casă</option>
+                    <option value="banca">Bancă</option>
+                    <option value="online">Online</option>
+                  </select>
+                </div>
+                <div className="form-field">
+                  <label className="form-field__label">Observații</label>
+                  <input type="text" className="input" value={addNotes} onChange={e => setAddNotes(e.target.value)} />
+                </div>
+                {addMetoda === "banca" && (
+                  <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <label className="form-field__label">ID Tranzacție</label>
+                    <input type="text" className="input" value={addTranz} onChange={e => setAddTranz(e.target.value)} />
+                  </div>
+                )}
+                {addMetoda === "casa" && (<>
+                  <div className="form-field">
+                    <label className="form-field__label">Serie chitanță</label>
+                    <input type="text" className="input" value={addSerieCh} onChange={e => setAddSerieCh(e.target.value)} />
+                  </div>
+                  <div className="form-field">
+                    <label className="form-field__label">Nr. chitanță</label>
+                    <input type="number" className="input" min="1" step="1" value={addNrCh} onChange={e => setAddNrCh(e.target.value)} />
+                  </div>
+                </>)}
+              </div>
+              <p style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "0.5rem" }}>
+                Suma stinge întâi facturile restante ale furnizorului; ce rămâne devine avans disponibil pentru facturile viitoare.
+              </p>
+            </div>
+            <div className="modal__footer" style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button className="btn btn--secondary" onClick={() => setShowAdd(false)} disabled={addSaving}>Anulează</button>
+              <button className="btn btn--primary" onClick={saveAdd} disabled={addSaving || !addFurnizorId || !addSuma}>
+                {addSaving ? "Se salvează..." : "Salvează"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
