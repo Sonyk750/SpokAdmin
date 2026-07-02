@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }),
     db.listaLunaApartament.findMany({
       where:  { listaId: lista.id },
-      select: { apartamentId: true, numarAp: true, totalDePlata: true },
+      select: { apartamentId: true, numarAp: true, totalDePlata: true, proprietar: true },
     }),
   ]);
 
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!p.user?.email) { faraEmail++; return; }
     const r = await sendInstiintarePlataProprietar({
       to: p.user.email, asocName: asoc.name, luna, an,
-      numarAp: snap.numarAp, suma: snap.totalDePlata,
+      numarAp: snap.numarAp, suma: snap.totalDePlata, numeProprietar: snap.proprietar,
     });
     if (r.ok) trimise++;
   }));

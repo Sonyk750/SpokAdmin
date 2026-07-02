@@ -184,20 +184,34 @@ export async function sendListaPlataPublicata(opts: {
 }
 
 export async function sendInstiintarePlataProprietar(opts: {
-  to: string; asocName: string; luna: number; an: number; numarAp: string; suma: number;
+  to: string; asocName: string; luna: number; an: number; numarAp: string; suma: number; numeProprietar?: string | null;
 }) {
-  const { to, asocName, luna, an, numarAp, suma } = opts;
+  const { to, asocName, luna, an, numarAp, suma, numeProprietar } = opts;
   const perioada = `${LUNI_LABELS[luna - 1] ?? luna} ${an}`;
   const sumaStr = suma.toFixed(2);
+  const APP_URL = process.env.NEXTAUTH_URL || "https://www.spokadmin.ro";
+  const salut = numeProprietar ? `Stimate proprietar, <strong>${numeProprietar}</strong>,` : "Stimate proprietar,";
+
   const html = shell("Înștiințare de plată", `
-    <p style="margin:0 0 12px;font-size:14px;line-height:1.6">Lista de întreținere pentru <strong>${asocName}</strong> — apartament <strong>${numarAp}</strong> — perioada <strong>${perioada}</strong> — a fost închisă.</p>
-    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:16px 18px;margin:0 0 18px">
-      <p style="margin:0;font-size:14px;color:#374151">Sumă de plată</p>
-      <p style="margin:4px 0 0;font-size:22px;font-weight:800;color:#7c3aed">${sumaStr} lei</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">${salut}</p>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.7;color:#374151">
+      Asociația de proprietari <strong>${asocName}</strong> vă anunță că aveți de achitat cotele de întreținere
+      pentru apartamentul <strong>${numarAp}</strong>, perioada <strong>${perioada}</strong>, în valoare de:
+    </p>
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;padding:16px 18px;margin:0 0 20px;text-align:center">
+      <p style="margin:0;font-size:22px;font-weight:800;color:#7c3aed">${sumaStr} lei</p>
     </div>
-    <p style="margin:0;font-size:14px;line-height:1.6;color:#374151">Toate documentele asociației (listă, facturi, chitanțe) le găsești oricând în contul tău din aplicația SpokAdmin, unde ai acces cu drepturile tale de proprietar.</p>
+    <p style="margin:0 0 20px;font-size:14px;line-height:1.7;color:#374151">
+      Pentru documentare (listă de întreținere, facturi, chitanțe), vă rugăm să accesați contul dumneavoastră din aplicația de administrare:
+    </p>
+    <p style="margin:0 0 20px">
+      <a href="${APP_URL}" style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:700;font-size:14px">
+        Accesează contul →
+      </a>
+    </p>
+    <p style="margin:0;font-size:13px;color:#64748b">Cu stimă,<br>${asocName}</p>
   `);
-  const text = `Înștiințare de plată — ${asocName}, ap. ${numarAp}, ${perioada}: sumă de plată ${sumaStr} lei. Documentele asociației le găsești în contul tău din aplicația SpokAdmin.`;
+  const text = `${numeProprietar ? `Stimate proprietar, ${numeProprietar},` : "Stimate proprietar,"}\n\nAsociația de proprietari ${asocName} vă anunță că aveți de achitat cotele de întreținere pentru apartamentul ${numarAp}, perioada ${perioada}, în valoare de ${sumaStr} lei.\n\nPentru documentare, accesați contul dumneavoastră: ${APP_URL}\n\nCu stimă,\n${asocName}`;
   return sendMail({ to, subject: `SpokAdmin — înștiințare de plată ${perioada} (ap. ${numarAp})`, html, text });
 }
 
